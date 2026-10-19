@@ -1,0 +1,41 @@
+{
+  "name": "incubateur-cgs-backend",
+  "version": "1.0.0",
+  "description": "API Backend - Incubateur Digital Solidaire (IDS)",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "migrate": "npx sequelize-cli db:migrate",
+    "seed": "npx sequelize-cli db:seed:all",
+    "seed:init": "node database/seed.js",
+    "create-admin": "node database/create-admin.js",
+    "test": "node tests/validation.test.js",
+    "sync:cloud": "node full_sync_cloud_to_local.js",
+    "dump:cloud": "node dump_aiven_to_sql.js",
+    "check:sync": "node check_sync.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "docx": "^9.8.1",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.7.1",
+    "express-validator": "^7.0.1",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "mysql2": "^3.24.4",
+    "node-fetch": "^3.3.2",
+    "nodemailer": "^10.0.10",
+    "sequelize": "^6.35.1",
+    "toposort-class": "^1.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "sequelize-cli": "^6.6.2"
+  }
+}

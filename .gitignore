@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Production build
+dist/
+*/dist/
+
+# Environment variables
+.env
+*/.env
+.env.local
+.env.*.local
+
+# Uploads
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS and IDE files
+Thumbs.db
+.DS_Store
+.vscode/
+
+# Local DB scripts and dumps
+*.sql
+backend/sync-db.js
+
+# Cloud relay (microservice indépendant sur Heroku / ids repo)
+cloud/
+ids-repo/
+

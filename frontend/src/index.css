@@ -1,0 +1,275 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-800 dark:bg-dark-950 dark:text-dark-100 font-sans antialiased transition-colors duration-300;
+  }
+}
+
+@layer components {
+  /* Cards */
+  .card {
+    @apply bg-white dark:bg-dark-800/60 backdrop-blur-sm border border-slate-200 dark:border-dark-700/50 rounded-2xl p-6 transition-all duration-300 hover:border-primary-500/50 dark:hover:border-primary-500/30 shadow-sm dark:shadow-none;
+  }
+
+  /* Form controls */
+  .input {
+    @apply w-full bg-slate-50 dark:bg-dark-900/70 border border-slate-300 dark:border-dark-600/50 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-dark-100 
+           placeholder-slate-400 dark:placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500/40 focus:border-primary-500
+           transition-all duration-200;
+  }
+
+  /* Style & visibilité du calendrier pour les champs date */
+  input[type="date"] {
+    cursor: pointer;
+  }
+  .dark input[type="date"] {
+    color-scheme: dark;
+  }
+  .dark input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1) brightness(120%);
+    cursor: pointer;
+    opacity: 0.9;
+    padding: 3px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+  }
+  .dark input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+    background-color: rgba(255, 255, 255, 0.15);
+    transform: scale(1.15);
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.75;
+    padding: 3px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+    background-color: rgba(0, 0, 0, 0.08);
+    transform: scale(1.15);
+  }
+
+  .label {
+    @apply block text-sm font-medium text-slate-700 dark:text-dark-300 mb-1.5;
+  }
+
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold
+           transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply bg-gradient-to-r from-primary-400 to-primary-500 text-[#001633] font-bold hover:from-primary-300 hover:to-primary-400 
+           shadow-lg shadow-primary-500/20 hover:shadow-primary-500/35 border border-primary-300/30;
+  }
+  .btn-secondary {
+    @apply bg-slate-100 dark:bg-dark-800/80 text-slate-600 dark:text-dark-200 border border-slate-300 dark:border-dark-700/60 hover:bg-slate-200 dark:hover:bg-dark-700/60 hover:text-slate-900 dark:hover:text-white hover:border-slate-400 dark:hover:border-dark-600;
+  }
+  .btn-danger {
+    @apply bg-red-100 dark:bg-red-600/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30 hover:bg-red-200 dark:hover:bg-red-600/30;
+  }
+  .btn-success {
+    @apply bg-emerald-100 dark:bg-emerald-600/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30 hover:bg-emerald-200 dark:hover:bg-emerald-600/30;
+  }
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs rounded-lg;
+  }
+  .btn-icon {
+    @apply p-2;
+  }
+
+  /* Badges */
+  .badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold;
+  }
+  .badge-blue { @apply bg-[#0c87eb]/10 dark:bg-[#0c87eb]/20 text-[#0c87eb] dark:text-[#7cc2fb] border border-[#0c87eb]/20 dark:border-[#0c87eb]/30; }
+  .badge-green { @apply bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20; }
+  .badge-orange { @apply bg-primary-500/10 dark:bg-primary-500/15 text-primary-600 dark:text-primary-400 border border-primary-500/25; }
+  .badge-red { @apply bg-red-500/10 dark:bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/20; }
+  .badge-navy { @apply bg-navy-500/10 dark:bg-navy-500/15 text-navy-600 dark:text-navy-400 border border-navy-500/20; }
+  .badge-gray { @apply bg-slate-100 dark:bg-dark-500/15 text-slate-600 dark:text-dark-300 border border-slate-200 dark:border-dark-500/20; }
+
+  /* Tabs */
+  .tab {
+    @apply px-4 py-2.5 text-sm font-medium text-slate-500 dark:text-dark-400 rounded-xl cursor-pointer transition-all duration-200
+           hover:text-slate-900 dark:hover:text-dark-200 hover:bg-slate-100 dark:hover:bg-dark-700/40;
+  }
+  .tab-active {
+    @apply bg-white dark:bg-primary-500/15 text-primary-600 dark:text-primary-400 border border-slate-200 dark:border-primary-500/30 shadow-sm dark:shadow-md dark:shadow-primary-500/10 font-bold;
+  }
+
+  /* Table */
+  .table-container {
+    @apply overflow-x-auto rounded-xl border border-slate-200 dark:border-transparent bg-white dark:bg-transparent;
+  }
+  .table-container table {
+    @apply w-full text-sm;
+  }
+  .table-container thead {
+    @apply bg-slate-50 dark:bg-dark-800/80 border-b border-slate-200 dark:border-dark-700/60;
+  }
+  .table-container th {
+    @apply px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-dark-400 uppercase tracking-wider;
+  }
+  .table-container td {
+    @apply px-4 py-3 text-slate-700 dark:text-dark-200 border-t border-slate-100 dark:border-dark-700/40;
+  }
+  .table-container tr:hover td {
+    @apply bg-slate-50/50 dark:bg-dark-700/20;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    @apply fixed inset-0 bg-[#001633]/20 dark:bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4;
+  }
+  .modal {
+    @apply bg-white dark:bg-dark-800 border border-slate-200 dark:border-dark-700/60 rounded-2xl w-full max-w-xl max-h-[85vh] overflow-y-auto shadow-2xl;
+  }
+  .modal-header {
+    @apply flex items-center justify-between p-5 border-b border-slate-200 dark:border-dark-700/50;
+  }
+  .modal-body {
+    @apply p-5 space-y-4;
+  }
+  .modal-footer {
+    @apply flex justify-end gap-3 p-5 border-t border-slate-200 dark:border-dark-700/50 bg-slate-50/50 dark:bg-transparent;
+  }
+
+  /* Stat card */
+  .stat-card {
+    @apply card flex items-center gap-4;
+  }
+  .stat-icon {
+    @apply w-12 h-12 rounded-xl flex items-center justify-center;
+  }
+
+  /* Animations */
+  .fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+  .slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(100,116,139,0.3); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(100,116,139,0.5); }
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* =========================================================================
+   STYLE D'IMPRESSION (SEULEMENT LE TICKET ET QR CODE IDS SONT IMPRIMÉS)
+   ========================================================================= */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 12mm 10mm 12mm;
+  }
+
+  /* Masquer toute la navigation, les barres d'outils et l'interface Web normale */
+  nav, header, sidebar, aside, button, .no-print, input, .no-print-on-page, .print\:hidden, [class*="lg:hidden"] {
+    display: none !important;
+  }
+
+  body, html {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Feuille d'émargement officielle : s'adapte dynamiquement (1 page pour ~15 incubés) */
+  .print-emargement-container {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    min-height: 245mm !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    box-sizing: border-box !important;
+  }
+
+  .print-emargement-container table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  .print-emargement-container thead {
+    display: table-header-group !important;
+  }
+
+  .print-emargement-container tr {
+    page-break-inside: avoid !important;
+  }
+
+  /* Footer officiel GARANTI visible au bas de la page */
+  .print-emargement-footer {
+    position: static !important;
+    margin-top: auto !important;
+    padding-top: 10px !important;
+    padding-bottom: 4px !important;
+    border-top: 2px solid #334155 !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    font-size: 11px !important;
+    font-family: monospace, sans-serif !important;
+    font-weight: 700 !important;
+    color: #1e293b !important;
+    width: 100% !important;
+  }
+
+  /* Zone d'impression dédiée QR Code */
+  .printable-qr-only {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    max-width: 650px !important;
+    margin: 0 auto !important;
+    padding: 30px !important;
+    border: 3px solid #0f172a !important;
+    border-radius: 24px !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+  }
+}
