@@ -93,15 +93,15 @@ class SyncService {
         try {
           await ReservationEspace.create({
             espace: res.espace || 'fablab',
-            salleSpecifique: res.salle_specifique || res.salleSpecifique || null,
-            nomIncube: res.nom_incube || res.nomIncube || '—',
-            emailIncube: res.email_incube || res.emailIncube || null,
-            telephoneIncube: res.telephone_incube || res.telephoneIncube || null,
+            salleSpecifique: res.salle_specifique || res.salleSpecifique || res.salle || null,
+            nomIncube: res.nom_incube || res.nomIncube || res.nomComplet || res.nom || '—',
+            emailIncube: res.email_incube || res.emailIncube || res.email || null,
+            telephoneIncube: res.telephone_incube || res.telephoneIncube || res.telephone || null,
             dateReservation: res.date_reservation || res.dateReservation,
             heureDebut: res.heure_debut || res.heureDebut,
             heureFin: res.heure_fin || res.heureFin,
             duree: res.duree || '2h',
-            motifUtilisation: res.motif_utilisation || res.motifUtilisation || null,
+            motifUtilisation: res.motif_utilisation || res.motifUtilisation || res.motif || null,
             equipementsUtilises: res.equipements_utilises || res.equipementsUtilises || null,
             statut: 'en_attente'
           });
