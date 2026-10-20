@@ -1,0 +1,8 @@
+# Force LF line endings for shell scripts (Linux server)
+*.sh text eol=lf
+
+# Force LF for other text files
+*.js text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.env* text eol=lf
