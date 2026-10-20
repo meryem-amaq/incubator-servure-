@@ -106,6 +106,43 @@ export default function GestionEspaces() {
   const [resStatusFilter, setResStatusFilter] = useState('all'); // 'all', 'en_attente', 'valide', 'refuse'
   const [resMoisFilter, setResMoisFilter] = useState('all'); // 'all' ou 'YYYY-MM'
 
+  // Modal de réservation directe par l'administrateur
+  const [adminBookingModal, setAdminBookingModal] = useState({
+    open: false,
+    espace: 'fablab',
+    salleSpecifique: '',
+    dateReservation: new Date().toISOString().split('T')[0],
+    heureDebut: '09:00',
+    heureFin: '12:00',
+    duree: '3h',
+    motifUtilisation: 'Réservation administrative / Équipe IDS',
+    equipementsUtilises: '',
+    nomPersonnalise: ''
+  });
+
+  const handleCreateAdminReservation = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await api.post('/reservations/directe', adminBookingModal);
+      toast.success(res.data?.message || 'Réservation administrative validée !', { icon: '✅' });
+      setAdminBookingModal({
+        open: false,
+        espace: selectedEspace,
+        salleSpecifique: '',
+        dateReservation: new Date().toISOString().split('T')[0],
+        heureDebut: '09:00',
+        heureFin: '12:00',
+        duree: '3h',
+        motifUtilisation: 'Réservation administrative / Équipe IDS',
+        equipementsUtilises: '',
+        nomPersonnalise: ''
+      });
+      fetchReservations();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Erreur lors de la réservation directe');
+    }
+  };
+
   // Liste des mois présents dans l'historique des réservations
   const availableReservationMonths = useMemo(() => {
     const set = new Set();
@@ -816,6 +853,30 @@ export default function GestionEspaces() {
             >
               <span>📊 Exporter (.xlsx)</span>
             </button>
+
+            {/* 5. BOUTON NOUVELLE RÉSERVATION DIRECTE ADMIN */}
+            <button
+              type="button"
+              onClick={() => {
+                const currentEsp = ESPACES.find(e => e.id === selectedEspace);
+                setAdminBookingModal({
+                  open: true,
+                  espace: selectedEspace,
+                  salleSpecifique: selectedSousSalleFilter !== 'all' ? selectedSousSalleFilter : (currentEsp?.salles?.[0] || ''),
+                  dateReservation: new Date().toISOString().split('T')[0],
+                  heureDebut: '09:00',
+                  heureFin: '12:00',
+                  duree: '3h',
+                  motifUtilisation: 'Réservation administrative / Équipe IDS',
+                  equipementsUtilises: '',
+                  nomPersonnalise: user?.nom ? `${user.prenom || ''} ${user.nom} (Admin)`.trim() : 'Administration'
+                });
+              }}
+              className="btn py-1.5 px-3 rounded-xl text-xs font-black bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white flex items-center gap-1.5 shadow-sm shadow-emerald-500/25 cursor-pointer transition-all shrink-0 border border-emerald-400/30"
+              title="Créer une réservation directe immédiate pour l'administration"
+            >
+              <Plus size={14} /> Réserver pour l'Admin
+            </button>
           </div>
         )}
       </div>
@@ -1441,7 +1502,7 @@ export default function GestionEspaces() {
          ONGLET 4 : QR CODE UNIQUE DE RÉSERVATION D'ESPACE
          ========================================================================= */}
       {activeTab === 'qr' && (() => {
-        const baseUrl = import.meta.env.VITE_CLOUD_URL || window.location.origin;
+        const baseUrl = import.meta.env.VITE_CLOUD_URL || 'https://ids-production-app-6aba82b6af10.herokuapp.com';
         const qrUrl = `${baseUrl}/booking/${selectedEspace}`;
         const afficheTitle = `QR Code Officiel — ${currentEsp?.nom || 'Espace'}`;
 
@@ -1975,6 +2036,179 @@ export default function GestionEspaces() {
                 Fermer
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+         MODAL : RÉSERVATION DIRECTE PAR L'ADMINISTRATEUR (SUPER ADMIN)
+         ========================================================================= */}
+      {adminBookingModal.open && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white rounded-3xl p-6 max-w-lg w-full border border-slate-200 dark:border-dark-700 space-y-4 shadow-2xl max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-dark-800 pb-3">
+              <h3 className="font-black text-base text-slate-900 dark:text-white flex items-center gap-2">
+                <ShieldCheck size={18} className="text-emerald-500" />
+                Nouvelle Réservation Directe (Administration)
+              </h3>
+              <button
+                type="button"
+                onClick={() => setAdminBookingModal(prev => ({ ...prev, open: false }))}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-dark-800 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateAdminReservation} className="space-y-3.5 text-xs">
+              <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-[11px] font-medium leading-relaxed">
+                ℹ️ Cette réservation sera <strong>immédiatement validée</strong> dans le planning sans passer par la file d'attente, et le créneau sera bloqué contre tout conflit.
+              </div>
+
+              {/* Choix Espace & Salle */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-dark-300 block mb-1">
+                    Espace principal *
+                  </label>
+                  <select
+                    value={adminBookingModal.espace}
+                    onChange={(e) => {
+                      const esp = ESPACES.find(item => item.id === e.target.value);
+                      setAdminBookingModal(prev => ({
+                        ...prev,
+                        espace: e.target.value,
+                        salleSpecifique: esp?.salles?.[0] || ''
+                      }));
+                    }}
+                    className="input w-full !py-2 !text-xs font-bold cursor-pointer"
+                    required
+                  >
+                    {ESPACES.map(esp => (
+                      <option key={esp.id} value={esp.id}>{esp.nom}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-dark-300 block mb-1">
+                    Zone / Salle spécifique
+                  </label>
+                  <select
+                    value={adminBookingModal.salleSpecifique}
+                    onChange={(e) => setAdminBookingModal(prev => ({ ...prev, salleSpecifique: e.target.value }))}
+                    className="input w-full !py-2 !text-xs font-bold cursor-pointer"
+                  >
+                    <option value="">Espace complet</option>
+                    {(ESPACES.find(esp => esp.id === adminBookingModal.espace)?.salles || []).map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Nom du demandeur */}
+              <div>
+                <label className="font-bold text-slate-700 dark:text-dark-300 block mb-1">
+                  Nom du demandeur / Responsable *
+                </label>
+                <input
+                  type="text"
+                  placeholder="ex: Direction IDS, Formateur externe, Maintenance..."
+                  value={adminBookingModal.nomPersonnalise}
+                  onChange={(e) => setAdminBookingModal(prev => ({ ...prev, nomPersonnalise: e.target.value }))}
+                  className="input w-full !py-2 !text-xs font-semibold"
+                  required
+                />
+              </div>
+
+              {/* Date & Horaires */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-dark-300 block mb-1">
+                    Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={adminBookingModal.dateReservation}
+                    onChange={(e) => setAdminBookingModal(prev => ({ ...prev, dateReservation: e.target.value }))}
+                    className="input w-full !py-2 !text-xs font-bold"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-dark-300 block mb-1">
+                    Heure début *
+                  </label>
+                  <input
+                    type="time"
+                    value={adminBookingModal.heureDebut}
+                    onChange={(e) => setAdminBookingModal(prev => ({ ...prev, heureDebut: e.target.value }))}
+                    className="input w-full !py-2 !text-xs font-bold"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-dark-300 block mb-1">
+                    Heure fin *
+                  </label>
+                  <input
+                    type="time"
+                    value={adminBookingModal.heureFin}
+                    onChange={(e) => setAdminBookingModal(prev => ({ ...prev, heureFin: e.target.value }))}
+                    className="input w-full !py-2 !text-xs font-bold"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Motif */}
+              <div>
+                <label className="font-bold text-slate-700 dark:text-dark-300 block mb-1">
+                  Motif / Raison de la réservation
+                </label>
+                <input
+                  type="text"
+                  placeholder="ex: Session officielle d'accompagnement, Maintenance mensuelle..."
+                  value={adminBookingModal.motifUtilisation}
+                  onChange={(e) => setAdminBookingModal(prev => ({ ...prev, motifUtilisation: e.target.value }))}
+                  className="input w-full !py-2 !text-xs"
+                />
+              </div>
+
+              {/* Matériel */}
+              <div>
+                <label className="font-bold text-slate-700 dark:text-dark-300 block mb-1">
+                  Matériel ou équipement réservé
+                </label>
+                <input
+                  type="text"
+                  placeholder="ex: Tous les équipements, Imprimantes 3D, Fraiseuse..."
+                  value={adminBookingModal.equipementsUtilises}
+                  onChange={(e) => setAdminBookingModal(prev => ({ ...prev, equipementsUtilises: e.target.value }))}
+                  className="input w-full !py-2 !text-xs"
+                />
+              </div>
+
+              {/* Boutons d'action */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-dark-800">
+                <button
+                  type="button"
+                  onClick={() => setAdminBookingModal(prev => ({ ...prev, open: false }))}
+                  className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-dark-800 text-xs font-bold text-slate-600 dark:text-dark-300 cursor-pointer"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-extrabold text-xs shadow-md shadow-emerald-600/20 cursor-pointer flex items-center gap-1.5"
+                >
+                  <Check size={14} /> Confirmer la Réservation
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -301,4 +301,106 @@ router.post('/:id/rappel', auth, requireStaff, async (req, res) => {
   }
 });
 
+// POST /api/reservations/directe (ADMIN / STAFF - Réservation directe immédiate validée)
+router.post('/directe', auth, requireStaff, async (req, res) => {
+  try {
+    const { 
+      espace, 
+      salleSpecifique, 
+      dateReservation, 
+      heureDebut, 
+      heureFin, 
+      duree, 
+      motifUtilisation, 
+      equipementsUtilises,
+      nomPersonnalise
+    } = req.body;
+
+    if (!dateReservation || !heureDebut || !heureFin) {
+      return res.status(400).json({ message: 'Champs obligatoires manquants (dateReservation, heureDebut, heureFin)' });
+    }
+
+    if (heureDebut >= heureFin) {
+      return res.status(400).json({ message: 'L\'heure de début doit être antérieure à l\'heure de fin' });
+    }
+
+    // Vérifier les conflits de créneau horaire
+    const conflictWhere = {
+      espace: espace || 'fablab',
+      dateReservation,
+      statut: 'valide',
+      heureDebut: { [Op.lt]: heureFin },
+      heureFin: { [Op.gt]: heureDebut }
+    };
+
+    if (salleSpecifique) {
+      conflictWhere[Op.or] = [
+        { salleSpecifique: salleSpecifique },
+        { salleSpecifique: null },
+        { salleSpecifique: '' }
+      ];
+    }
+
+    const conflict = await ReservationEspace.findOne({ where: conflictWhere });
+
+    if (conflict) {
+      const precisionSalle = salleSpecifique ? ` pour la ${salleSpecifique}` : '';
+      return res.status(409).json({
+        message: `Conflit horaire : le créneau ${heureDebut}-${heureFin}${precisionSalle} est déjà réservé par "${conflict.nomIncube}".`
+      });
+    }
+
+    const staffNom = req.user ? `${req.user.prenom || ''} ${req.user.nom || ''}`.trim() : 'Administration';
+    const nomAffiche = nomPersonnalise && nomPersonnalise.trim() 
+      ? nomPersonnalise.trim() 
+      : `${staffNom} (Administration)`;
+
+    const reservation = await ReservationEspace.create({
+      espace: espace || 'fablab',
+      salleSpecifique: salleSpecifique || null,
+      nomIncube: nomAffiche,
+      emailIncube: req.user?.email || 'admin@cgs.dz',
+      telephoneIncube: req.user?.telephone || null,
+      dateReservation,
+      heureDebut,
+      heureFin,
+      duree: duree || '2h',
+      motifUtilisation: motifUtilisation || 'Réservation administrative / Équipe IDS',
+      equipementsUtilises: equipementsUtilises ? String(equipementsUtilises).trim() : 'Tous les équipements',
+      statut: 'valide'
+    });
+
+    // Générer la checklist matériel automatiquement
+    try {
+      const { EquipementEspace, ChecklistMateriel } = require('../models');
+      const equipWhere = { espace: reservation.espace };
+      if (reservation.salleSpecifique) {
+        equipWhere.salle = reservation.salleSpecifique;
+      }
+      const equipements = await EquipementEspace.findAll({ where: equipWhere });
+      if (equipements.length > 0) {
+        const checklists = equipements.map(e => ({
+          reservation_id: reservation.id,
+          equipement_id: e.id,
+          etat_avant: e.etatAvant || 'Opérationnel / Parfait état',
+          etat_apres: e.etatApres || 'Conforme & Rendu propre'
+        }));
+        await ChecklistMateriel.bulkCreate(checklists);
+      }
+    } catch (checklistErr) {
+      console.warn('Checklist non générée:', checklistErr.message);
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Réservation administrative créée et validée avec succès !',
+      reservation
+    });
+  } catch (err) {
+    console.error('Erreur réservation directe:', err.message);
+    res.status(500).json({ message: 'Erreur lors de la création de la réservation' });
+  }
+});
+
 module.exports = router;
+

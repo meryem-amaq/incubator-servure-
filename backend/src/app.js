@@ -65,6 +65,14 @@ app.use('/api/rapports', require('./routes/rapports'));
 if (process.env.CLOUD_URL) {
   const syncService = require('./services/SyncService');
   syncService.startCron(10);
+
+  // Synchronisation automatique de la liste blanche (Incubés + Staff) vers Heroku au démarrage
+  if (process.env.ACTIVER_SYNC_CLOUD === 'true') {
+    const { syncWhitelistCloud } = require('./controllers/incubeController');
+    setTimeout(() => {
+      syncWhitelistCloud().catch(err => console.warn('⚠️ [Whitelist] Sync initiale:', err.message));
+    }, 4000);
+  }
 }
 
 // Endpoint manuel pour forcer la synchronisation immédiate (Admin / Staff)

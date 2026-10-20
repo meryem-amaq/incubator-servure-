@@ -9,23 +9,53 @@ const syncWhitelistCloud = async () => {
   if (process.env.ACTIVER_SYNC_CLOUD !== 'true') return;
 
   try {
+    // 1. Récupérer tous les incubés avec un email valide
     const incubes = await Incube.findAll({ attributes: ['email', 'pp_numero'] });
-    const porteurs = incubes
+    const listIncubes = incubes
       .filter(i => i.email && i.email.trim() !== '')
-      .map(i => ({ email: i.email.trim(), pp_numero: i.pp_numero || '' }));
+      .map(i => ({ 
+        email: i.email.trim().toLowerCase(), 
+        pp_numero: i.pp_numero || 'INCUBE' 
+      }));
 
+    // 2. Récupérer les accompagnateurs, administrateurs et super_admins
+    const staffUsers = await User.findAll({
+      where: {
+        role: { [Op.in]: ['super_admin', 'administrateur', 'accompagnateur'] }
+      },
+      attributes: ['email', 'role']
+    });
+    const listStaff = staffUsers
+      .filter(u => u.email && u.email.trim() !== '')
+      .map(u => ({ 
+        email: u.email.trim().toLowerCase(), 
+        pp_numero: (u.role || 'STAFF').toUpperCase() 
+      }));
+
+    // 3. Fusionner les deux listes sans doublons
+    const emailMap = new Map();
+    [...listIncubes, ...listStaff].forEach(p => {
+      if (!emailMap.has(p.email)) {
+        emailMap.set(p.email, p);
+      }
+    });
+    const porteurs = Array.from(emailMap.values());
+
+    console.log(`📡 [Whitelist] Envoi de ${porteurs.length} comptes autorisés vers Heroku (${listIncubes.length} incubés + ${listStaff.length} staff)...`);
+
+    // 4. Envoi vers Heroku
     const cloudUrl = (process.env.CLOUD_URL || process.env.CLOUD_API_URL || 'https://ids-production-app-6aba82b6af10.herokuapp.com').replace(/\/+$/, '');
     const response = await fetch(`${cloudUrl}/api/sync/whitelist`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        secret: 'MON_SECRET_DE_SYNC_123',
+        secret: process.env.WHITELIST_SECRET || process.env.SYNC_SECRET || 'MON_SECRET_DE_SYNC_123',
         porteurs
       })
     });
-    
+
     if (response.ok) {
-      console.log('✅ Synchronisation de la liste blanche avec le Cloud réussie.');
+      console.log(`✅ Synchronisation de la liste blanche réussie (${porteurs.length} personnes autorisées sur Heroku).`);
     } else {
       console.error('⚠️ Échec de la synchronisation avec le Cloud :', await response.text());
     }
@@ -33,6 +63,9 @@ const syncWhitelistCloud = async () => {
     console.error('⚠️ Impossible de joindre le Cloud pour la synchronisation de la liste blanche.', err.message);
   }
 };
+
+// Export pour pouvoir l'appeler au démarrage ou depuis d'autres controllers
+exports.syncWhitelistCloud = syncWhitelistCloud;
 
 // GET /api/incubes — Liste avec filtrage multi-tenant
 exports.getAll = async (req, res) => {
@@ -653,7 +686,7 @@ exports.create = async (req, res) => {
     });
 
     res.status(201).json(createdIncube || incube);
-    
+
     // Synchronisation avec le Cloud en arrière-plan
     syncWhitelistCloud();
   } catch (err) {
@@ -743,7 +776,7 @@ exports.bulkCreate = async (req, res) => {
       count: created.length,
       data: created,
     });
-    
+
     // Synchronisation avec le Cloud en arrière-plan
     syncWhitelistCloud();
   } catch (err) {
@@ -760,7 +793,7 @@ exports.update = async (req, res) => {
     if (!incube) return res.status(404).json({ message: 'Incubé non trouvé' });
 
     if (!isSuper) {
-      const isOwner = incube.admin_id === req.user.id || 
+      const isOwner = incube.admin_id === req.user.id ||
         (req.user.nom && incube.accompagnateur && incube.accompagnateur.toLowerCase().includes(req.user.nom.toLowerCase()));
       if (!isOwner) {
         return res.status(403).json({ message: 'Action non autorisée sur ce dossier' });
@@ -845,7 +878,7 @@ exports.update = async (req, res) => {
     }
 
     res.json(incube);
-    
+
     // Synchronisation avec le Cloud en arrière-plan
     syncWhitelistCloud();
   } catch (err) {
@@ -886,7 +919,7 @@ exports.delete = async (req, res) => {
     if (!incube) return res.status(404).json({ message: 'Incubé non trouvé' });
 
     if (!isSuper) {
-      const isOwner = incube.admin_id === req.user.id || 
+      const isOwner = incube.admin_id === req.user.id ||
         (req.user.nom && incube.accompagnateur && incube.accompagnateur.toLowerCase().includes(req.user.nom.toLowerCase()));
       if (!isOwner) {
         return res.status(403).json({ message: 'Action non autorisée sur ce dossier' });
@@ -895,7 +928,7 @@ exports.delete = async (req, res) => {
 
     await incube.destroy();
     res.json({ message: 'Incubé supprimé avec succès' });
-    
+
     // Synchronisation avec le Cloud en arrière-plan
     syncWhitelistCloud();
   } catch (err) {
@@ -940,7 +973,7 @@ exports.activerCompte = async (req, res) => {
 
     const isSuper = ['super_admin', 'administrateur'].includes(req.user.role);
     if (!isSuper) {
-      const isOwner = incube.admin_id === req.user.id || 
+      const isOwner = incube.admin_id === req.user.id ||
         (req.user.nom && incube.accompagnateur && incube.accompagnateur.toLowerCase().includes(req.user.nom.toLowerCase()));
       if (!isOwner) {
         return res.status(403).json({ message: 'Vous n\'êtes pas autorisé à activer ce compte' });
@@ -1050,7 +1083,7 @@ exports.desactiverCompte = async (req, res) => {
 
     const isSuper = ['super_admin', 'administrateur'].includes(req.user.role);
     if (!isSuper) {
-      const isOwner = incube.admin_id === req.user.id || 
+      const isOwner = incube.admin_id === req.user.id ||
         (req.user.nom && incube.accompagnateur && incube.accompagnateur.toLowerCase().includes(req.user.nom.toLowerCase()));
       if (!isOwner) {
         return res.status(403).json({ message: 'Vous n\'êtes pas autorisé à modifier ce compte' });
@@ -1093,7 +1126,7 @@ exports.renvoyerAcces = async (req, res) => {
 
     const isSuper = ['super_admin', 'administrateur'].includes(req.user.role);
     if (!isSuper) {
-      const isOwner = incube.admin_id === req.user.id || 
+      const isOwner = incube.admin_id === req.user.id ||
         (req.user.nom && incube.accompagnateur && incube.accompagnateur.toLowerCase().includes(req.user.nom.toLowerCase()));
       if (!isOwner) {
         return res.status(403).json({ message: 'Vous n\'êtes pas autorisé à réexpédier les accès' });
