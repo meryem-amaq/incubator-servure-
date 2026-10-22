@@ -14,6 +14,11 @@ const User = sequelize.define('User', {
   photo_url: { type: DataTypes.TEXT('medium'), allowNull: true },
   telephone: { type: DataTypes.STRING(20), allowNull: true },
   actif: { type: DataTypes.BOOLEAN, defaultValue: true },
+  type: {
+    type: DataTypes.ENUM('Incube', 'Administration', 'Formation', 'Visiteur', 'Prestataire', 'Autre'),
+    defaultValue: 'Incube',
+  },
+  badge_id: { type: DataTypes.STRING(50), allowNull: true },
 }, { tableName: 'users' });
 
 module.exports = User;

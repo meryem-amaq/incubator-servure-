@@ -431,13 +431,13 @@ export default function Evenements() {
       }
 
       try {
-        const resPub = await fetch('/api/presence/incubes');
-        const data = await resPub.json();
+        const resPub = await api.get('/presence/incubes');
+        const data = resPub.data;
         if (isMounted && Array.isArray(data)) {
           setAllIncubes(data);
         }
       } catch (e) {
-        console.error("fetch('/api/presence/incubes') failed", e);
+        console.warn("api.get('/presence/incubes') fallback failed", e);
       } finally {
         if (isMounted) {
           setLoadingIncubes(false);

@@ -67,17 +67,20 @@ export default function Engagement() {
   }, []);
 
   // 2. Charger les données détaillées de l'incubé sélectionné
-  const loadSelectedIncube = async (id) => {
+  const loadSelectedIncube = async (id, isBackground = false) => {
     if (!id) return;
-    setLoadingIncube(true);
+    if (!isBackground) setLoadingIncube(true);
     try {
       const res = await api.get(`/incubes/${id}`);
       setCurrentIncube(res.data);
     } catch (err) {
+      console.error("Erreur chargement données incubé:", err);
       toast.error("Impossible de charger les données de cet incubé");
-      setCurrentIncube(null);
+      if (!isBackground) {
+        setCurrentIncube(null);
+      }
     } finally {
-      setLoadingIncube(false);
+      if (!isBackground) setLoadingIncube(false);
     }
   };
 
@@ -268,7 +271,7 @@ export default function Engagement() {
             incubeId={currentIncube.id} 
             incube={currentIncube}
             data={currentIncube.engagements || []} 
-            onUpdate={() => loadSelectedIncube(currentIncube.id)} 
+            onUpdate={() => loadSelectedIncube(currentIncube.id, true)} 
             incubeSelector={renderIncubeSelector()}
           />
         </div>

@@ -1,3 +1,6 @@
+// Configuration de l'environnement en heure locale GMT+0 (UTC)
+process.env.TZ = process.env.APP_TIMEZONE || 'UTC';
+
 const dns = require('dns');
 if (dns.setDefaultResultOrder) {
   dns.setDefaultResultOrder('ipv4first');
@@ -306,6 +309,19 @@ sequelize.authenticate()
       }
     } catch (adminErr) {
       console.error('Initialisation admin:', adminErr.message);
+    }
+
+    // Démarrage de la collecte automatique des tourniquets ZKTeco (démarrage + toutes les 60 secondes)
+    try {
+      const { collectFromAllDevices } = require('./services/tourniquetCollector');
+      setTimeout(() => {
+        collectFromAllDevices().catch(err => console.warn('⚠️ Collecte tourniquets initiale:', err.message));
+        setInterval(() => {
+          collectFromAllDevices().catch(err => console.warn('⚠️ Collecte tourniquets interval:', err.message));
+        }, 60 * 1000);
+      }, 3000);
+    } catch (collErr) {
+      console.warn('⚠️ Erreur init collecteur tourniquets:', collErr.message);
     }
   })
   .catch(err => {

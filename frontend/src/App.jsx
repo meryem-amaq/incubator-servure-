@@ -19,6 +19,7 @@ import GestionEspaces from './pages/GestionEspaces';
 import ReservationEspacePublique from './pages/ReservationEspacePublique';
 import BookingPage from './pages/BookingPage';
 import RapportsActivite from './pages/RapportsActivite';
+import ControleAcces from './pages/ControleAcces';
 
 function PrivateRoute({ children }) {
   const { user } = useAuth();
@@ -96,6 +97,14 @@ function AppRoutes() {
           element={
             <SuperAdminRoute>
               <Utilisateurs />
+            </SuperAdminRoute>
+          }
+        />
+        <Route
+          path="controle-acces"
+          element={
+            <SuperAdminRoute>
+              <ControleAcces />
             </SuperAdminRoute>
           }
         />

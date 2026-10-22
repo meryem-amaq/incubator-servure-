@@ -3,6 +3,7 @@ const { Op } = require('sequelize');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const emailService = require('../services/emailService');
+const tourniquetService = require('../services/tourniquetService');
 
 // Fonction utilitaire pour synchroniser la liste blanche avec le Cloud
 const syncWhitelistCloud = async () => {
@@ -135,7 +136,7 @@ exports.getAll = async (req, res) => {
 // GET /api/incubes/stats — Statistiques consolidées pour le Dashboard (Réservé au Super Admin)
 exports.getStats = async (req, res) => {
   try {
-    const isSuper = ['super_admin', 'administrateur'].includes(req.user.role);
+    const isSuper = ['super_admin', 'admin', 'administrateur', 'superadmin'].includes(req.user.role);
     if (!isSuper) {
       return res.status(403).json({ message: 'Accès interdit : Les KPIs consolidés sont réservés au Super Administrateur' });
     }
@@ -962,6 +963,23 @@ exports.envoyerAlerteAssiduite = async (req, res) => {
   }
 };
 
+// GET & POST /api/incubes/:id/sync-tourniquet
+exports.syncTourniquet = async (req, res) => {
+  try {
+    const incubeId = req.params.id;
+    const annee = parseInt(req.query.annee || req.body?.annee || new Date().getFullYear(), 10);
+    const result = await tourniquetService.syncIncubeTourniquet(incubeId, annee);
+    res.json({
+      success: true,
+      message: `Pointages synchronisés avec succès depuis les tourniquets pour ${result.incube.nom_incube}`,
+      ...result
+    });
+  } catch (err) {
+    console.error('Erreur syncTourniquet:', err);
+    res.status(500).json({ message: "Erreur lors de la synchronisation des tourniquets", error: err.message });
+  }
+};
+
 // POST /api/incubes/:id/activer-compte — Activer le compte de l'incubé et envoyer les identifiants
 // Les opérations DB (mot de passe + actif=true) et l'envoi email sont séparés intentionnellement :
 // un échec SMTP ne doit pas annuler l'activation en base.
@@ -971,7 +989,7 @@ exports.activerCompte = async (req, res) => {
     const incube = await Incube.findByPk(req.params.id);
     if (!incube) return res.status(404).json({ message: 'Incubé introuvable' });
 
-    const isSuper = ['super_admin', 'administrateur'].includes(req.user.role);
+    const isSuper = ['super_admin', 'admin', 'administrateur', 'superadmin'].includes(req.user.role);
     if (!isSuper) {
       const isOwner = incube.admin_id === req.user.id ||
         (req.user.nom && incube.accompagnateur && incube.accompagnateur.toLowerCase().includes(req.user.nom.toLowerCase()));

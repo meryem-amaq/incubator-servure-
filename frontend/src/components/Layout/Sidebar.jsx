@@ -17,6 +17,7 @@ import {
   GraduationCap,
   Sun,
   Moon,
+  DoorOpen,
   X
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -301,6 +302,24 @@ export default function Sidebar({
             >
               <ShieldCheck size={20} className="shrink-0" />
               {isExpanded && <span className="ml-3 font-medium text-sm truncate">Gestion des Utilisateurs</span>}
+            </NavLink>
+          )}
+
+          {isSuperAdmin && (
+            <NavLink 
+              to="/controle-acces" 
+              onClick={onMobileClose}
+              title={!isExpanded ? 'Contrôle d\'Accès' : undefined}
+              className={({ isActive }) => 
+                `flex items-center px-3 py-3 rounded-xl transition-all duration-200 ${
+                  isActive 
+                    ? 'bg-[#0A2744] text-amber-400 font-semibold shadow-inner' 
+                    : 'text-gray-300 hover:text-white hover:bg-[#0A2744]/70'
+                } ${!isExpanded ? 'justify-center' : ''}`
+              }
+            >
+              <DoorOpen size={20} className="shrink-0 text-amber-400" />
+              {isExpanded && <span className="ml-3 font-medium text-sm truncate">Contrôle d'Accès</span>}
             </NavLink>
           )}
         </div>

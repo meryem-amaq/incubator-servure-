@@ -38,7 +38,8 @@ export default function CalendrierBookingModal({
   onClose, 
   incubesList = [], 
   currentAccompagnateurNom = 'Accompagnateur IDS',
-  initialIncubeId = null
+  initialIncubeId = null,
+  onSuccess = null
 }) {
   const [rdvList, setRdvList] = useState([]);
   const [activeTab, setActiveTab] = useState('calendrier'); // 'calendrier' | 'prochains' | 'historique' | 'nouveau'
@@ -143,6 +144,7 @@ export default function CalendrierBookingModal({
       setCommentaireEmail('');
       setSelectedIncubeIds(initialIncubeId ? [initialIncubeId] : []);
       fetchRendezVous();
+      if (onSuccess) onSuccess();
       setActiveTab('prochains');
     } catch (err) {
       toast.error(err.response?.data?.message || "Erreur lors de la création du rendez-vous");
@@ -156,6 +158,7 @@ export default function CalendrierBookingModal({
       await api.put(`/rendezvous/${rdvId}`, { statut: 'effectue' });
       toast.success("Rendez-vous marqué comme effectué !", { icon: '✅' });
       fetchRendezVous();
+      if (onSuccess) onSuccess();
     } catch (err) {
       toast.error("Erreur lors de la mise à jour");
     }
@@ -167,6 +170,7 @@ export default function CalendrierBookingModal({
       await api.delete(`/rendezvous/${rdvId}`);
       toast.success("Rendez-vous supprimé");
       fetchRendezVous();
+      if (onSuccess) onSuccess();
     } catch (err) {
       toast.error("Erreur lors de la suppression");
     }

@@ -20,6 +20,8 @@ router.post('/:id/activer-compte', auth, incubeCtrl.activerCompte);
 router.post('/:id/desactiver-compte', auth, incubeCtrl.desactiverCompte);
 router.post('/:id/renvoyer-acces', auth, incubeCtrl.renvoyerAcces);
 router.post('/:id/alerte-assiduite', auth, incubeCtrl.envoyerAlerteAssiduite);
+router.get('/:id/sync-tourniquet', auth, incubeCtrl.syncTourniquet);
+router.post('/:id/sync-tourniquet', auth, incubeCtrl.syncTourniquet);
 router.post('/:id/welcome-email', auth, incubeCtrl.envoyerWelcomeEmail);
 router.delete('/:id', auth, incubeCtrl.delete);
 

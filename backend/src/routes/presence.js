@@ -2,7 +2,9 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const requireStaff = require('../middleware/requireStaff');
-const { PresenceAtelier, Incube, Atelier } = require('../models');
+const isSuperAdmin = require('../middleware/isSuperAdmin');
+const { PresenceAtelier, Incube, Atelier, User, Attendance, TourniquetUser, sequelize } = require('../models');
+const tourniquetService = require('../services/tourniquetService');
 
 function normalizeDateString(dateInput) {
   if (!dateInput) return new Date().toISOString().split('T')[0];
@@ -63,8 +65,299 @@ function isAtelierAttendanceWindowOpen(atelier, body = {}) {
   return { isOpen: true };
 }
 
-// GET /api/presence/incubes : Liste des incubés (accessible uniquement au personnel staff)
-router.get('/incubes', auth, requireStaff, async (req, res) => {
+// GET /api/presence/superadmin/dashboard : Tableau de bord supervision et contrôle d'accès en temps réel (Super Admin)
+router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
+  try {
+    const rawDate = req.query.date;
+    const targetDate = normalizeDateString(rawDate) || new Date().toISOString().split('T')[0];
+    const typeFilter = req.query.type || 'Tous';
+    const searchFilter = (req.query.search || '').trim().toLowerCase();
+
+    // 1. Récupérer les utilisateurs, incubés et usagers tourniquet pour le rapprochement
+    const [users, incubes, tourniquetUsers] = await Promise.all([
+      User.findAll({
+        attributes: ['id', 'nom', 'prenom', 'email', 'type', 'badge_id', 'role', 'photo_url']
+      }),
+      Incube.findAll({
+        attributes: ['id', 'user_id', 'nom_incube', 'email', 'badge_id', 'photo_path']
+      }),
+      TourniquetUser.findAll({
+        attributes: ['badge_id', 'name', 'cardno', 'type']
+      })
+    ]);
+
+    const userById = new Map(users.map(u => [u.id, u]));
+    const userByBadge = new Map();
+    users.forEach(u => {
+      if (u.badge_id) userByBadge.set(String(u.badge_id).trim(), u);
+    });
+
+    const incubeByUserId = new Map();
+    incubes.forEach(i => {
+      if (i.user_id) incubeByUserId.set(i.user_id, i);
+    });
+    const incubeByBadge = new Map();
+    incubes.forEach(i => {
+      if (i.badge_id) incubeByBadge.set(String(i.badge_id).trim(), i);
+    });
+
+    const tourniquetUserByBadge = new Map();
+    tourniquetUsers.forEach(tu => {
+      if (tu.badge_id) tourniquetUserByBadge.set(String(tu.badge_id).trim(), tu);
+    });
+
+    // 2. Récupérer tous les scans de la date ciblée (plage horaire directe ultra-rapide avec index MySQL sur time)
+    const cleanDate = /^\d{4}-\d{2}-\d{2}$/.test(targetDate) ? targetDate : new Date().toISOString().split('T')[0];
+    const scans = await Attendance.findAll({
+      where: sequelize.literal(`\`Attendance\`.\`time\` BETWEEN '${cleanDate} 00:00:00' AND '${cleanDate} 23:59:59'`),
+      order: [['time', 'ASC']]
+    });
+
+    const CATEGORIES = ['Administration', 'Incube', 'Formation', 'Visiteur', 'Prestataire', 'Autre'];
+    const statsCategories = {
+      Administration: 0,
+      Incube: 0,
+      Formation: 0,
+      Visiteur: 0,
+      Prestataire: 0,
+      Autre: 0
+    };
+
+    function resolvePerson(scan) {
+      const rawBadge = scan.raw_badge_id ? String(scan.raw_badge_id).trim() : '';
+
+      // 1. Recherche par user_id ou badge_id dans users
+      let u = scan.user_id ? userById.get(scan.user_id) : null;
+      if (!u && rawBadge) {
+        u = userByBadge.get(rawBadge);
+      }
+
+      // 2. Recherche par user_id ou badge_id dans incubes
+      let inc = null;
+      if (u) {
+        inc = incubeByUserId.get(u.id);
+      }
+      if (!inc && rawBadge) {
+        inc = incubeByBadge.get(rawBadge);
+      }
+
+      // 3. Recherche dans le répertoire physique des tourniquets
+      const tu = rawBadge ? tourniquetUserByBadge.get(rawBadge) : null;
+
+      let name = '';
+      let category = 'Autre';
+      let email = null;
+      let photo = null;
+
+      if (inc) {
+        // Priorité 1 : Incubé reconnu (affiche nom_incube et catégorie 'Incube')
+        name = inc.nom_incube;
+        email = inc.email || u?.email || null;
+        photo = inc.photo_path || u?.photo_url || null;
+        category = 'Incube';
+      } else if (u) {
+        // Priorité 2 : Compte utilisateur (Administration, Staff, Consultant...)
+        name = `${u.prenom || ''} ${u.nom || ''}`.trim() || tu?.name || 'Utilisateur';
+        email = u.email;
+        photo = u.photo_url;
+        category = u.type || (u.role === 'incube' ? 'Incube' : 'Administration');
+      } else if (tu) {
+        // Priorité 3 : Usager inscrit sur la borne tourniquet (Ali FARFRA, Reda BENHAMIDA...)
+        name = tu.name;
+        category = tu.type || 'Visiteur';
+      } else {
+        // Priorité 4 : Badge non identifié
+        name = `Visiteur (Badge #${rawBadge})`;
+        category = 'Visiteur';
+      }
+
+      if (!CATEGORIES.includes(category)) {
+        category = 'Autre';
+      }
+
+      return {
+        name,
+        category,
+        email,
+        photo,
+        userId: u ? u.id : (inc?.user_id || null),
+        badgeId: scan.raw_badge_id
+      };
+    }
+
+    // Grouper par personne unique pour déterminer le DERNIER scan de la journée
+    const personScansMap = new Map();
+    for (const scan of scans) {
+      const personInfo = resolvePerson(scan);
+      const canonicalKey = (scan.raw_badge_id && String(scan.raw_badge_id).trim())
+        ? ('b_' + String(scan.raw_badge_id).trim())
+        : (personInfo.userId ? ('u_' + personInfo.userId) : ('scan_' + scan.id));
+      if (!personScansMap.has(canonicalKey)) {
+        personScansMap.set(canonicalKey, { personInfo, pScans: [] });
+      }
+      personScansMap.get(canonicalKey).pScans.push(scan);
+    }
+
+    const allPresentsOnSite = [];
+    for (const [key, { personInfo, pScans }] of personScansMap.entries()) {
+      const lastScan = pScans[pScans.length - 1];
+      if (lastScan.type === 'IN') {
+        statsCategories[personInfo.category] = (statsCategories[personInfo.category] || 0) + 1;
+        const d = new Date(lastScan.time);
+        const heureStr = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'UTC' });
+        allPresentsOnSite.push({
+          id: lastScan.id,
+          user_id: personInfo.userId,
+          badge_id: lastScan.raw_badge_id,
+          name: personInfo.name,
+          type: personInfo.category,
+          email: personInfo.email,
+          photo_url: personInfo.photo,
+          derniere_entree: lastScan.time,
+          heure_entree: heureStr,
+          device_ip: lastScan.device_ip,
+          statut: 'Sur site'
+        });
+      }
+    }
+
+    const totalPresentsSurSite = allPresentsOnSite.length;
+
+    // Journal chronologique complet (du plus récent au plus ancien)
+    const fullFlux = scans.slice().reverse().map(scan => {
+      const personInfo = resolvePerson(scan);
+      const d = new Date(scan.time);
+      return {
+        id: scan.id,
+        time: scan.time,
+        date: targetDate,
+        heure: d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'UTC' }),
+        badge_id: scan.raw_badge_id,
+        user_id: personInfo.userId,
+        name: personInfo.name,
+        type: personInfo.category,
+        mouvement: scan.type, // 'IN' ou 'OUT'
+        device_ip: scan.device_ip
+      };
+    });
+
+    // Filtres appliqués pour presents_actuellement et historique_flux
+    function matchesFilter(item) {
+      if (typeFilter && typeFilter !== 'Tous' && item.type !== typeFilter) return false;
+      if (searchFilter) {
+        const n = (item.name || '').toLowerCase();
+        const b = String(item.badge_id || '').toLowerCase();
+        if (!n.includes(searchFilter) && !b.includes(searchFilter)) return false;
+      }
+      return true;
+    }
+
+    const filteredPresents = allPresentsOnSite.filter(matchesFilter);
+    const filteredFlux = fullFlux.filter(matchesFilter);
+
+    res.json({
+      success: true,
+      date: targetDate,
+      total_presents_sur_site: totalPresentsSurSite,
+      stats_categories: statsCategories,
+      presents_actuellement: filteredPresents,
+      historique_flux: filteredFlux,
+      all_presents: allPresentsOnSite,
+      all_flux: fullFlux
+    });
+  } catch (err) {
+    console.error('Erreur /presence/superadmin/dashboard:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors du chargement du tableau de bord contrôle d\'accès',
+      error: err.message
+    });
+  }
+});
+
+// GET /api/presence/superadmin/tourniquet-users : Liste de tous les usagers enregistrés sur les tourniquets
+router.get('/superadmin/tourniquet-users', auth, isSuperAdmin, async (req, res) => {
+  try {
+    const list = await TourniquetUser.findAll({ order: [['badge_id', 'ASC']] });
+    res.json({ success: true, count: list.length, users: list });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// PUT /api/presence/superadmin/tourniquet-users/:badge_id : Modifier la catégorie ou le nom d'un usager tourniquet
+router.put('/superadmin/tourniquet-users/:badge_id', auth, isSuperAdmin, async (req, res) => {
+  try {
+    const { badge_id } = req.params;
+    const { name, type } = req.body;
+    const existing = await TourniquetUser.findByPk(badge_id);
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Usager tourniquet introuvable' });
+    }
+    await existing.update({
+      name: name !== undefined ? name : existing.name,
+      type: type !== undefined ? type : existing.type
+    });
+    res.json({ success: true, user: existing });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/presence/superadmin/tourniquet-sync : Lancer la synchronisation complète avec les bornes
+router.post('/superadmin/tourniquet-sync', auth, isSuperAdmin, async (req, res) => {
+  try {
+    const collector = require('../services/tourniquetCollector');
+    const result = await collector.collectFromAllDevices();
+    res.json({ success: true, result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/presence/superadmin/sync-clocks : Synchroniser les horloges des 7 bornes sur l'heure locale exacte GMT+0
+router.post('/superadmin/sync-clocks', auth, isSuperAdmin, async (req, res) => {
+  try {
+    const { syncAllDeviceClocks } = require('../services/tourniquetCollector');
+    const result = await syncAllDeviceClocks();
+    res.json({
+      success: true,
+      message: `Synchronisation terminée : ${result.successCount}/${result.totalDevices} bornes synchronisées sur l'heure locale GMT+0`,
+      data: result
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Erreur synchronisation horloges', error: err.message });
+  }
+});
+
+// GET /api/presence/live : Retourne en temps réel toutes les personnes actuellement à l'intérieur du bâtiment
+router.get('/live', auth, async (req, res) => {
+  try {
+    const liveData = await tourniquetService.getLivePresence();
+    res.json(liveData);
+  } catch (err) {
+    console.error('Erreur /presence/live:', err);
+    res.status(500).json({ message: 'Erreur lors de la récupération de la présence en direct', error: err.message });
+  }
+});
+
+// POST /api/presence/recalibrate : Recalibration déterministe des pointages en BDD
+router.post('/recalibrate', auth, isSuperAdmin, async (req, res) => {
+  try {
+    const { recalibrateAllAttendances } = require('../services/tourniquetCollector');
+    const result = await recalibrateAllAttendances();
+    res.json({
+      success: true,
+      message: 'Recalibration déterministe des pointages effectuée avec succès !',
+      result
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Erreur lors de la recalibration', error: err.message });
+  }
+});
+
+// GET /api/presence/incubes : Liste des incubés (accessible pour l'émargement et le staff)
+router.get('/incubes', async (req, res) => {
   try {
     const incubes = await Incube.findAll({
       attributes: ['id', 'nom_incube', 'pp_numero'],

@@ -18,6 +18,12 @@ const HistoriquePhase = require('./HistoriquePhase');
 const HistoriqueStatut = require('./HistoriqueStatut');
 const FicheSuivi = require('./FicheSuivi');
 const Formation = require('./Formation');
+const Attendance = require('./Attendance');
+const TourniquetUser = require('./TourniquetUser');
+
+// === Associations : User & Attendance (Tourniquets) ===
+User.hasMany(Attendance, { foreignKey: 'user_id', as: 'attendances' });
+Attendance.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 
 // === Associations : User & Incube (Compte Utilisateur 1-to-1 - Porteur de Projet) ===
 User.hasOne(Incube, { foreignKey: 'user_id', as: 'porteurProjet' });
@@ -95,5 +101,7 @@ module.exports = {
   HistoriquePhase,
   HistoriqueStatut,
   FicheSuivi,
-  Formation
+  Formation,
+  Attendance,
+  TourniquetUser
 };

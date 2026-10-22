@@ -86,7 +86,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem('cgs_user', JSON.stringify(updatedUser));
   };
 
-  const isSuperAdmin = ['super_admin', 'administrateur'].includes(user?.role);
+  const isSuperAdmin = ['super_admin', 'admin', 'administrateur', 'superadmin'].includes(user?.role);
 
   return (
     <AuthContext.Provider value={{ user, isSuperAdmin, login, logout, loading, updateUser }}>

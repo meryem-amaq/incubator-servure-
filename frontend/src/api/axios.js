@@ -2,6 +2,7 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: '/api',
+  timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -50,7 +51,7 @@ export const getPhotoUrl = (path) => {
   }
 
   const clean = path.replace(/^uploads[\\/]/, '');
-  const baseUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
+  const baseUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://127.0.0.1:5000');
   return `${baseUrl}/uploads/${clean}`;
 };
 

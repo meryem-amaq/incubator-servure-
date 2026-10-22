@@ -4,11 +4,11 @@ module.exports = (req, res, next) => {
   }
 
   const role = req.user.role;
-  if (role === 'super_admin' || role === 'administrateur') {
+  if (['super_admin', 'admin', 'administrateur', 'superadmin'].includes(role)) {
     return next();
   }
 
   return res.status(403).json({
-    message: 'Accès interdit : Cette action est réservée au Super Administrateur',
+    message: 'Accès interdit : Cette action est réservée à l\'administration',
   });
 };

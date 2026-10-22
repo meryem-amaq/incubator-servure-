@@ -69,7 +69,12 @@ function createSubController(Model, modelName) {
           }
         }
 
-        const item = await Model.create({ ...req.body, incube_id: req.params.incubeId });
+        const createData = { ...req.body, incube_id: req.params.incubeId };
+        if (Model === SuiviEngagement && !req.body._forceTourniquetSync) {
+          delete createData.moyenne_heures_presence;
+        }
+
+        const item = await Model.create(createData);
         res.status(201).json(item);
       } catch (err) { res.status(400).json({ message: err.message }); }
     },
@@ -131,7 +136,15 @@ function createSubController(Model, modelName) {
           }
         }
 
-        await item.update(req.body);
+        const updateData = { ...req.body };
+        // Pour SuiviEngagement : les heures de présence sont certifiées par les tourniquets et protégées
+        if (Model === SuiviEngagement && req.body.moyenne_heures_presence !== undefined) {
+          if (item.moyenne_heures_presence !== null && item.moyenne_heures_presence !== undefined && !req.body._forceTourniquetSync) {
+            delete updateData.moyenne_heures_presence;
+          }
+        }
+
+        await item.update(updateData);
         res.json(item);
       } catch (err) { res.status(400).json({ message: err.message }); }
     },

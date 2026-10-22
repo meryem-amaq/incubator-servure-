@@ -53,6 +53,7 @@ const Incube = sequelize.define('Incube', {
       }
     }
   },
+  badge_id: { type: DataTypes.STRING(50), allowNull: true },
 }, { tableName: 'incubes' });
 
 module.exports = Incube;

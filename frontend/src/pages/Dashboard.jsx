@@ -20,7 +20,11 @@ import {
   BarChart3,
   CheckCircle,
   ExternalLink,
-  Download
+  Download,
+  CalendarCheck,
+  CalendarPlus,
+  MapPin,
+  User
 } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -36,10 +40,9 @@ const PHASE_COLORS = {
 };
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
   const navigate = useNavigate();
-  const isSuperAdmin = ['super_admin', 'administrateur'].includes(user?.role);
-  
+
   // Redirection automatique des accompagnateurs/admins non Super Admin vers /incubes
   useEffect(() => {
     if (!isSuperAdmin) {
@@ -61,6 +64,8 @@ export default function Dashboard() {
   // Stats d'assiduité & impact des espaces
   const [impactStats, setImpactStats] = useState(null);
   const [loadingImpact, setLoadingImpact] = useState(false);
+
+
 
   const [exportingPdf, setExportingPdf] = useState(false);
   const dashboardRef = useRef(null);
@@ -143,12 +148,12 @@ export default function Dashboard() {
         pdf.setFontSize(7.5);
         pdf.setTextColor(100, 116, 139);
         const pageSubtitle = activeTab === 'economique'
-          ? (pageNum === 1 
-              ? `Page 1 sur 2 : Indicateurs Clés & Analyse Financière Globale  •  Promotion : ${promoLabel}`
-              : `Page 2 sur 2 : Performance des Projets & Démographie  •  Promotion : ${promoLabel}`)
+          ? (pageNum === 1
+            ? `Page 1 sur 2 : Indicateurs Clés & Analyse Financière Globale  •  Promotion : ${promoLabel}`
+            : `Page 2 sur 2 : Performance des Projets & Démographie  •  Promotion : ${promoLabel}`)
           : (pageNum === 1
-              ? `Page 1 sur 2 : Assiduité & Participation aux Ateliers  •  Promotion : ${promoLabel}`
-              : `Page 2 sur 2 : Occupation des Espaces & Santé du Matériel  •  Promotion : ${promoLabel}`);
+            ? `Page 1 sur 2 : Assiduité & Participation aux Ateliers  •  Promotion : ${promoLabel}`
+            : `Page 2 sur 2 : Occupation des Espaces & Santé du Matériel  •  Promotion : ${promoLabel}`);
         pdf.text(pageSubtitle, marginX, 13.5);
 
         pdf.text(dateStr, pageWidth - marginX - pdf.getTextWidth(dateStr), 13.5);
@@ -233,7 +238,16 @@ export default function Dashboard() {
         const res = await api.get('/incubes/stats', { params });
         setStats(res.data);
       } catch (err) {
+        console.error('Erreur stats dashboard:', err);
         toast.error('Impossible de charger les statistiques du tableau de bord');
+        setStats({
+          total: 0,
+          caTotal: 0,
+          totalEmplois: 0,
+          phases: [],
+          recentIncubes: [],
+          promotionsDisponibles: []
+        });
       } finally {
         setLoading(false);
       }
@@ -255,6 +269,7 @@ export default function Dashboard() {
         .finally(() => setLoadingImpact(false));
     }
   }, [activeTab, selectedPromotion]);
+
 
   if (loading && !stats) {
     return (
@@ -323,11 +338,10 @@ export default function Dashboard() {
             <button
               type="button"
               onClick={() => setActiveTab('economique')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                activeTab === 'economique'
-                  ? 'bg-white dark:bg-dark-900 text-slate-900 dark:text-white shadow-sm'
-                  : 'text-slate-500 hover:text-slate-800 dark:text-dark-300'
-              }`}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${activeTab === 'economique'
+                ? 'bg-white dark:bg-dark-900 text-slate-900 dark:text-white shadow-sm'
+                : 'text-slate-500 hover:text-slate-800 dark:text-dark-300'
+                }`}
             >
               <TrendingUp size={14} className="text-primary-600" />
               <span>Impact Économique</span>
@@ -336,11 +350,10 @@ export default function Dashboard() {
             <button
               type="button"
               onClick={() => setActiveTab('impact')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                activeTab === 'impact'
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'text-slate-500 hover:text-slate-800 dark:text-dark-300'
-              }`}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${activeTab === 'impact'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-slate-500 hover:text-slate-800 dark:text-dark-300'
+                }`}
             >
               <Award size={14} className={activeTab === 'impact' ? 'text-white' : 'text-emerald-500'} />
               <span>Assiduité & Espaces</span>
@@ -444,6 +457,7 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+
 
           {/* Graphiques Économiques & Financiers */}
           <KpiEconomique stats={stats} />
@@ -558,11 +572,10 @@ export default function Dashboard() {
                       </div>
                       <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-slate-100 dark:border-dark-800 text-[11px] font-medium">
                         <span className="text-slate-500 dark:text-dark-400">Pannes en cours :</span>
-                        <span className={`font-bold px-2 py-0.5 rounded-full ${
-                          ((impactStats?.equipements?.incidentsEnCours || 0) + (impactStats?.equipements?.neMarchePlus || 0)) > 0
-                            ? 'bg-red-500/15 text-red-600 dark:text-red-400'
-                            : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                        }`}>
+                        <span className={`font-bold px-2 py-0.5 rounded-full ${((impactStats?.equipements?.incidentsEnCours || 0) + (impactStats?.equipements?.neMarchePlus || 0)) > 0
+                          ? 'bg-red-500/15 text-red-600 dark:text-red-400'
+                          : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                          }`}>
                           {(impactStats?.equipements?.incidentsEnCours || 0) + (impactStats?.equipements?.neMarchePlus || 0)} active(s)
                         </span>
                       </div>
@@ -588,52 +601,51 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                  {(!impactStats?.assiduite?.topIncubes || impactStats.assiduite.topIncubes.length === 0) ? (
-                    <div className="text-center py-10 text-slate-400 text-xs">
-                      Aucun émargement enregistré pour le moment.
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {impactStats.assiduite.topIncubes.map((inc, idx) => (
-                        <div key={inc.incubeId || idx} className="p-3 rounded-xl bg-slate-50 dark:bg-dark-800/60 border border-slate-200/60 dark:border-dark-700/60 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <span className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-xs shrink-0 ${
-                                idx === 0 ? 'bg-amber-500 text-white shadow-sm' :
-                                idx === 1 ? 'bg-slate-300 text-slate-800' :
-                                idx === 2 ? 'bg-amber-700 text-white' :
-                                'bg-slate-200 dark:bg-dark-700 text-slate-600 dark:text-dark-300'
-                              }`}>
-                                {idx + 1}
-                              </span>
-                              <div className="min-w-0">
-                                <p className="font-extrabold text-xs text-slate-900 dark:text-white truncate">
-                                  {inc.nomComplet}
-                                </p>
-                                <span className="font-mono text-[10px] text-slate-400">
-                                  {inc.ppNumero || 'PP-IDS'}
+                    {(!impactStats?.assiduite?.topIncubes || impactStats.assiduite.topIncubes.length === 0) ? (
+                      <div className="text-center py-10 text-slate-400 text-xs">
+                        Aucun émargement enregistré pour le moment.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {impactStats.assiduite.topIncubes.map((inc, idx) => (
+                          <div key={inc.incubeId || idx} className="p-3 rounded-xl bg-slate-50 dark:bg-dark-800/60 border border-slate-200/60 dark:border-dark-700/60 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <span className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-xs shrink-0 ${idx === 0 ? 'bg-amber-500 text-white shadow-sm' :
+                                  idx === 1 ? 'bg-slate-300 text-slate-800' :
+                                    idx === 2 ? 'bg-amber-700 text-white' :
+                                      'bg-slate-200 dark:bg-dark-700 text-slate-600 dark:text-dark-300'
+                                  }`}>
+                                  {idx + 1}
                                 </span>
+                                <div className="min-w-0">
+                                  <p className="font-extrabold text-xs text-slate-900 dark:text-white truncate">
+                                    {inc.nomComplet}
+                                  </p>
+                                  <span className="font-mono text-[10px] text-slate-400">
+                                    {inc.ppNumero || 'PP-IDS'}
+                                  </span>
+                                </div>
+                              </div>
+                              <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-black text-xs shrink-0">
+                                {inc.count} atelier{inc.count > 1 ? 's' : ''}
+                              </span>
+                            </div>
+
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-[10px] font-bold text-slate-400">
+                                <span>Taux d'assiduité :</span>
+                                <span className="text-emerald-600 font-extrabold">{inc.taux}%</span>
+                              </div>
+                              <div className="w-full h-1.5 bg-slate-200 dark:bg-dark-700 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full"
+                                  style={{ width: `${inc.taux}%` }}
+                                />
                               </div>
                             </div>
-                            <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-black text-xs shrink-0">
-                              {inc.count} atelier{inc.count > 1 ? 's' : ''}
-                            </span>
                           </div>
-
-                          <div className="space-y-1">
-                            <div className="flex justify-between text-[10px] font-bold text-slate-400">
-                              <span>Taux d'assiduité :</span>
-                              <span className="text-emerald-600 font-extrabold">{inc.taux}%</span>
-                            </div>
-                            <div className="w-full h-1.5 bg-slate-200 dark:bg-dark-700 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full"
-                                style={{ width: `${inc.taux}%` }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                        ))}
                       </div>
                     )}
                   </div>
@@ -708,6 +720,7 @@ export default function Dashboard() {
           <p className="text-xs text-slate-300 mt-1">Calibrage vectoriel A4 Paysage (2 pages certifiées IDS)</p>
         </div>
       )}
+
     </div>
   );
 }
