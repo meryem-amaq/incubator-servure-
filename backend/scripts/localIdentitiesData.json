@@ -734,608 +734,847 @@
       "cardno": "6855593",
       "type": "Visiteur",
       "device_ip": "10.0.1.223"
+    },
+    {
+      "badge_id": "3",
+      "name": "Mustapha",
+      "cardno": null,
+      "type": "Administration",
+      "device_ip": null
+    },
+    {
+      "badge_id": "6",
+      "name": "Nadia SEFIANI",
+      "cardno": null,
+      "type": "Administration",
+      "device_ip": null
     }
   ],
   "users": [
     {
       "id": 1,
-      "email": "admin@cgs-incubateur.ma",
-      "badge_id": "1",
-      "type": "Administration",
       "nom": "Administrateur",
-      "prenom": ""
+      "prenom": "",
+      "email": "admin@cgs-incubateur.ma",
+      "role": "super_admin",
+      "type": "Administration",
+      "badge_id": "1",
+      "mot_de_passe": "$2a$12$eKfbZMh7XdocLI3CVE4HaOT6tGf2RD4.LthQmQ7G.VJ3PfQF2FHBm",
+      "actif": true
     },
     {
       "id": 2,
-      "email": "incubateur.digital.solidaire@gmail.com",
-      "badge_id": "145",
-      "type": "Administration",
       "nom": "AMA",
-      "prenom": "Test"
+      "prenom": "Test",
+      "email": "incubateur.digital.solidaire@gmail.com",
+      "role": "admin",
+      "type": "Administration",
+      "badge_id": "145",
+      "mot_de_passe": "$2a$12$KH6iIhLhp1TPVHqtZioL8uylAkVRyK6wqJH7LM/qS7lcfK1OjLxr2",
+      "actif": true
     },
     {
       "id": 11,
-      "email": "nadia.sefiani@ctpes.ma",
-      "badge_id": "6",
-      "type": "Administration",
       "nom": "sefiani",
-      "prenom": "nadia"
+      "prenom": "nadia",
+      "email": "nadia.sefiani@ctpes.ma",
+      "role": "admin",
+      "type": "Administration",
+      "badge_id": "6",
+      "mot_de_passe": "$2a$12$YvPDvwyUKqexDPbEu7ePy.6vMkCmQTI1tfFI9Ml.Ouw6T9xK3HAfe",
+      "actif": true
     },
     {
       "id": 14,
-      "email": "ilham.lahboub@ctpes.ma",
-      "badge_id": "194",
-      "type": "Administration",
       "nom": "LAHBOUB",
-      "prenom": "Ilham"
+      "prenom": "Ilham",
+      "email": "ilham.lahboub@ctpes.ma",
+      "role": "admin",
+      "type": "Administration",
+      "badge_id": "194",
+      "mot_de_passe": "$2a$12$UBlOgqkcLoCgEtEH.VvK7.CfzND9NOJrANUJqTe34.KEfrf7fT0du",
+      "actif": true
     },
     {
       "id": 15,
-      "email": "ayoub.elbouchikhi@ctpes.ma",
-      "badge_id": "143",
-      "type": "Administration",
       "nom": "EL BOUCHIKHI",
-      "prenom": "Ayoub"
+      "prenom": "Ayoub",
+      "email": "ayoub.elbouchikhi@ctpes.ma",
+      "role": "admin",
+      "type": "Administration",
+      "badge_id": "143",
+      "mot_de_passe": "$2a$12$25d8B0TwfCDK1a2XF188VOqq5OHbB5Gz9YGa9DAMjE2pqgcOo/hky",
+      "actif": true
     },
     {
       "id": 24,
-      "email": "ghar99ib@gmail.com",
-      "badge_id": "219",
-      "type": "Incube",
       "nom": "GHRIB",
-      "prenom": "Abdessamad"
+      "prenom": "Abdessamad",
+      "email": "ghar99ib@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "219",
+      "mot_de_passe": "$2a$10$3hnYioIJW5GPfL4Tijl5GODvFJG3lm/caax2lF0jW3k2ZLcRuNNc2",
+      "actif": false
     },
     {
       "id": 25,
-      "email": "aicha1998armani@gmail.com",
-      "badge_id": "154",
-      "type": "Incube",
       "nom": "ELAMRANI",
-      "prenom": "Aicha"
+      "prenom": "Aicha",
+      "email": "aicha1998armani@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "154",
+      "mot_de_passe": "$2a$10$25oXX2HMIkxnofvBGNeaQe6e0etIcfO.0Xg/daAUE6g/g9INomHXu",
+      "actif": false
     },
     {
       "id": 26,
-      "email": "chaimae.mandour14@gmail.com",
-      "badge_id": "165",
-      "type": "Incube",
       "nom": "Chaimae",
-      "prenom": "MANDOUR"
+      "prenom": "MANDOUR",
+      "email": "chaimae.mandour14@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "165",
+      "mot_de_passe": "$2a$10$ITarXc7goekxjZgMvarZ.e4J2VdajYpQBQKIQJrTbXTtC7w85BjIK",
+      "actif": false
     },
     {
       "id": 27,
-      "email": "elkandri.abdeljalil@gmail.com",
-      "badge_id": "159",
-      "type": "Incube",
       "nom": " EL KANDRI",
-      "prenom": "ABDELJALIL"
+      "prenom": "ABDELJALIL",
+      "email": "elkandri.abdeljalil@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "159",
+      "mot_de_passe": "$2a$10$B8I8jszR3YJi/.CS6ZmfWucaoe.GDw/aO776HXUgUVuSGgwNIo0p.",
+      "actif": false
     },
     {
       "id": 28,
-      "email": "elmrabti.khalid23@gmail.com",
-      "badge_id": "149",
-      "type": "Incube",
       "nom": "ELMRABTI",
-      "prenom": "Khalid"
+      "prenom": "Khalid",
+      "email": "elmrabti.khalid23@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "149",
+      "mot_de_passe": "$2a$10$pSMryPL9yyXmQfVFUbhiN.EtEDG97T0ICPRfWPfbUemwB8T8WPM0.",
+      "actif": false
     },
     {
       "id": 30,
-      "email": "louldelmaallem@gmail.com",
-      "badge_id": null,
-      "type": "Incube",
       "nom": "EL MAALEM Layla",
-      "prenom": "OULD"
+      "prenom": "OULD",
+      "email": "louldelmaallem@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": null,
+      "mot_de_passe": "$2a$10$jCQuX/m4Y04D.YMa9wniqOcCdUERqZ5SMKAWRVslYCf5rNAlNsGly",
+      "actif": false
     },
     {
       "id": 31,
-      "email": "abdelkrim.kouhaila@gmail.com",
-      "badge_id": "167",
-      "type": "Incube",
       "nom": "KOUHAILA",
-      "prenom": "Abdelkrim"
+      "prenom": "Abdelkrim",
+      "email": "abdelkrim.kouhaila@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "167",
+      "mot_de_passe": "$2a$12$Mkoth4DBSpRxVK2iSUScfuk5.rCP2KBZDsojvX1/pFTuJIRq90z0m",
+      "actif": false
     },
     {
       "id": 32,
-      "email": "badr.aiz@hotmail.com",
-      "badge_id": "161",
-      "type": "Incube",
       "nom": "Badreddine",
-      "prenom": "AIZ"
+      "prenom": "AIZ",
+      "email": "badr.aiz@hotmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "161",
+      "mot_de_passe": "$2a$12$Mkoth4DBSpRxVK2iSUScfuk5.rCP2KBZDsojvX1/pFTuJIRq90z0m",
+      "actif": false
     },
     {
       "id": 33,
-      "email": "saidaaboudouribb@gmail.com",
-      "badge_id": "164",
-      "type": "Incube",
       "nom": "ABOUDOURIB",
-      "prenom": "Saida"
+      "prenom": "Saida",
+      "email": "saidaaboudouribb@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "164",
+      "mot_de_passe": "$2a$10$a4/SSrZJ/6ep0arekM5RWuP15Sl0Iq/wUnJ17gWhFB0uN04kZNl7q",
+      "actif": false
     },
     {
       "id": 34,
-      "email": "zianisaid.web@gmail.com",
-      "badge_id": "163",
-      "type": "Incube",
       "nom": "Said",
-      "prenom": "ZIANI"
+      "prenom": "ZIANI",
+      "email": "zianisaid.web@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "163",
+      "mot_de_passe": "$2a$10$e0VHS/YyeMMS3g/ktTEaM.2F20GGNAk.MDSP7d1MLwQ8ZIGxTxJIK",
+      "actif": false
     },
     {
       "id": 35,
-      "email": "boujahdachraf@gmail.com",
-      "badge_id": "152",
-      "type": "Incube",
       "nom": "BOUJAHED",
-      "prenom": "Achraf"
+      "prenom": "Achraf",
+      "email": "boujahdachraf@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "152",
+      "mot_de_passe": "$2a$10$Pb0GeLiyq/ixHepssSXfMuA040Uaw0EYA4lIyc3sOiRJWPS49OO0K",
+      "actif": false
     },
     {
       "id": 36,
-      "email": "morcy.bennani@edu.isga.ma",
-      "badge_id": "162",
-      "type": "Incube",
       "nom": "Morcy",
-      "prenom": "BENNANI"
+      "prenom": "BENNANI",
+      "email": "morcy.bennani@edu.isga.ma",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "162",
+      "mot_de_passe": "$2a$10$5HhlvZTN6OIG3vakLDZ4qOrnw26JUX4y1nYRvp3MJuAHvNn1ThAqO",
+      "actif": false
     },
     {
       "id": 37,
-      "email": "anasghziel@gmail.com",
-      "badge_id": null,
-      "type": "Incube",
       "nom": "ANASS",
-      "prenom": "GHZIEL"
+      "prenom": "GHZIEL",
+      "email": "anasghziel@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": null,
+      "mot_de_passe": "$2a$10$qB6Jr3HU/vuAGkoYqmRx5OLX6mRTZ.R9WshXg7uaMzwOO3Vx8nA1m",
+      "actif": false
     },
     {
       "id": 38,
-      "email": "sabermahfoudi99@gmail.com",
-      "badge_id": "174",
-      "type": "Incube",
       "nom": "Mahfoudi",
-      "prenom": "Saber"
+      "prenom": "Saber",
+      "email": "sabermahfoudi99@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "174",
+      "mot_de_passe": "$2a$10$COprkrq54jOonDiGSX.b8uz/Zpz5LmV8hEu8IlmEye8K0qu9LKeqa",
+      "actif": false
     },
     {
       "id": 39,
-      "email": "diquarks@gmail.com",
-      "badge_id": "168",
-      "type": "Incube",
       "nom": "MASTATI Tawfik",
-      "prenom": "EL"
+      "prenom": "EL",
+      "email": "diquarks@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "168",
+      "mot_de_passe": "$2a$10$smwKjUZpzlzBurGYv00.Pug1p4Hk3bnfZ2GYdn8PVpoX2KkZ848VG",
+      "actif": false
     },
     {
       "id": 40,
-      "email": "adnan.laalaoui@gmail.com",
-      "badge_id": "169",
-      "type": "Incube",
       "nom": "LAALAOUI",
-      "prenom": "Adnan"
+      "prenom": "Adnan",
+      "email": "adnan.laalaoui@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "169",
+      "mot_de_passe": "$2a$10$qpwTyVcDP/HbzOfdMgUBv.73zwY6vTOl3nqR0/sXGJGjk8rSnqJim",
+      "actif": false
     },
     {
       "id": 41,
-      "email": "tahawardighi1@gmail.com",
-      "badge_id": "155",
-      "type": "Incube",
       "nom": "WARDIGHI",
-      "prenom": "Taha"
+      "prenom": "Taha",
+      "email": "tahawardighi1@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "155",
+      "mot_de_passe": "$2a$10$Ue348ColUPkBwDmrnrlqou3GmI2MOuVsnZTG2BUY7rb.ZOc35KRia",
+      "actif": false
     },
     {
       "id": 42,
-      "email": "g.halhoule22@gmail.com",
-      "badge_id": "150",
-      "type": "Incube",
       "nom": "HALHOULE",
-      "prenom": "Ghizlane"
+      "prenom": "Ghizlane",
+      "email": "g.halhoule22@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "150",
+      "mot_de_passe": "$2a$10$oLHsgmBWkNVCJ..Xcm7ujOJaMBdsv.mbTF7ZYulDa0X.1mpHehoSi",
+      "actif": false
     },
     {
       "id": 43,
-      "email": "e.abdelouadoud23@gmail.com",
-      "badge_id": "153",
-      "type": "Incube",
       "nom": "Elyanouti",
-      "prenom": "Abdelouadoud"
+      "prenom": "Abdelouadoud",
+      "email": "e.abdelouadoud23@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "153",
+      "mot_de_passe": "$2a$10$r2gSTlJZckBgHv9cv3o3lOWtd2aoISmV5hFUkkfwg9NRfqcgU.mxa",
+      "actif": false
     },
     {
       "id": 44,
-      "email": "agourdyousef@gmail.com",
-      "badge_id": "151",
-      "type": "Incube",
       "nom": "AGOURD",
-      "prenom": "Youssef"
+      "prenom": "Youssef",
+      "email": "agourdyousef@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "151",
+      "mot_de_passe": "$2a$10$2lszoY22viTzJWIUHpl0xe9XKf7n0dGcwIYo7d.6C320CKVuELFeC",
+      "actif": false
     },
     {
       "id": 45,
-      "email": "dardour.badreddin@gmail.com",
-      "badge_id": "180",
-      "type": "Incube",
       "nom": "Dardour",
-      "prenom": "Badreddin"
+      "prenom": "Badreddin",
+      "email": "dardour.badreddin@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "180",
+      "mot_de_passe": "$2a$10$sC8Yy/7JYWBrLaQB6y0cieE4TrPpMebMrFVIjcG8h4OvjNRgjBRVm",
+      "actif": false
     },
     {
       "id": 46,
-      "email": "hamzaelbadr.elbakkali@gmail.com",
-      "badge_id": null,
-      "type": "Incube",
       "nom": "El Badr EL BAKKALI",
-      "prenom": "Hamza"
+      "prenom": "Hamza",
+      "email": "hamzaelbadr.elbakkali@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "22",
+      "mot_de_passe": "$2a$10$jZmZ9cCdGjZICnxRhWYM4.BaFAjswshV5YgS4NL6IF/GbhSf4CQry",
+      "actif": false
     },
     {
       "id": 47,
-      "email": "chakri.naoufal@gmail.com",
-      "badge_id": "158",
-      "type": "Incube",
       "nom": "NAOUFAL",
-      "prenom": "CHAKRI"
+      "prenom": "CHAKRI",
+      "email": "chakri.naoufal@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "158",
+      "mot_de_passe": "$2a$10$/shM9Mt1yJxiJFDLLPetsOCS7k9Fl/quQdcSl7bZRdsV8iTdGFeie",
+      "actif": false
     },
     {
       "id": 48,
-      "email": "contact@xai.ma",
-      "badge_id": "177",
-      "type": "Incube",
       "nom": "Eddine HALIM",
-      "prenom": "Bahae"
+      "prenom": "Bahae",
+      "email": "contact@xai.ma",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "177",
+      "mot_de_passe": "$2a$10$VFPX494E3A8PmFyKqMKPo.39bf0lgyWxe14.16PYzEuzaXguadFQu",
+      "actif": false
     },
     {
       "id": 49,
-      "email": "hazim7832@gmail.com",
-      "badge_id": "171",
-      "type": "Incube",
       "nom": "AZIM",
-      "prenom": "Hamza"
+      "prenom": "Hamza",
+      "email": "hazim7832@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "171",
+      "mot_de_passe": "$2a$10$VXqLfIq4mqT1CbrEYUabTu7Ry9PL94/A0hlbaZUiSLl3FBEc3K.G.",
+      "actif": false
     },
     {
       "id": 50,
-      "email": "douaelanaya1@gmail.com",
-      "badge_id": "173",
-      "type": "Incube",
       "nom": "Douae",
-      "prenom": "LANAYA"
+      "prenom": "LANAYA",
+      "email": "douaelanaya1@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "173",
+      "mot_de_passe": "$2a$10$8lXCnMH0Ddb/GPhmIYj4/OhLhlBL4iLK4NsHdU8Z6lDSit.w81L02",
+      "actif": false
     },
     {
       "id": 51,
-      "email": "cordobadigitalagency@gmail.com",
-      "badge_id": null,
-      "type": "Incube",
       "nom": "Zakaria",
-      "prenom": "DAOU"
+      "prenom": "DAOU",
+      "email": "cordobadigitalagency@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "41",
+      "mot_de_passe": "$2a$10$8W7M9qJkIcJIV57KAi0Lp.wbB5EXzfvEEiMRa3OAEbTVNFqVJC65.",
+      "actif": false
     },
     {
       "id": 52,
-      "email": "omaressadiqui@gmail.com",
-      "badge_id": "233",
-      "type": "Incube",
       "nom": "ESSADQY",
-      "prenom": "Omar"
+      "prenom": "Omar",
+      "email": "omaressadiqui@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "233",
+      "mot_de_passe": "$2a$10$law09ZmCfHRBn0nYhTZ3aOpQdScNv.loogE4eeBN30EnMjPWOJU4q",
+      "actif": false
     },
     {
       "id": 53,
-      "email": "youneschikh@gmail.com",
-      "badge_id": null,
-      "type": "Incube",
       "nom": "CHIKH",
-      "prenom": "Younes"
+      "prenom": "Younes",
+      "email": "youneschikh@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": null,
+      "mot_de_passe": "$2a$10$CcWSKXCiDaH1vlYJNdf6Eucz0XDzRe3KWpBk93ZWqcyU3LLWCI2c2",
+      "actif": false
     },
     {
       "id": 54,
-      "email": "benaqa@gmail.com",
-      "badge_id": "178",
-      "type": "Incube",
       "nom": "EL MAHDI",
-      "prenom": "BENAQA"
+      "prenom": "BENAQA",
+      "email": "benaqa@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "178",
+      "mot_de_passe": "$2a$10$ZGOJE9nveKbh/uqcgJD0H.ZtMj5kdUQc6V2UATFbvQrg53j/V5F32",
+      "actif": false
     },
     {
       "id": 55,
-      "email": "elatrachdesign@gmail.com",
-      "badge_id": "179",
-      "type": "Incube",
       "nom": "Younes",
-      "prenom": "Elatrach"
+      "prenom": "Elatrach",
+      "email": "elatrachdesign@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "179",
+      "mot_de_passe": "$2a$10$xt4If0qWSbBpMGwIEKT7yOVRnlU9WUnPog4vKeB1iLwNwO1Y7JSTW",
+      "actif": false
     },
     {
       "id": 56,
-      "email": "t.harkat@gmail.com",
-      "badge_id": "146",
-      "type": "Incube",
       "nom": " HARKAT",
-      "prenom": "Tahar"
+      "prenom": "Tahar",
+      "email": "t.harkat@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "146",
+      "mot_de_passe": "$2a$10$byD5RMAv6oKyERPaPj93bubjhmDomSTDWkr1j47ksZFV4rs//AnO6",
+      "actif": false
     },
     {
       "id": 57,
-      "email": "elhalabiayoub6@gmail.com",
-      "badge_id": "148",
-      "type": "Incube",
       "nom": "ELHALABI",
-      "prenom": "Ayoub"
+      "prenom": "Ayoub",
+      "email": "elhalabiayoub6@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "148",
+      "mot_de_passe": "$2a$10$e.DQTjgH4m9MTl9CtCbxlO2PPpiau38ekepbDSoKI8sHed0Tdp8ae",
+      "actif": false
     },
     {
       "id": 58,
-      "email": "mehdigarmaj37@gmail.com",
-      "badge_id": "157",
-      "type": "Incube",
       "nom": "GARMAJ",
-      "prenom": "Mehdi"
+      "prenom": "Mehdi",
+      "email": "mehdigarmaj37@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "157",
+      "mot_de_passe": "$2a$10$MQJLDzH9SxusGIdgdRjgN.cfAWI1AiOpzgf5nyoH..kGegWomykTy",
+      "actif": false
     },
     {
       "id": 59,
-      "email": "taharelharit@gmail.com",
-      "badge_id": "160",
-      "type": "Incube",
       "nom": "El Harit",
-      "prenom": "Tahar"
+      "prenom": "Tahar",
+      "email": "taharelharit@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "160",
+      "mot_de_passe": "$2a$10$3vFFer5fvJphP0y5YeCCCOo75EmweQf6KzKaB29f6qHwYHUI3PkhO",
+      "actif": false
     },
     {
       "id": 60,
-      "email": "techamghar@gmail.com",
-      "badge_id": "181",
-      "type": "Incube",
       "nom": "AMGHAR",
-      "prenom": "Riham"
+      "prenom": "Riham",
+      "email": "techamghar@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "181",
+      "mot_de_passe": "$2a$10$OHxidte7wPQDKSPsC0r.yeYXtuRiejw.4woPb46oJsMC3WgKRhbB.",
+      "actif": false
     },
     {
       "id": 61,
-      "email": "sami.atif2001@gmail.com",
-      "badge_id": "182",
-      "type": "Incube",
       "nom": "ATIF",
-      "prenom": "Sami"
+      "prenom": "Sami",
+      "email": "sami.atif2001@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "182",
+      "mot_de_passe": "$2a$10$sSGMUo.yhKKr8WB5xF655ODFAcauXcdbbazFtaTPupVeHvdcgAb3.",
+      "actif": false
     },
     {
       "id": 62,
-      "email": "simohamedsidikin1@gmail.com",
-      "badge_id": "183",
-      "type": "Incube",
       "nom": "Mohamed",
-      "prenom": "SIDIKI"
+      "prenom": "SIDIKI",
+      "email": "simohamedsidikin1@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "183",
+      "mot_de_passe": "$2a$10$nsJH90v3L5veeoyHjXnecu8HuZhsMdVd747XoUipLzCz3iKEn4Y1y",
+      "actif": false
     },
     {
       "id": 63,
-      "email": "ikram.ballouk@gmail.com",
-      "badge_id": "147",
-      "type": "Incube",
       "nom": "BALLOUK",
-      "prenom": "Ikram"
+      "prenom": "Ikram",
+      "email": "ikram.ballouk@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "147",
+      "mot_de_passe": "$2a$10$TKTIjxk7bEy/JtXTtIaIUOlPMUKBVqwdYjseHtcCa3Zn24wya9lSa",
+      "actif": false
     },
     {
       "id": 64,
-      "email": "nizarhouarpro@gmail.com",
-      "badge_id": "184",
-      "type": "Incube",
       "nom": "Nizar",
-      "prenom": "Houar"
+      "prenom": "Houar",
+      "email": "nizarhouarpro@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "184",
+      "mot_de_passe": "$2a$10$ySqq0uEGURZ0PSsu/9dg2.XUMKDY5x2fYF35MfPoAHfsVbNPz6NIG",
+      "actif": false
     },
     {
       "id": 65,
-      "email": "mehdimellit@gmail.com",
-      "badge_id": null,
-      "type": "Incube",
       "nom": "mehdi mellit",
-      "prenom": "El"
+      "prenom": "El",
+      "email": "mehdimellit@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "19",
+      "mot_de_passe": "$2a$10$faRonkgPMSonTmQrYfSOAOjewLf9Odn.bUPrjUsJJmsXVtc2nCL2q",
+      "actif": false
     },
     {
       "id": 66,
-      "email": "contact@smailbalhs.com",
-      "badge_id": "186",
-      "type": "Incube",
       "nom": "SMAIL",
-      "prenom": "BALHS"
+      "prenom": "BALHS",
+      "email": "contact@smailbalhs.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "186",
+      "mot_de_passe": "$2a$10$2haIiRDn5UtTQOgLQU6MF.3je8A1CRYou2mJ3.5NzLsk2z2eWBv/G",
+      "actif": false
     },
     {
       "id": 67,
-      "email": "ma.mohamed.amouri@gmail.com",
-      "badge_id": "187",
-      "type": "Incube",
       "nom": "Mohamed",
-      "prenom": "Amouri"
+      "prenom": "Amouri",
+      "email": "ma.mohamed.amouri@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "187",
+      "mot_de_passe": "$2a$10$cB3zt75AbdofWldz9yvBreDeBnD08LIpu2YzhgdY2/QrIU00WalMm",
+      "actif": false
     },
     {
       "id": 68,
-      "email": "anass.baba.contact@gmail.com",
-      "badge_id": "223",
-      "type": "Incube",
       "nom": "BABA",
-      "prenom": "Anass"
+      "prenom": "Anass",
+      "email": "anass.baba.contact@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "223",
+      "mot_de_passe": "$2a$10$3WffSs0Irlx.6LxFnvz6UuzqutOcgEyNa2/Q2tbpujn/zeZYClA7C",
+      "actif": false
     },
     {
       "id": 69,
-      "email": "h.elfaqir.hassan@gmail.com",
-      "badge_id": "188",
-      "type": "Incube",
       "nom": "FAQIR HASSAN",
-      "prenom": "EL"
+      "prenom": "EL",
+      "email": "h.elfaqir.hassan@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "188",
+      "mot_de_passe": "$2a$10$b9M8x5PP2BN.qh0u4PXijeolQywTDtbscaGCp2BSGWVPRSs9P2KFS",
+      "actif": false
     },
     {
       "id": 70,
-      "email": "nn0864772@gmail.com",
-      "badge_id": "189",
-      "type": "Incube",
       "nom": "Elouarti",
-      "prenom": "Nabil"
+      "prenom": "Nabil",
+      "email": "nn0864772@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "189",
+      "mot_de_passe": "$2a$10$zp/iCdc1GxTwqXctcMR4rOJ/uRT2OTugk3tFMyrec46UgOLqwNpLW",
+      "actif": false
     },
     {
       "id": 71,
-      "email": "a.tribak.2000@gmail.com",
-      "badge_id": "190",
-      "type": "Incube",
       "nom": "Aymane",
-      "prenom": "Tribak"
+      "prenom": "Tribak",
+      "email": "a.tribak.2000@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "190",
+      "mot_de_passe": "$2a$10$6jRXZ/8IaDmPcwctRfda1OTiT9QB8n5zkIq/6ee3iUl87Hdr.EC7K",
+      "actif": false
     },
     {
       "id": 72,
-      "email": "ismail.ess.98@gmail.com",
-      "badge_id": null,
-      "type": "Incube",
       "nom": "Ismail",
-      "prenom": "Essabbagh"
+      "prenom": "Essabbagh",
+      "email": "ismail.ess.98@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": null,
+      "mot_de_passe": "$2a$10$DA6AFRzeGQsG0u1dtgaMKO9UMTzK7LpN6O6H.CAn9wyv.jYqXgP7G",
+      "actif": false
     },
     {
       "id": 73,
-      "email": "aitaissaaissa00@gmail.com",
-      "badge_id": "192",
-      "type": "Incube",
       "nom": "AIT AISSA",
-      "prenom": "RACHID"
+      "prenom": "RACHID",
+      "email": "aitaissaaissa00@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "192",
+      "mot_de_passe": "$2a$10$9K1MSemdKLtOGZAPl1tqtelH2j6q5TJv0MqRd7aJjMbRKCvTu1do2",
+      "actif": false
     },
     {
       "id": 74,
-      "email": "abdoubeniich@gmail.com",
-      "badge_id": null,
-      "type": "Incube",
       "nom": "Abdelghani",
-      "prenom": "BENIICH"
+      "prenom": "BENIICH",
+      "email": "abdoubeniich@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "42",
+      "mot_de_passe": "$2a$10$MbWAJIEsM4BB6Xsz1g/Hy.OliNmCO4OxHLbdDDJ0DpmdlqekHMyDe",
+      "actif": false
     },
     {
       "id": 75,
-      "email": "laila.a@finthreadsolutions.com",
-      "badge_id": "195",
-      "type": "Incube",
       "nom": "Laila",
-      "prenom": "Aatti"
+      "prenom": "Aatti",
+      "email": "laila.a@finthreadsolutions.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "195",
+      "mot_de_passe": "$2a$10$7slc.qY4cZWQLEED5jAxje2teJgAH3Jz1qg2/KPriCBo0z0WxQPB6",
+      "actif": false
     },
     {
       "id": 76,
-      "email": "ilakbiripro@gmail.com",
-      "badge_id": "193",
-      "type": "Incube",
       "nom": "Idriss",
-      "prenom": "LAKBIRI"
+      "prenom": "LAKBIRI",
+      "email": "ilakbiripro@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "193",
+      "mot_de_passe": "$2a$10$e6ey5I5bhFw0j9u7HJySkO5WE1OR9hRj/JhElitO20DWfitJFBHbS",
+      "actif": false
     },
     {
       "id": 77,
-      "email": "adibdinia21@gmail.com",
-      "badge_id": "170",
-      "type": "Incube",
       "nom": "Adib",
-      "prenom": "DINIA"
+      "prenom": "DINIA",
+      "email": "adibdinia21@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "170",
+      "mot_de_passe": "$2a$10$TIoJjdQe.wkuHU06/Bvs4edMKD7nFNDanYRHnUVwQvO/aAyhw7vSi",
+      "actif": false
     },
     {
       "id": 78,
-      "email": "yassineelyousfi928@gmail.com",
-      "badge_id": "176",
-      "type": "Incube",
       "nom": "YOUSFI Yassine",
-      "prenom": "EL"
+      "prenom": "EL",
+      "email": "yassineelyousfi928@gmail.com",
+      "role": "incube",
+      "type": "Incube",
+      "badge_id": "176",
+      "mot_de_passe": "$2a$10$yzf2b0VBZLbB8w6nv46e9OfJyVcnG0L5mT4uIAUq87jV/APqTKCnG",
+      "actif": false
     },
     {
       "id": 79,
-      "email": "hicham@ctpes.ma",
-      "badge_id": "227",
-      "type": "Administration",
       "nom": "BELAAZIZ",
-      "prenom": "Hicham"
+      "prenom": "Hicham",
+      "email": "hicham@ctpes.ma",
+      "role": "admin",
+      "type": "Administration",
+      "badge_id": "227",
+      "mot_de_passe": "$2b$10$defaultHash",
+      "actif": true
     },
     {
       "id": 80,
-      "email": "mustapha@ctpes.ma",
-      "badge_id": "3",
-      "type": "Administration",
       "nom": "Mustapha",
-      "prenom": ""
+      "prenom": "",
+      "email": "mustapha@ctpes.ma",
+      "role": "admin",
+      "type": "Administration",
+      "badge_id": "3",
+      "mot_de_passe": "$2b$10$defaultHash",
+      "actif": true
     },
     {
       "id": 81,
-      "email": "kawtar@ctpes.ma",
-      "badge_id": "144",
-      "type": "Administration",
       "nom": "SBAI",
-      "prenom": "Kawtar"
+      "prenom": "Kawtar",
+      "email": "kawtar@ctpes.ma",
+      "role": "admin",
+      "type": "Administration",
+      "badge_id": "144",
+      "mot_de_passe": "$2b$10$defaultHash",
+      "actif": true
     },
     {
       "id": 82,
-      "email": "charaf@ctpes.ma",
-      "badge_id": "205",
-      "type": "Administration",
       "nom": "EL AMRANI",
-      "prenom": "Charaf"
+      "prenom": "Charaf",
+      "email": "charaf@ctpes.ma",
+      "role": "admin",
+      "type": "Administration",
+      "badge_id": "205",
+      "mot_de_passe": "$2b$10$defaultHash",
+      "actif": true
     },
     {
       "id": 83,
-      "email": "meryemamqran@gmail.com",
-      "badge_id": "ADMIN-003",
-      "type": "Autre",
       "nom": "Meryem",
-      "prenom": "Amqran"
+      "prenom": "Amqran",
+      "email": "meryemamqran@gmail.com",
+      "role": "consultant",
+      "type": "Incube",
+      "badge_id": "141",
+      "mot_de_passe": "$2b$10$defaultHash",
+      "actif": true
     },
     {
       "id": 84,
-      "email": "visiteur1@cgs.ma",
-      "badge_id": "57",
-      "type": "Visiteur",
       "nom": "VISITEUR 1",
-      "prenom": ""
+      "prenom": "",
+      "email": "visiteur1@cgs.ma",
+      "role": "consultant",
+      "type": "Visiteur",
+      "badge_id": "57",
+      "mot_de_passe": "$2b$10$defaultHash",
+      "actif": true
     },
     {
       "id": 85,
-      "email": "visiteur2@cgs.ma",
-      "badge_id": "58",
-      "type": "Visiteur",
       "nom": "VISITEUR 2",
-      "prenom": ""
+      "prenom": "",
+      "email": "visiteur2@cgs.ma",
+      "role": "consultant",
+      "type": "Visiteur",
+      "badge_id": "58",
+      "mot_de_passe": "$2b$10$defaultHash",
+      "actif": true
     },
     {
       "id": 86,
-      "email": "visiteur3@cgs.ma",
-      "badge_id": "59",
-      "type": "Visiteur",
       "nom": "VISITEUR 3",
-      "prenom": ""
+      "prenom": "",
+      "email": "visiteur3@cgs.ma",
+      "role": "consultant",
+      "type": "Visiteur",
+      "badge_id": "59",
+      "mot_de_passe": "$2b$10$defaultHash",
+      "actif": true
     },
     {
       "id": 87,
-      "email": "visiteur4@cgs.ma",
-      "badge_id": "60",
-      "type": "Visiteur",
       "nom": "VISITEUR 4",
-      "prenom": ""
+      "prenom": "",
+      "email": "visiteur4@cgs.ma",
+      "role": "consultant",
+      "type": "Visiteur",
+      "badge_id": "60",
+      "mot_de_passe": "$2b$10$defaultHash",
+      "actif": true
     },
     {
       "id": 88,
-      "email": "visiteur5@cgs.ma",
-      "badge_id": "61",
-      "type": "Visiteur",
       "nom": "VISITEUR 5",
-      "prenom": ""
+      "prenom": "",
+      "email": "visiteur5@cgs.ma",
+      "role": "consultant",
+      "type": "Visiteur",
+      "badge_id": "61",
+      "mot_de_passe": "$2b$10$defaultHash",
+      "actif": true
     },
     {
       "id": 89,
-      "email": "visiteur6@cgs.ma",
-      "badge_id": "62",
-      "type": "Visiteur",
       "nom": "VISITEUR 6",
-      "prenom": ""
+      "prenom": "",
+      "email": "visiteur6@cgs.ma",
+      "role": "consultant",
+      "type": "Visiteur",
+      "badge_id": "62",
+      "mot_de_passe": "$2b$10$defaultHash",
+      "actif": true
     },
     {
       "id": 90,
-      "email": "visiteur7@cgs.ma",
-      "badge_id": "64",
-      "type": "Visiteur",
       "nom": "VISITEUR 7",
-      "prenom": ""
+      "prenom": "",
+      "email": "visiteur7@cgs.ma",
+      "role": "consultant",
+      "type": "Visiteur",
+      "badge_id": "64",
+      "mot_de_passe": "$2b$10$defaultHash",
+      "actif": true
     },
     {
       "id": 91,
-      "email": "visiteur8@cgs.ma",
-      "badge_id": "63",
-      "type": "Visiteur",
       "nom": "VISITEUR 8",
-      "prenom": ""
+      "prenom": "",
+      "email": "visiteur8@cgs.ma",
+      "role": "consultant",
+      "type": "Visiteur",
+      "badge_id": "63",
+      "mot_de_passe": "$2b$10$defaultHash",
+      "actif": true
     },
     {
       "id": 92,
-      "email": "visiteur9@cgs.ma",
-      "badge_id": "66",
-      "type": "Visiteur",
       "nom": "VISITEUR 9",
-      "prenom": ""
+      "prenom": "",
+      "email": "visiteur9@cgs.ma",
+      "role": "consultant",
+      "type": "Visiteur",
+      "badge_id": "66",
+      "mot_de_passe": "$2b$10$defaultHash",
+      "actif": true
     },
     {
       "id": 93,
-      "email": "visiteur10@cgs.ma",
-      "badge_id": "65",
-      "type": "Visiteur",
       "nom": "VISITEUR 10",
-      "prenom": ""
+      "prenom": "",
+      "email": "visiteur10@cgs.ma",
+      "role": "consultant",
+      "type": "Visiteur",
+      "badge_id": "65",
+      "mot_de_passe": "$2b$10$defaultHash",
+      "actif": true
     },
     {
       "id": 94,
-      "email": "ouissal.missaoui@cgs.ma",
-      "badge_id": "139",
-      "type": "Visiteur",
       "nom": "ouissal",
-      "prenom": "MISSAOUI"
+      "prenom": "MISSAOUI",
+      "email": "ouissal.missaoui@cgs.ma",
+      "role": "consultant",
+      "type": "Visiteur",
+      "badge_id": "139",
+      "mot_de_passe": "$2b$10$defaultHash",
+      "actif": true
     }
   ],
   "incubes": [

@@ -22,7 +22,7 @@ async function runSync() {
   const rawData = fs.readFileSync(dataPath, 'utf8');
   const { tourniquetUsers, users, incubes } = JSON.parse(rawData);
 
-  // 1. Synchronisation de TourniquetUser (105 usagers avec leurs noms exacts et types Administration, Incube, Visiteur)
+  // 1. Synchronisation de TourniquetUser (107 usagers avec leurs noms exacts et types Administration, Incube, Visiteur)
   console.log(`\n📋 1. Synchronisation de ${tourniquetUsers.length} usagers TourniquetUser...`);
   let tuCount = 0;
   for (const tu of tourniquetUsers) {
@@ -37,15 +37,25 @@ async function runSync() {
   }
   console.log(`✅ ${tuCount} usagers synchronisés dans 'tourniquet_users'.`);
 
-  // 2. Synchronisation des types et badges dans la table User
-  console.log(`\n👤 2. Synchronisation de ${users.length} comptes User (badge_id et type)...`);
+  // 2. Synchronisation et Création des comptes User (badge_id, role, type)
+  console.log(`\n👤 2. Synchronisation de ${users.length} comptes User (badge_id, role et type)...`);
   let uCount = 0;
+  let uCreated = 0;
   for (const u of users) {
-    const whereClause = u.email ? { email: u.email } : { id: u.id };
-    const existing = await User.findOne({ where: whereClause });
+    let existing = null;
+    if (u.email) {
+      existing = await User.findOne({ where: { email: u.email } });
+    }
+    if (!existing && u.id) {
+      existing = await User.findByPk(u.id);
+    }
+
     if (existing) {
+      existing.role = u.role || existing.role;
       existing.type = u.type || existing.type;
       if (u.badge_id) existing.badge_id = u.badge_id;
+      if (u.nom && !existing.nom) existing.nom = u.nom;
+      if (u.prenom && !existing.prenom) existing.prenom = u.prenom;
       await existing.save();
       uCount++;
 
@@ -61,9 +71,34 @@ async function runSync() {
           }
         ).catch(() => {});
       }
+    } else {
+      // Créer le compte utilisateur manquant (ex: Mustapha, Hicham, etc.)
+      const newUser = await User.create({
+        nom: u.nom || 'Admin',
+        prenom: u.prenom || '',
+        email: u.email || `user_${Date.now()}@cgs-incubateur.ma`,
+        mot_de_passe: u.mot_de_passe || '$2b$10$defaultHashPlaceholderAdmin',
+        role: u.role || 'admin',
+        type: u.type || 'Administration',
+        badge_id: u.badge_id || null,
+        actif: u.actif !== undefined ? u.actif : true
+      }).catch(err => {
+        console.warn('⚠️ Impossible de créer utilisateur:', u.email, err.message);
+        return null;
+      });
+
+      if (newUser) {
+        uCreated++;
+        if (newUser.badge_id) {
+          await Attendance.update(
+            { user_id: newUser.id },
+            { where: { raw_badge_id: String(newUser.badge_id).trim() } }
+          ).catch(() => {});
+        }
+      }
     }
   }
-  console.log(`✅ ${uCount} utilisateurs mis à jour avec leurs rôles/types et badges.`);
+  console.log(`✅ ${uCount} utilisateurs mis à jour, ${uCreated} créés.`);
 
   // 3. Synchronisation des badges dans la table Incube
   console.log(`\n🚀 3. Synchronisation de ${incubes.length} incubés (badge_id)...`);
