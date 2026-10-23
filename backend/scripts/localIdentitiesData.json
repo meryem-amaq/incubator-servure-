@@ -25,7 +25,7 @@
       "badge_id": "142",
       "name": "MEZZYANE AMINE",
       "cardno": "6895052",
-      "type": "Visiteur",
+      "type": "Administration",
       "device_ip": "10.0.1.223"
     },
     {
@@ -1574,6 +1574,17 @@
       "type": "Visiteur",
       "badge_id": "139",
       "mot_de_passe": "$2b$10$defaultHash",
+      "actif": true
+    },
+    {
+      "id": 95,
+      "nom": "MEZZYANE",
+      "prenom": "Amine",
+      "email": "Aminemezzyane@gmail.com",
+      "role": "admin",
+      "type": "Administration",
+      "badge_id": "142",
+      "mot_de_passe": "",
       "actif": true
     }
   ],
