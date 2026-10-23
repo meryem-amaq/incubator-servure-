@@ -24,8 +24,7 @@ import {
   CalendarCheck,
   CalendarPlus,
   MapPin,
-  User,
-  Coins
+  User
 } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -351,18 +350,6 @@ export default function Dashboard() {
 
             <button
               type="button"
-              onClick={() => setActiveTab('materiel')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${activeTab === 'materiel'
-                ? 'bg-amber-500 text-white shadow-sm'
-                : 'text-slate-500 hover:text-slate-800 dark:text-dark-300'
-                }`}
-            >
-              <Coins size={14} className={activeTab === 'materiel' ? 'text-white' : 'text-amber-500'} />
-              <span>Investissements Matériel</span>
-            </button>
-
-            <button
-              type="button"
               onClick={() => setActiveTab('impact')}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${activeTab === 'impact'
                 ? 'bg-emerald-600 text-white shadow-sm'
@@ -481,15 +468,6 @@ export default function Dashboard() {
 
           {/* Démographie */}
           <KpiDemographie stats={stats} />
-        </div>
-      )}
-
-      {/* =========================================================================
-         VUE DÉDIÉE : INVESTISSEMENTS MATÉRIEL PAR CATÉGORIE
-         ========================================================================= */}
-      {activeTab === 'materiel' && (
-        <div className="space-y-6 slide-up">
-          <KpiMaterielInvestissement stats={stats} />
         </div>
       )}
 
