@@ -11,9 +11,9 @@ const DEVICES = (process.env.ZKT_DEVICES || "10.0.1.120,10.0.1.201,10.0.1.113,10
 
 const PORT = parseInt(process.env.ZKT_PORT || '4370', 10);
 
-// Cartographie optionnelle de bornes dédiées Entrée / Sortie si configurées
-const IN_DEVICES = (process.env.ZKT_IN_DEVICES || '').split(',').map(s => s.trim()).filter(Boolean);
-const OUT_DEVICES = (process.env.ZKT_OUT_DEVICES || '').split(',').map(s => s.trim()).filter(Boolean);
+// Cartographie stricte des bornes dédiées Entrée / Sortie (avec valeurs par défaut si non définies en .env)
+const IN_DEVICES = (process.env.ZKT_IN_DEVICES || '10.0.1.116,10.0.1.223,10.0.1.201').split(',').map(s => s.trim()).filter(Boolean);
+const OUT_DEVICES = (process.env.ZKT_OUT_DEVICES || '10.0.1.17,10.0.1.120,10.0.1.113,10.0.1.108').split(',').map(s => s.trim()).filter(Boolean);
 
 function normalizeName(str) {
   if (!str) return '';
@@ -365,17 +365,17 @@ async function collectFromAllDevices() {
           continue;
         }
 
-        // Cohérence d'état physique et préservation des sorties :
-        // 1. Le 1er scan du jour est TOUJOURS 'IN' (la personne arrive sur le site).
-        // 2. Si la personne est déjà à l'intérieur (nextExpectedDir === 'OUT') :
-        //    Ce scan (> 60s) est sa SORTIE ('OUT'), y compris si elle a bipé sur une borne d'entrée utilisée pour sortir avant la mise à jour.
-        // 3. Si la personne est à l'extérieur (nextExpectedDir === 'IN') :
-        //    Ce scan est son ENTRÉE ('IN').
-        let direction = nextExpectedDir;
-        if (nextExpectedDir === 'OUT' && OUT_DEVICES.includes(scan.deviceIp)) {
+        // Règle stricte et définitive de détection du sens :
+        // 1. Si l'IP est dans OUT_DEVICES (ou si la borne ZKTeco indique punch = 1), le type est STRICTEMENT et DÉFINITIVEMENT 'OUT'.
+        // 2. Si l'IP est dans IN_DEVICES (ou si la borne ZKTeco indique punch = 0), le type est STRICTEMENT et DÉFINITIVEMENT 'IN'.
+        // 3. Ne recourir à l'alternance automatique que pour les bornes bidirectionnelles non spécifiées.
+        let direction;
+        if (OUT_DEVICES.includes(scan.deviceIp) || scan.punch === 1) {
           direction = 'OUT';
-        } else if (nextExpectedDir === 'IN' && IN_DEVICES.includes(scan.deviceIp)) {
+        } else if (IN_DEVICES.includes(scan.deviceIp) || scan.punch === 0) {
           direction = 'IN';
+        } else {
+          direction = nextExpectedDir;
         }
 
         lastAcceptedTime = t;
@@ -481,13 +481,18 @@ async function recalibrateAllAttendances() {
       }
 
       lastAcceptedTime = t;
-      // Cohérence d'état et préservation des sorties :
-      // 1. Une personne commence la journée DEHORS ('OUT') -> son premier scan est son ENTRÉE ('IN')
-      // 2. Si la personne est déjà à l'intérieur (expectedDir === 'OUT') :
-      //    Son prochain scan (> 60s) est sa SORTIE ('OUT') (y compris sur une borne utilisée pour sortir avant la mise à jour).
-      // 3. Si la personne est à l'extérieur (expectedDir === 'IN') :
-      //    Son prochain scan est son ENTRÉE ('IN').
-      let targetType = expectedDir;
+      // Règle de recalibration stricte :
+      // 1. Si la borne est dédiée à la sortie (OUT_DEVICES), elle reste STRICTEMENT et TOUJOURS 'OUT'.
+      // 2. Si la borne est dédiée à l'entrée (IN_DEVICES), elle reste STRICTEMENT et TOUJOURS 'IN'.
+      // 3. Alternance automatique uniquement si borne non répertoriée.
+      let targetType;
+      if (OUT_DEVICES.includes(s.device_ip)) {
+        targetType = 'OUT';
+      } else if (IN_DEVICES.includes(s.device_ip)) {
+        targetType = 'IN';
+      } else {
+        targetType = expectedDir;
+      }
       expectedDir = (targetType === 'IN') ? 'OUT' : 'IN';
 
       if (s.type !== targetType) {
@@ -568,11 +573,18 @@ async function recalibrateBadgeDay(badgeId, dStr) {
       continue;
     }
     lastAcceptedTime = t;
-    // Cohérence d'état et préservation des sorties :
-    // - Le 1er scan du jour est 'IN'.
-    // - Si la personne est dedans, le prochain scan (> 60s) est sa SORTIE ('OUT').
-    // - Si elle est dehors, le prochain scan est son ENTRÉE ('IN').
-    let targetType = expectedDir;
+    // Règle de recalibration stricte :
+    // 1. Si la borne est dédiée à la sortie (OUT_DEVICES), elle reste STRICTEMENT et TOUJOURS 'OUT'.
+    // 2. Si la borne est dédiée à l'entrée (IN_DEVICES), elle reste STRICTEMENT et TOUJOURS 'IN'.
+    // 3. Alternance automatique uniquement si borne non répertoriée.
+    let targetType;
+    if (OUT_DEVICES.includes(s.device_ip)) {
+      targetType = 'OUT';
+    } else if (IN_DEVICES.includes(s.device_ip)) {
+      targetType = 'IN';
+    } else {
+      targetType = expectedDir;
+    }
     expectedDir = (targetType === 'IN') ? 'OUT' : 'IN';
 
     if (s.type !== targetType) {

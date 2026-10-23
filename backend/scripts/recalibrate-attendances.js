@@ -1,5 +1,8 @@
 const { Attendance, sequelize } = require('../src/models');
 
+const IN_DEVICES = (process.env.ZKT_IN_DEVICES || '10.0.1.116,10.0.1.223,10.0.1.201').split(',').map(s => s.trim()).filter(Boolean);
+const OUT_DEVICES = (process.env.ZKT_OUT_DEVICES || '10.0.1.17,10.0.1.120,10.0.1.113,10.0.1.108').split(',').map(s => s.trim()).filter(Boolean);
+
 /**
  * Recalibre tous les pointages dans la base de données de manière 100% déterministe:
  * 1. Groupe les pointages par badge et par jour calendaire (YYYY-MM-DD).
@@ -50,8 +53,15 @@ async function recalibrateAllAttendances() {
 
       // Scan valide et distinct
       lastAcceptedTime = t;
-      const targetType = expectedDir;
-      expectedDir = (expectedDir === 'IN') ? 'OUT' : 'IN';
+      let targetType;
+      if (OUT_DEVICES.includes(s.device_ip)) {
+        targetType = 'OUT';
+      } else if (IN_DEVICES.includes(s.device_ip)) {
+        targetType = 'IN';
+      } else {
+        targetType = expectedDir;
+      }
+      expectedDir = (targetType === 'IN') ? 'OUT' : 'IN';
 
       if (s.type !== targetType) {
         if (targetType === 'IN') {
