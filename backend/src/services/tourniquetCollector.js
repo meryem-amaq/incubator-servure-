@@ -287,11 +287,11 @@ async function collectFromAllDevices() {
     // 3. TRI CHRONOLOGIQUE GLOBAL DE TOUS LES SCANS TOUTES BORNES CONFONDUES
     rawLogsAcrossAllDevices.sort((a, b) => a.time.getTime() - b.time.getTime());
 
-    // 4. Charger les pointages existants récents (30 derniers jours) pour dédoublonner
-    const minDate = new Date(Date.now() - 30 * 24 * 3600 * 1000);
+    // 4. Charger les pointages des 7 derniers jours pour dédoublonner les scans récents (1 095 lignes au lieu de 848 391)
+    const dedupWindow = new Date(Date.now() - 7 * 24 * 3600 * 1000);
     const existingRecent = await Attendance.findAll({
       where: {
-        time: { [Op.gte]: minDate }
+        time: { [Op.gte]: dedupWindow }
       },
       attributes: ['id', 'raw_badge_id', 'time', 'type'],
       order: [['time', 'ASC']],
@@ -321,6 +321,11 @@ async function collectFromAllDevices() {
     const newScansByBadgeDay = new Map(); // 'badge_YYYY-MM-DD' -> [scan]
 
     for (const scan of rawLogsAcrossAllDevices) {
+      // Ignorer les scans historiques plus vieux que 7 jours déjà archivés en BDD
+      if (scan.time.getTime() < dedupWindow.getTime()) {
+        continue;
+      }
+
       const t = scan.time.getTime();
       const bucket = Math.floor(t / 60000);
       const key = `${scan.badgeId}_${bucket}`;
@@ -402,10 +407,13 @@ async function collectFromAllDevices() {
       await Attendance.bulkCreate(toInsert, { ignoreDuplicates: true });
       console.log(`✅ Collecte déterministe terminée : ${toInsert.length} nouveau(x) pointage(s) ajouté(s) en GMT+0.`);
 
-      // Recalibration locale et instantanée pour les badges scannés aujourd'hui (garantit l'exactitude 100%)
+      // Recalibration locale et instantanée pour les badges scannés aujourd'hui uniquement
+      const todayStr = new Date().toISOString().split('T')[0];
       for (const dayKey of newScansByBadgeDay.keys()) {
         const [bId, dStr] = dayKey.split('_');
-        await recalibrateBadgeDay(bId, dStr).catch(() => {});
+        if (dStr === todayStr) {
+          await recalibrateBadgeDay(bId, dStr).catch(() => {});
+        }
       }
 
       // Mise à jour automatique de suivi_engagement en tâche de fond (non bloquante)

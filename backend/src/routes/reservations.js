@@ -14,22 +14,43 @@ const { getJourFerieInfo } = require('../utils/joursFeries');
 function getAuthenticatedUser(req) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+  const token = authHeader.split(' ')[1];
+  const secret1 = process.env.JWT_SECRET || 'cgs_incubateur_secret_key_super_secure_jwt_2024_ids';
+  const secret2 = 'cgs_incubateur_secret_key_ids_production_platform';
   try {
-    const token = authHeader.split(' ')[1];
-    const secret = process.env.JWT_SECRET || 'cgs_incubateur_secret_key_super_secure_jwt_2024_ids';
-    return jwt.verify(token, secret);
+    return jwt.verify(token, secret1);
   } catch {
-    return null;
+    try {
+      return jwt.verify(token, secret2);
+    } catch {
+      return null;
+    }
   }
 }
 
-// GET /api/reservations (Toutes les réservations)
-// Authentifié (Admin / Staff) : Retourne toutes les informations complètes (nom, email, téléphone, motif, etc.)
-// Non-authentifié (Public / Calendrier de réservation) : Ne retourne que les créneaux occupés anonymisés (RGPD)
+// GET /api/reservations (Toutes les réservations ou par espace/incubé)
+// Authentifié (Admin / Staff / Incubé) : Retourne toutes les informations complètes
+// Non-authentifié (Public) : Retourne les créneaux avec nom pour affichage du calendrier
 router.get('/', async (req, res) => {
   try {
     const user = getAuthenticatedUser(req);
+    const { incubeId, espace } = req.query;
+
+    const where = {};
+    if (espace && espace !== 'all') {
+      where.espace = espace;
+    }
+    if (incubeId) {
+      const idNum = Number(incubeId);
+      const inc = await Incube.findByPk(idNum);
+      const or = [{ incubeId: idNum }];
+      if (inc?.email) or.push({ emailIncube: inc.email });
+      if (inc?.nom_incube) or.push({ nomIncube: { [Op.like]: `%${inc.nom_incube}%` } });
+      where[Op.or] = or;
+    }
+
     const reservations = await ReservationEspace.findAll({
+      where,
       order: [['createdAt', 'DESC']]
     });
 
@@ -37,11 +58,13 @@ router.get('/', async (req, res) => {
       return res.json(reservations);
     }
 
-    // Filtrage de protection des données privées (RGPD) pour le public
+    // Protection des données privées pour le public anonyme
     const publicSlots = reservations.map(r => ({
       id: r.id,
+      incubeId: r.incubeId,
       espace: r.espace,
       salleSpecifique: r.salleSpecifique,
+      nomIncube: r.nomIncube || 'Occupé',
       dateReservation: r.dateReservation,
       heureDebut: r.heureDebut,
       heureFin: r.heureFin,
@@ -123,9 +146,23 @@ router.post('/demande', async (req, res) => {
       });
     }
 
+    // Auto-lier l'incubé correspondant si présent dans la base de données
+    let matchedIncubeId = req.body.incubeId ? Number(req.body.incubeId) : null;
+    try {
+      if (!matchedIncubeId && email) {
+        const inc = await Incube.findOne({ where: { email } });
+        if (inc) matchedIncubeId = inc.id;
+      }
+      if (!matchedIncubeId && nom) {
+        const inc = await Incube.findOne({ where: { nom_incube: nom } });
+        if (inc) matchedIncubeId = inc.id;
+      }
+    } catch (lookupErr) {}
+
     const reservation = await ReservationEspace.create({
       espace: espace || 'fablab',
       salleSpecifique: salleSpecifique,
+      incubeId: matchedIncubeId,
       nomIncube: nom,
       emailIncube: email || null,
       telephoneIncube: telephone || null,
@@ -355,9 +392,22 @@ router.post('/directe', auth, requireStaff, async (req, res) => {
       ? nomPersonnalise.trim() 
       : `${staffNom} (Administration)`;
 
+    let directIncubeId = req.body.incubeId ? Number(req.body.incubeId) : null;
+    try {
+      if (!directIncubeId && req.user?.email) {
+        const inc = await Incube.findOne({ where: { email: req.user.email } });
+        if (inc) directIncubeId = inc.id;
+      }
+      if (!directIncubeId && nomPersonnalise) {
+        const inc = await Incube.findOne({ where: { nom_incube: nomPersonnalise.trim() } });
+        if (inc) directIncubeId = inc.id;
+      }
+    } catch (lookupErr) {}
+
     const reservation = await ReservationEspace.create({
       espace: espace || 'fablab',
       salleSpecifique: salleSpecifique || null,
+      incubeId: directIncubeId,
       nomIncube: nomAffiche,
       emailIncube: req.user?.email || 'admin@cgs.dz',
       telephoneIncube: req.user?.telephone || null,

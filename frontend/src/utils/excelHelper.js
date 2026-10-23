@@ -913,18 +913,8 @@ export const exportFullIncubeTemplate = async () => {
   ]);
   XLSX.utils.book_append_sheet(wb, wsFinances, "6. Finances");
 
-  // 7. Engagement
-  const wsEng = XLSX.utils.json_to_sheet([
-    {
-      "Mois": "Janvier",
-      "Année": 2025,
-      "Heures présence": 36,
-      "Taux présence (%)": 95,
-      "Initiatives": "Participation active aux ateliers",
-      "Observations": "Très assidu"
-    }
-  ]);
-  XLSX.utils.book_append_sheet(wb, wsEng, "7. Engagement");
+  // Note : L'engagement et les heures de présence sont enregistrés automatiquement par les tourniquets ZKTeco
+  // et ne doivent pas être injectés via Excel.
 
   // 8. Associés
   const wsAssocies = XLSX.utils.json_to_sheet([

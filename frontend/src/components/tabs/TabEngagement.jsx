@@ -18,10 +18,10 @@ import {
   ArrowRight,
   QrCode,
   Mail,
-  RefreshCw
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react';
 import api from '../../api/axios';
-import ExcelImportModal from '../common/ExcelImportModal';
 import toast from 'react-hot-toast';
 
 const MOIS = [
@@ -35,7 +35,6 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
   const [annee, setAnnee] = useState(currentYear);
   const [savingAll, setSavingAll] = useState(false);
   const [savingRowIdx, setSavingRowIdx] = useState(null);
-  const [showExcelModal, setShowExcelModal] = useState(false);
   const [syncingTourniquet, setSyncingTourniquet] = useState(false);
 
   // Synchroniser automatiquement les pointages réels des tourniquets physiques ZKTeco
@@ -55,18 +54,22 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
           const next = { ...prev };
           Object.entries(monthlyHours).forEach(([m, h]) => {
             if (next[m]) {
-              next[m] = {
-                ...next[m],
-                moyenne_heures_presence: h
-              };
+              // On ne met à jour que si les heures tourniquets sont positives
+              // Si h === 0 et que le mois a déjà des heures en base, on ne les efface PAS !
+              if (h > 0) {
+                next[m] = {
+                  ...next[m],
+                  moyenne_heures_presence: h
+                };
+              }
             }
           });
           return next;
         });
 
         if (!isSilent) {
-          const badgeTxt = incInfo?.badge_id ? ` (Badge #${incInfo.badge_id})` : '';
-          toast.success(`Pointages synchronisés depuis les tourniquets${badgeTxt} ! Total: ${metrics?.totalHeures || 0}h`, { duration: 4000 });
+          const badgeTxt = incInfo?.badge_id ? ` (Badge #${incInfo.badge_id})` : ' (⚠️ Sans badge)';
+          toast.success(`Pointages tourniquets vérifiés${badgeTxt} ! Total certifié : ${metrics?.totalHeures || 0}h`, { duration: 4000 });
         }
       }
     } catch (err) {
@@ -104,27 +107,6 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
     }
     return Array.from(new Set([...fromData, ...list])).sort((a, b) => a - b);
   }, [data, currentYear]);
-
-  const handleImportEngagement = (importedRows) => {
-    setMonths(prev => {
-      const next = { ...prev };
-      for (const r of importedRows) {
-        const mName = String(r.mois || '').trim();
-        const foundMonth = MOIS.find(m => m.toLowerCase() === mName.toLowerCase());
-        if (foundMonth) {
-          next[foundMonth] = {
-            ...next[foundMonth],
-            moyenne_heures_presence: r.moyenne_heures_presence !== undefined && r.moyenne_heures_presence !== '' ? r.moyenne_heures_presence : next[foundMonth].moyenne_heures_presence,
-            taux_presence_formation: r.taux_presence_formation !== undefined && r.taux_presence_formation !== '' ? r.taux_presence_formation : next[foundMonth].taux_presence_formation,
-            initiatives: r.initiatives !== undefined && r.initiatives !== '' ? r.initiatives : next[foundMonth].initiatives,
-            observations: r.observations !== undefined && r.observations !== '' ? r.observations : next[foundMonth].observations,
-          };
-        }
-      }
-      return next;
-    });
-    toast.success('Données de présence remplies depuis Excel ! Cliquez sur "Enregistrer tout".');
-  };
 
   const findEngagementForMonth = (dataList, mName, year) => {
     if (!Array.isArray(dataList)) return null;
@@ -197,6 +179,10 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
   const [workshops, setWorkshops] = useState([]);
   const [allPresences, setAllPresences] = useState({});
 
+  // Identifier le parcours officiel de l'incubé (Pré-Création vs Post-Création)
+  const isPostCreation = ['Croissance', 'Maturité', 'Développement', 'Post-Création'].includes(incube?.phase_projet);
+  const trackName = isPostCreation ? 'Post-Création' : 'Pré-Création';
+
   // 1. Charger les formations obligatoires et leurs émargements
   const loadEventsAndPresences = async () => {
     const targetId = incubeId || incube?.id;
@@ -209,10 +195,12 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
         if (Array.isArray(fRes.data) && fRes.data.length > 0) {
           list = fRes.data.map(f => ({
             id: `f_${f.id}`,
-            titre: `[Formation Obligatoire] ${f.theme}`,
+            rawId: f.id,
+            titre: f.theme.startsWith('[') ? f.theme : `[Formation Obligatoire] ${f.theme}`,
+            theme: f.theme,
             formateur: f.formateur || 'Formateur IDS',
             date: f.date_formation,
-            duree: `${f.heures || 3}h`,
+            duree: `${f.heures || 3.5}h`,
             present: f.presence === true || f.presence === 'true' || f.presence === 1,
             isDirectPresence: true
           }));
@@ -222,44 +210,59 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
       }
     }
 
-    // B. Modules de formation obligatoire planifiés (Pré-Création & Post-Création)
+    // B. Formations obligatoires planifiées (Strictement réservées aux parcours Pré-Création & Post-Création)
+    // Les ateliers généraux, masterclass libres ou fablab ne sont PAS comptabilisés dans l'assiduité obligatoire
     try {
       const ateliersRes = await api.get('/ateliers');
       if (Array.isArray(ateliersRes.data) && ateliersRes.data.length > 0) {
         const modulesObligatoires = ateliersRes.data.filter(a => {
           const t = (a.titre || '').toLowerCase();
           const d = (a.description || '').toLowerCase();
-          return t.includes('création') || t.includes('creation') || t.includes('bmc') || 
-                 t.includes('business') || t.includes('juridique') || t.includes('comptable') || 
-                 t.includes('marketing') || d.includes('modulecode') || d.includes('typeparcours');
+          // Uniquement les modules officiels correspondant au parcours de l'incubé
+          const isPre = t.includes('pré-création') || t.includes('pre-creation') || t.includes('bmc') || t.includes('business plan') || t.includes('statut juridique');
+          const isPost = t.includes('post-création') || t.includes('post-creation') || t.includes('gestion comptable') || t.includes('marketing') || t.includes('gfc') || t.includes('mdc') || t.includes('recrutement');
+          
+          if (isPostCreation) {
+            return isPost && !isPre;
+          } else {
+            return isPre && !isPost;
+          }
         });
 
         modulesObligatoires.forEach(mo => {
           if (!list.some(l => l.titre === mo.titre && l.date === mo.date)) {
             list.push({
               id: mo.id,
+              rawId: mo.id,
               titre: mo.titre,
+              theme: mo.titre,
               formateur: mo.formateur || mo.intervenant || 'Formateur IDS',
               date: mo.date,
-              duree: mo.duree || '3h',
+              duree: mo.duree || '3h30',
               isDirectPresence: false
             });
           }
         });
       }
     } catch (e) {
-      console.warn("Erreur chargement ateliers obligatoires:", e.message);
+      console.warn("Erreur chargement formations obligatoires:", e.message);
     }
 
-    // C. Référence officielle des modules obligatoires si aucune session en base
+    // C. Référence officielle des modules obligatoires selon le parcours de l'incubé
     if (list.length === 0) {
-      list = [
-        { id: 101, titre: '[Pré-Création] BMC – Business Model Canvas', formateur: 'M. Benjelloun', date: `${annee}-01-15`, duree: '3h00' },
-        { id: 102, titre: '[Pré-Création] BP – Business Plan & Faisabilité', formateur: 'Mme. Tazi', date: `${annee}-02-10`, duree: '4h00' },
-        { id: 103, titre: '[Pré-Création] SJ – Statut Juridique & Formalités', formateur: 'Me. Alaoui', date: `${annee}-03-05`, duree: '3h00' },
-        { id: 104, titre: '[Post-Création] GFC – Gestion Comptable et Financière', formateur: 'M. Amrani', date: `${annee}-04-12`, duree: '3h30' },
-        { id: 105, titre: '[Post-Création] MDC – Marketing et Développement Commercial', formateur: 'Coach IDS', date: `${annee}-05-20`, duree: '3h30' }
-      ];
+      if (isPostCreation) {
+        list = [
+          { id: 'def_104', rawId: null, titre: '[Post-Création] GFC – Gestion Comptable et Financière', theme: 'GFC – Gestion Comptable et Financière', formateur: 'M. Amrani', date: `${annee}-02-15`, duree: '3h30', isDefault: true },
+          { id: 'def_105', rawId: null, titre: '[Post-Création] MDC – Marketing et Développement Commercial', theme: 'MDC – Marketing et Développement Commercial', formateur: 'Coach IDS', date: `${annee}-04-18`, duree: '3h30', isDefault: true },
+          { id: 'def_106', rawId: null, titre: '[Post-Création] RH – Management & Recrutement RH', theme: 'RH – Management & Recrutement RH', formateur: 'Consultant RH', date: `${annee}-06-20`, duree: '3h00', isDefault: true }
+        ];
+      } else {
+        list = [
+          { id: 'def_101', rawId: null, titre: '[Pré-Création] BMC – Business Model Canvas', theme: 'BMC – Business Model Canvas', formateur: 'M. Benjelloun', date: `${annee}-01-15`, duree: '3h00', isDefault: true },
+          { id: 'def_102', rawId: null, titre: '[Pré-Création] BP – Business Plan & Faisabilité', theme: 'BP – Business Plan & Faisabilité', formateur: 'Mme. Tazi', date: `${annee}-02-10`, duree: '4h00', isDefault: true },
+          { id: 'def_103', rawId: null, titre: '[Pré-Création] SJ – Statut Juridique & Formalités', theme: 'SJ – Statut Juridique & Formalités', formateur: 'Me. Alaoui', date: `${annee}-03-05`, duree: '3h00', isDefault: true }
+        ];
+      }
     }
     setWorkshops(list);
 
@@ -398,6 +401,46 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
       return next;
     });
     toast.success(`Assiduité formations synchronisée avec les feuilles de présence (${syncedCount} mois mis à jour). Pensez à "Enregistrer tout" !`);
+  };
+
+  // Basculer la présence de l'incubé à une formation obligatoire
+  const handleTogglePresence = async (w, monthName) => {
+    const targetId = incubeId || incube?.id;
+    if (!targetId) return;
+
+    const currentPresence = isIncubePresentAtWorkshop(w);
+    const newPresence = !currentPresence;
+
+    try {
+      if (w.isDirectPresence && w.rawId) {
+        await api.put(`/formations/${w.rawId}`, {
+          presence: newPresence
+        });
+      } else {
+        // Enregistrer la formation directement pour cet incubé
+        await api.post('/formations', {
+          incube_id: targetId,
+          theme: w.theme || w.titre,
+          formateur: w.formateur || 'Formateur IDS',
+          date_formation: w.date || new Date().toISOString().split('T')[0],
+          heures: parseFloat(w.duree) || 3.5,
+          presence: newPresence
+        });
+      }
+
+      toast.success(`Présence formation : ${newPresence ? 'Validée (Présent)' : 'Non validée (Absent)'}`);
+      
+      // Mettre à jour l'état local du mois immédiatement
+      if (monthName) {
+        updateField(monthName, 'taux_presence_formation', newPresence ? 100 : 0);
+      }
+      
+      await loadEventsAndPresences();
+      if (onUpdate) onUpdate();
+    } catch (err) {
+      console.error("Erreur bascule présence:", err);
+      toast.error(err.response?.data?.message || "Erreur lors de la mise à jour de la présence");
+    }
   };
 
   // Auto-sync des formations en temps réel au chargement et dès que allPresences change
@@ -725,9 +768,14 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                 <GraduationCap size={22} />
               </div>
               <div>
-                <p className="text-[11px] text-slate-500 dark:text-dark-400 font-bold uppercase tracking-wider">
-                  Assiduité Formations Obligatoires
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-[11px] text-slate-500 dark:text-dark-400 font-bold uppercase tracking-wider">
+                    Assiduité Formations Obligatoires
+                  </p>
+                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+                    Parcours {trackName}
+                  </span>
+                </div>
                 <div className="flex items-baseline gap-1.5 mt-0.5">
                   <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
                     {stats.tauxFormationsReel}%
@@ -758,7 +806,7 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
           </div>
 
           <div className="pt-2 border-t border-slate-100 dark:border-dark-700/60 flex items-center justify-between text-xs">
-            <span className="text-slate-500 dark:text-dark-400 text-[11px]">Formations obligatoires {annee} :</span>
+            <span className="text-slate-500 dark:text-dark-400 text-[11px]">Formations obligatoires {annee} ({trackName}) :</span>
             <span className="font-bold text-slate-800 dark:text-dark-200 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 rounded-md text-[11px]">
               {stats.totalAssistesAnnee} sur {stats.totalAteliersAnnee} séances ({stats.tauxFormationsReel}%)
             </span>
@@ -861,6 +909,19 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
         </div>
       </div>
 
+      {/* Avertissement informatif si l'incubé n'a pas de badge ZKTeco attribué */}
+      {!incube?.badge_id && (
+        <div className="flex items-center gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs shadow-sm">
+          <AlertCircle size={18} className="text-amber-500 shrink-0" />
+          <div className="flex-1">
+            <span className="font-bold">Aucun badge tourniquet n'est attribué à cet incubé ({incube?.nom_incube || '—'}).</span>
+            <span className="block sm:inline sm:ml-1 text-slate-600 dark:text-dark-300">
+              Les heures de présence seront enregistrées automatiquement dès qu'un badge physique ZKTeco lui sera affecté dans l'onglet <em>« Infos Générales »</em>.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* 3. TABLEAU PRINCIPAL : Engagement, Implication et Initiatives (12 Mois) */}
       <div className="card p-0 overflow-hidden border border-slate-200 dark:border-dark-700/60 shadow-md">
         <div className="table-container">
@@ -870,14 +931,16 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                 <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 w-28 min-w-[110px] sticky left-0 bg-slate-100 dark:bg-dark-800 z-10 border-r border-slate-200 dark:border-dark-700/60 whitespace-nowrap">
                   Mois
                 </th>
-                <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 text-center min-w-[210px] whitespace-nowrap">
+                <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 text-center min-w-[220px] whitespace-nowrap">
                   <div className="flex items-center justify-center gap-1.5">
-                    <span>Heures Présence Tourniquets</span>
+                    <span>Heures Certifiées Tourniquet (Total Mois)</span>
                     <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                      Auto ZKTeco
+                      🔒 ZKTeco Direct
                     </span>
                   </div>
-                  <div className="text-[10px] font-semibold text-blue-600 dark:text-blue-400">Obj : 15 h/sem (60 h/mois)</div>
+                  <div className="text-[10px] font-semibold text-blue-600 dark:text-blue-400">
+                    Objectif : 60 h/mois (soit 15 h/semaine)
+                  </div>
                 </th>
                 <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 text-center min-w-[210px] whitespace-nowrap">
                   <div>Taux Formations Obligatoires (%)</div>
@@ -903,9 +966,11 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                 // Calculs exacts heures
                 const valPresence = item.moyenne_heures_presence !== '' && !isNaN(item.moyenne_heures_presence) ? parseFloat(item.moyenne_heures_presence) : null;
                 const hebdoHeures = valPresence !== null ? (valPresence / 4).toFixed(1) : null;
-                // Taux calculé sur base de 15h/semaine
+                // Taux calculé sur base de 15h/semaine (ou 60h/mois)
                 const hebdoTaux = valPresence !== null ? Math.round(((valPresence / 4) / OBJECTIF_HEBDO) * 100) : null;
                 const moisTaux = valPresence !== null ? Math.round((valPresence / OBJECTIF_MOIS) * 100) : null;
+                const isFutureMonth = annee === currentYear && idx > new Date().getMonth();
+                const hasBadge = Boolean(incube?.badge_id);
 
                 // Calculs événements réels pour ce mois
                 const eventStats = getMonthFormationStats(idx);
@@ -927,9 +992,9 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                       <div className="flex flex-col items-center justify-center gap-1.5">
                         <div className="inline-flex items-center justify-center gap-1.5 px-3 py-1 bg-slate-100/90 dark:bg-dark-800/90 border border-slate-200/80 dark:border-dark-700/80 rounded-md shadow-xs">
                           <span className="text-xs font-extrabold text-slate-800 dark:text-dark-100 font-mono">
-                            {valPresence !== null && valPresence !== undefined ? Number(valPresence).toFixed(1) : '0.0'}
+                            {valPresence !== null && valPresence !== undefined ? Number(valPresence).toFixed(1) : (isFutureMonth ? '—' : '0.0')}
                           </span>
-                          <span className="text-[11px] text-slate-500 dark:text-dark-400 font-semibold">h/mois</span>
+                          <span className="text-[11px] text-slate-500 dark:text-dark-400 font-semibold">h / mois</span>
                         </div>
 
                         {/* Badges de calculs exacts semaine et mois + Statut Conforme/Attention/Non Conforme */}
@@ -938,17 +1003,19 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                             <div className={`inline-flex items-center justify-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-md border w-full max-w-[200px] ${
                               valPresence >= OBJECTIF_MOIS 
                                 ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                                : 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                            }`} title={`Moyenne : ${hebdoHeures}h / 15h par semaine (${hebdoTaux}%) | Mois : ${valPresence}h / 60h (${moisTaux}%)`}>
+                                : valPresence >= 45
+                                ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                                : 'bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
+                            }`} title={`Moyenne : ${hebdoHeures}h / 15h par semaine (${hebdoTaux}%) | Total Mois : ${valPresence}h / 60h (${moisTaux}%)`}>
                               <span>Sem : {hebdoHeures}h / 15h</span>
                               <span>•</span>
                               <span>{hebdoTaux}%</span>
                             </div>
                             <div className="flex items-center justify-between w-full max-w-[200px] text-[9px] px-0.5">
                               <span className="text-slate-400">
-                                Mois : {valPresence}h / 60h ({moisTaux}%)
+                                Total : {valPresence}h / 60h ({moisTaux}%)
                               </span>
-                              <span className={`px-1.5 py-0.2 rounded font-black text-[8px] uppercase tracking-wider border ${
+                              <span className={`px-1.5 py-0.5 rounded font-black text-[8px] uppercase tracking-wider border ${
                                 moisTaux >= 100 
                                   ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
                                   : moisTaux >= 75
@@ -959,8 +1026,22 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                               </span>
                             </div>
                           </div>
+                        ) : !hasBadge ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 dark:bg-dark-800 dark:text-dark-400 border border-slate-200 dark:border-dark-700">
+                            Sans badge
+                          </span>
+                        ) : isFutureMonth ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 dark:bg-dark-800 dark:text-dark-400 border border-slate-200 dark:border-dark-700">
+                            À venir
+                          </span>
+                        ) : (Number(stats.totalHeures) === 0 || stats.countHeuresMois === 0) ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 dark:bg-dark-800 dark:text-dark-300 border border-slate-200 dark:border-dark-700" title="Badge actif - En attente des premiers pointages aux tourniquets pour cette année">
+                            En attente de pointages
+                          </span>
                         ) : (
-                          <span className="text-[10px] text-slate-400 dark:text-dark-500 font-medium">— h/sem (Obj: 15h)</span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
+                            0.0h (Non conforme)
+                          </span>
                         )}
                       </div>
                     </td>
@@ -982,35 +1063,47 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                           <span className="text-[11px] text-slate-500 dark:text-dark-400 font-semibold">%</span>
                         </div>
 
-                        {/* Indicateur clair et automatique de la présence aux ateliers */}
+                        {/* Indicateur clair et interactif de la présence aux formations obligatoires */}
                         {eventStats.total > 0 ? (
-                          <div className="flex flex-col items-center justify-center gap-0.5 text-[10px]">
-                            {eventStats.attended > 0 ? (
-                              <span 
-                                className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-md font-extrabold inline-flex items-center gap-1 shadow-xs"
-                                title={`Atelier(s) assisté(s) : ${eventStats.workshops.filter(w => isIncubePresentAtWorkshop(w.id)).map(w => w.titre).join(', ')}`}
-                              >
-                                <CheckCircle2 size={11} className="text-emerald-600 dark:text-emerald-400" />
-                                {eventStats.attended}/{eventStats.total} présent ({eventStats.rate}%)
-                              </span>
-                            ) : (
-                              <span 
-                                className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-md font-semibold inline-flex items-center gap-1"
-                                title={`Atelier(s) prévu(s) : ${eventStats.workshops.map(w => w.titre).join(', ')}`}
-                              >
-                                0/{eventStats.total} présent (0%)
-                              </span>
-                            )}
+                          <div className="flex flex-col items-center justify-center gap-1 text-[10px]">
+                            {eventStats.workshops.map((w, wIdx) => {
+                              const isPres = isIncubePresentAtWorkshop(w);
+                              return (
+                                <button
+                                  key={w.id || wIdx}
+                                  type="button"
+                                  onClick={() => handleTogglePresence(w, m)}
+                                  className={`px-2 py-0.5 rounded-md font-bold inline-flex items-center gap-1 shadow-2xs transition-all cursor-pointer border ${
+                                    isPres
+                                      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25'
+                                      : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
+                                  }`}
+                                  title="Cliquer pour basculer Présent / Absent"
+                                >
+                                  {isPres ? (
+                                    <>
+                                      <CheckCircle2 size={11} className="text-emerald-600 dark:text-emerald-400" />
+                                      <span>Présent (100%)</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                      <span>Absent (0%)</span>
+                                    </>
+                                  )}
+                                </button>
+                              );
+                            })}
                             
-                            {/* Titre de l'atelier du mois */}
+                            {/* Titre de la formation obligatoire du mois */}
                             {eventStats.workshops.length > 0 && (
-                              <span className="text-[9px] text-slate-400 dark:text-dark-400 truncate max-w-[170px]" title={eventStats.workshops.map(w => w.titre).join(' • ')}>
+                              <span className="text-[9px] text-slate-500 dark:text-dark-400 font-medium truncate max-w-[190px]" title={eventStats.workshops.map(w => w.titre).join(' • ')}>
                                 {eventStats.workshops[0].titre}
                               </span>
                             )}
                           </div>
                         ) : (
-                          <span className="text-[10px] text-slate-400 italic">Aucun atelier ce mois</span>
+                          <span className="text-[10px] text-slate-400 italic">Aucune formation ce mois</span>
                         )}
                       </div>
                     </td>
@@ -1055,16 +1148,6 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
           </table>
         </div>
       </div>
-
-      {/* Modale d'importation Excel pour l'engagement */}
-      <ExcelImportModal
-        isOpen={showExcelModal}
-        onClose={() => setShowExcelModal(false)}
-        title="Importer les feuilles d'engagement / présence (Excel)"
-        description="Chargez un fichier Excel pour remplir les présences, taux et observations des 12 mois."
-        templateType="engagement"
-        onImport={handleImportEngagement}
-      />
 
     </div>
   );

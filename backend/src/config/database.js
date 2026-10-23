@@ -21,10 +21,10 @@ const sequelize = dbUrl
   ? new Sequelize(dbUrl, {
       dialect: 'mysql',
       dialectOptions,
-      logging: process.env.NODE_ENV === 'development' ? console.log : false,
+      logging: false,
       pool: {
-        max: 10,
-        min: 0,
+        max: 25,
+        min: 2,
         acquire: 30000,
         idle: 10000,
       },
@@ -41,10 +41,10 @@ const sequelize = dbUrl
         host: process.env.DB_HOST || 'localhost',
         port: process.env.DB_PORT || 3306,
         dialect: 'mysql',
-        logging: process.env.NODE_ENV === 'development' ? console.log : false,
+        logging: false,
         pool: {
-          max: 10,
-          min: 0,
+          max: 25,
+          min: 2,
           acquire: 30000,
           idle: 10000,
         },

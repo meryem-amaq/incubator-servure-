@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Save, GraduationCap } from 'lucide-react';
+import { Plus, Trash2, Save, GraduationCap, Sparkles } from 'lucide-react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
 
@@ -10,15 +10,15 @@ export default function TabFormations({ incubeId, formations = [], onUpdate }) {
     setRows(formations || []);
   }, [formations]);
 
-  const addRow = () => {
+  const addRow = (custom = {}) => {
     setRows([
       ...rows,
       {
-        date_formation: new Date().toISOString().split('T')[0],
-        theme: '',
-        formateur: '',
-        heures: 0,
-        presence: true,
+        date_formation: custom.date || new Date().toISOString().split('T')[0],
+        theme: custom.theme || '',
+        formateur: custom.formateur || '',
+        heures: custom.heures || 3.5,
+        presence: custom.presence !== undefined ? custom.presence : true,
         _key: Date.now()
       }
     ]);
@@ -34,40 +34,95 @@ export default function TabFormations({ incubeId, formations = [], onUpdate }) {
     const row = rows[idx];
     if (row.id) {
       try {
-        await api.delete(`/incubes/${incubeId}/formation/${row.id}`);
+        await api.delete(`/formations/${row.id}`);
       } catch (e) {
         toast.error("Erreur lors de la suppression");
         return;
       }
     }
     setRows(rows.filter((_, i) => i !== idx));
-    toast.success("Ligne supprimée");
+    toast.success("Formation supprimée");
+    if (onUpdate) onUpdate();
   };
 
   const saveRow = async (idx) => {
     const row = rows[idx];
+    if (!row.theme || !row.theme.trim()) {
+      toast.error("Le thème de la formation est requis");
+      return;
+    }
+
     try {
+      let saved;
       if (row.id) {
-        await api.put(`/incubes/${incubeId}/formation/${row.id}`, row);
+        const res = await api.put(`/formations/${row.id}`, row);
+        saved = res.data;
       } else {
-        await api.post(`/incubes/${incubeId}/formation`, row);
+        const res = await api.post('/formations', {
+          ...row,
+          incube_id: incubeId
+        });
+        saved = res.data;
       }
-      toast.success('Enregistré avec succès');
-      onUpdate();
+      toast.success('Formation enregistrée avec succès');
+      if (saved && (saved.id || saved.data?.id)) {
+        const updated = [...rows];
+        updated[idx] = { ...updated[idx], id: saved.id || saved.data?.id };
+        setRows(updated);
+      }
+      if (onUpdate) onUpdate();
     } catch (err) {
       toast.error(err.response?.data?.message || "Erreur lors de l'enregistrement");
     }
   };
 
+  const PRESET_MODULES = [
+    { track: 'Pré-Création', theme: '[Pré-Création] BMC – Business Model Canvas', formateur: 'M. Benjelloun', heures: 3 },
+    { track: 'Pré-Création', theme: '[Pré-Création] BP – Business Plan & Faisabilité', formateur: 'Mme. Tazi', heures: 4 },
+    { track: 'Pré-Création', theme: '[Pré-Création] SJ – Statut Juridique & Formalités', formateur: 'Me. Alaoui', heures: 3 },
+    { track: 'Post-Création', theme: '[Post-Création] GFC – Gestion Comptable et Financière', formateur: 'M. Amrani', heures: 3.5 },
+    { track: 'Post-Création', theme: '[Post-Création] MDC – Marketing et Développement Commercial', formateur: 'Coach IDS', heures: 3.5 },
+    { track: 'Post-Création', theme: '[Post-Création] RH – Management & Recrutement RH', formateur: 'Consultant RH', heures: 3 },
+  ];
+
   return (
     <div className="space-y-4 slide-up">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-          <GraduationCap size={18} className="text-emerald-500" /> Formations suivies
-        </h2>
-        <button className="btn btn-primary btn-sm" onClick={addRow}>
-          <Plus size={14} /> Ajouter
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <GraduationCap size={18} className="text-emerald-500" /> Formations suivies & Assiduité
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-dark-400 mt-0.5">
+            Modules obligatoires contractuels (Pré-Création & Post-Création) comptabilisés dans l'engagement
+          </p>
+        </div>
+        <button className="btn btn-primary btn-sm flex items-center gap-1.5" onClick={() => addRow()}>
+          <Plus size={14} /> Nouvelle formation
         </button>
+      </div>
+
+      {/* Raccourcis modules officiels */}
+      <div className="p-3 bg-slate-50 dark:bg-dark-800/40 rounded-xl border border-slate-200 dark:border-dark-700/60 flex items-center gap-2 flex-wrap">
+        <span className="text-[11px] font-bold text-slate-500 dark:text-dark-400 flex items-center gap-1 shrink-0">
+          <Sparkles size={12} className="text-emerald-500" /> Ajouter un module officiel :
+        </span>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {PRESET_MODULES.map((pm, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => addRow({ theme: pm.theme, formateur: pm.formateur, heures: pm.heures })}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all hover:scale-102 cursor-pointer ${
+                pm.track === 'Post-Création'
+                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20'
+                  : 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30 hover:bg-blue-500/20'
+              }`}
+              title={`Ajouter ${pm.theme} (${pm.heures}h)`}
+            >
+              + {pm.theme.split('–')[0].trim()} ({pm.theme.split('–')[1]?.trim()?.slice(0, 15)}...)
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="card p-0 overflow-hidden border border-slate-200 dark:border-dark-700/60 shadow-md">
@@ -86,7 +141,9 @@ export default function TabFormations({ incubeId, formations = [], onUpdate }) {
             <tbody className="divide-y divide-slate-200 dark:divide-dark-700/50">
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="text-center py-6 text-slate-400">Aucune formation enregistrée.</td>
+                  <td colSpan="6" className="text-center py-6 text-slate-400">
+                    Aucune formation enregistrée. Utilisez les boutons ci-dessus pour ajouter les modules officiels.
+                  </td>
                 </tr>
               ) : (
                 rows.map((row, idx) => (
@@ -102,10 +159,10 @@ export default function TabFormations({ incubeId, formations = [], onUpdate }) {
                     <td className="p-2">
                       <input 
                         type="text" 
-                        className="input !py-1.5 !text-xs w-full"
+                        className="input !py-1.5 !text-xs w-full font-semibold"
                         value={row.theme || ''}
                         onChange={(e) => updateRow(idx, 'theme', e.target.value)}
-                        placeholder="Thème de la formation"
+                        placeholder="Thème de la formation obligatoire"
                       />
                     </td>
                     <td className="p-2">
@@ -120,7 +177,7 @@ export default function TabFormations({ incubeId, formations = [], onUpdate }) {
                     <td className="p-2">
                       <input 
                         type="number" 
-                        className="input !py-1.5 !text-xs w-20"
+                        className="input !py-1.5 !text-xs w-20 font-bold"
                         value={row.heures || 0}
                         onChange={(e) => updateRow(idx, 'heures', parseFloat(e.target.value))}
                         min="0"
@@ -128,18 +185,21 @@ export default function TabFormations({ incubeId, formations = [], onUpdate }) {
                       />
                     </td>
                     <td className="p-2 text-center">
-                      <label className="inline-flex items-center cursor-pointer">
+                      <label className="inline-flex items-center gap-1.5 cursor-pointer">
                         <input 
                           type="checkbox" 
-                          className="w-4 h-4 rounded border-slate-300 text-primary-500 focus:ring-primary-500"
-                          checked={row.presence}
+                          className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                          checked={row.presence === true || row.presence === 'true' || row.presence === 1}
                           onChange={(e) => updateRow(idx, 'presence', e.target.checked)}
                         />
+                        <span className={`text-[10px] font-bold ${row.presence ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                          {row.presence ? 'Présent' : 'Absent'}
+                        </span>
                       </label>
                     </td>
                     <td className="p-2">
                       <div className="flex justify-center gap-1.5">
-                        <button className="btn btn-success btn-sm btn-icon" onClick={() => saveRow(idx)} title="Enregistrer">
+                        <button className="btn btn-success btn-sm btn-icon" onClick={() => saveRow(idx)} title="Enregistrer cette formation">
                           <Save size={14} />
                         </button>
                         <button className="btn btn-danger btn-sm btn-icon" onClick={() => deleteRow(idx)} title="Supprimer">

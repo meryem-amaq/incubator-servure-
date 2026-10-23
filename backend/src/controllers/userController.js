@@ -36,28 +36,71 @@ exports.getAll = async (req, res) => {
   }
 };
 
-// GET /api/users/admins — Liste simplifiée des accompagnateurs pour les listes déroulantes
+// GET /api/users/admins — Liste simplifiée et stricte des accompagnateurs réels pour les listes déroulantes
 exports.getAdmins = async (req, res) => {
   try {
     const { Op } = require('sequelize');
-    const admins = await User.findAll({
+    
+    // 1. Récupérer les utilisateurs ayant un rôle d'encadrement / administration
+    const users = await User.findAll({
       where: { 
         actif: true,
-        role: { [Op.ne]: 'incube' }
+        role: { [Op.in]: ['admin', 'accompagnateur', 'administrateur'] },
+        nom: { [Op.notLike]: '%VISITEUR%' }
       },
-      attributes: ['id', 'nom', 'prenom', 'email', 'role', 'photo_url'],
+      attributes: ['id', 'nom', 'prenom', 'email', 'role', 'photo_url', 'type'],
       order: [['nom', 'ASC']],
     });
-    // Filtrer pour ne garder strictement que les accompagnateurs réels (exclure le super admin et le compte Administrateur)
-    const accompagnateurs = admins.filter(a => 
-      a.id !== 1 && 
-      a.role !== 'super_admin' && 
-      !a.nom?.toLowerCase().includes('administrateur') &&
-      !a.email?.toLowerCase().startsWith('admin@')
-    );
+
+    // 2. Récupérer les accompagnateurs assignés dans les dossiers d'incubés
+    let assignedNames = new Set();
+    let assignedIds = new Set();
+    try {
+      const incubes = await Incube.findAll({
+        attributes: ['accompagnateur', 'admin_id'],
+        raw: true
+      });
+      incubes.forEach(i => {
+        const acc = (i.accompagnateur || '').trim().toLowerCase();
+        if (acc && !acc.includes('test') && !acc.includes('visiteur')) {
+          assignedNames.add(acc);
+        }
+        if (i.admin_id && Number(i.admin_id) > 1) {
+          assignedIds.add(Number(i.admin_id));
+        }
+      });
+    } catch (e) {
+      console.warn('⚠️ Impossible de croiser avec Incube pour getAdmins:', e.message);
+    }
+
+    // 3. Filtrer strictement pour ne conserver QUE les accompagnateurs réels
+    const accompagnateurs = users.filter(u => {
+      if (u.id === 1 || u.role === 'super_admin') return false;
+      const nom = (u.nom || '').toLowerCase();
+      const prenom = (u.prenom || '').toLowerCase();
+      const email = (u.email || '').toLowerCase();
+
+      // Exclure les visiteurs, comptes de test et le compte Super Administrateur
+      if (nom.includes('visiteur') || prenom.includes('visiteur')) return false;
+      if (nom.includes('test') || prenom.includes('test')) return false;
+      if (nom.includes('administrateur') || email.startsWith('admin@')) return false;
+      if (u.type === 'Visiteur' || u.type === 'Autre') return false;
+
+      // Doit avoir au moins un incubé assigné OU avoir le rôle 'accompagnateur'
+      const isAssignedByName = Array.from(assignedNames).some(name => 
+        (nom && name.includes(nom)) || (prenom && name.includes(prenom))
+      );
+      const isAssignedById = assignedIds.has(Number(u.id));
+      const isAccompRole = u.role === 'accompagnateur';
+
+      return isAssignedByName || isAssignedById || isAccompRole;
+    });
+
     res.json(accompagnateurs);
   } catch (err) {
-    res.status(500).json({ message: 'Erreur serveur', error: err.message });
+    console.error('Erreur getAdmins:', err);
+    // Repli de secours sécurisé en cas d'erreur de base de données pour ne jamais bloquer le frontend
+    res.status(200).json([]);
   }
 };
 

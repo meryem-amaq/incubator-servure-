@@ -417,59 +417,70 @@ export default function Annuaire() {
     return incubes.filter(i => isIncubeAssignedToAdmin(i, a)).length;
   };
 
-  // Libellé de l'option accompagnateur avec détails promo 1 et 2 ou promo sélectionnée
+  // Libellé épuré de l'option accompagnateur (ex: "Ayoub EL BOUCHIKHI (17)")
   const getAdminOptionLabel = (a) => {
     if (!a) return '';
     const prenomCap = a.prenom ? a.prenom.charAt(0).toUpperCase() + a.prenom.slice(1).toLowerCase() : '';
     const nomUpper = a.nom ? a.nom.toUpperCase() : '';
-    const adminName = `${prenomCap} ${nomUpper}`.trim() || a.email || `Admin #${a.id}`;
+    const adminName = `${prenomCap} ${nomUpper}`.trim() || a.email || `Accompagnateur #${a.id}`;
 
     const adminIncubes = incubes.filter(i => isIncubeAssignedToAdmin(i, a));
 
-    // Si une promotion spécifique est sélectionnée : afficher uniquement le nombre de cette promotion
+    // Si une promotion spécifique est sélectionnée : afficher uniquement le nombre pour cette promotion
     if (selectedPromotionFilter !== 'all') {
       const countInPromo = adminIncubes.filter(i => incubeMatchesPromo(i, selectedPromotionFilter)).length;
       return `${adminName} (${countInPromo})`;
     }
 
-    // Si "Tout" est sélectionné : afficher le total ainsi que le détail Promo 1 et Promo 2
-    const totalCount = adminIncubes.length;
-    const activePromos = promotionsList && promotionsList.length > 0 
-      ? promotionsList 
-      : [{ nom: 'Promotion 1' }, { nom: 'Promotion 2' }];
-
-    const details = activePromos.map(p => {
-      const pCount = adminIncubes.filter(i => incubeMatchesPromo(i, p.nom)).length;
-      const shortNom = p.nom.replace(/^Promotion\s*/i, 'Promo ');
-      return `${shortNom}: ${pCount}`;
-    }).join(', ');
-
-    return details 
-      ? `${adminName} (${totalCount} • ${details})` 
-      : `${adminName} (${totalCount})`;
+    // Affichage direct et concis du nombre total d'incubés
+    return `${adminName} (${adminIncubes.length})`;
   };
 
-  // Libellé de l'option "Tous les Incubés" avec détails promo 1 et 2 ou promo sélectionnée
+  // Libellé épuré de l'option "Tous les Incubés" (ex: "Tous les Incubés (58)")
   const getAllIncubesOptionLabel = () => {
     if (selectedPromotionFilter !== 'all') {
       const countInPromo = incubes.filter(i => incubeMatchesPromo(i, selectedPromotionFilter)).length;
       return `Tous les Incubés (${countInPromo})`;
     }
-
-    const activePromos = promotionsList && promotionsList.length > 0 
-      ? promotionsList 
-      : [{ nom: 'Promotion 1' }, { nom: 'Promotion 2' }];
-
-    const details = activePromos.map(p => {
-      const pCount = incubes.filter(i => incubeMatchesPromo(i, p.nom)).length;
-      const shortNom = p.nom.replace(/^Promotion\s*/i, 'Promo ');
-      return `${shortNom}: ${pCount}`;
-    }).join(', ');
-
-    return details 
-      ? `Tous les Incubés (${incubes.length} • ${details})` 
-      : `Tous les Incubés (${incubes.length})`;
+    return `Tous les Incubés (${incubes.length})`;
   };
+
+  // Liste exclusive et stricte des accompagnateurs réels (exclut visiteurs, tests, super_admin et comptes sans incubé)
+  const realAccompagnateurs = useMemo(() => {
+    const list = (Array.isArray(adminsList) ? adminsList : []).filter(a => {
+      if (!a) return false;
+      const nom = (a.nom || '').toLowerCase();
+      const prenom = (a.prenom || '').toLowerCase();
+      const email = (a.email || '').toLowerCase();
+
+      // Exclusions strictes : pas de visiteur, pas de compte test, pas de super administrateur
+      if (a.id === 1 || a.role === 'super_admin' || a.role === 'incube') return false;
+      if (nom.includes('visiteur') || prenom.includes('visiteur')) return false;
+      if (nom.includes('test') || prenom.includes('test')) return false;
+      if (nom.includes('administrateur') || email.startsWith('admin@')) return false;
+      if (a.type === 'Visiteur' || a.type === 'Autre') return false;
+
+      // Doit avoir au moins un incubé assigné ou avoir le rôle d'accompagnateur officiel
+      const count = incubes.filter(i => isIncubeAssignedToAdmin(i, a)).length;
+      return count > 0 || a.role === 'accompagnateur';
+    });
+
+    if (list.length > 0) return list;
+
+    // Repli de secours : dériver les accompagnateurs directement depuis la liste des incubés chargés
+    const distinctNames = Array.from(new Set(
+      incubes
+        .map(i => (i.accompagnateur || '').trim())
+        .filter(n => n && !n.toLowerCase().includes('test') && !n.toLowerCase().includes('visiteur'))
+    ));
+
+    return distinctNames.map((name, idx) => ({
+      id: `accomp_name_${idx + 1}`,
+      nom: name,
+      prenom: '',
+      role: 'accompagnateur'
+    }));
+  }, [adminsList, incubes]);
 
   // Filtrage par nom, raison sociale, portefeuille (Admin) ou liste accompagnateur (Super Admin)
   const filtered = incubes.filter(i => {
@@ -497,7 +508,8 @@ export default function Annuaire() {
       } else if (selectedAdminFilter === 'mine') {
         if (!user || !isIncubeAssignedToAdmin(i, user)) return false;
       } else {
-        const targetAdmin = adminsList.find(a => String(a.id) === String(selectedAdminFilter));
+        const targetAdmin = realAccompagnateurs.find(a => String(a.id) === String(selectedAdminFilter)) ||
+                            adminsList.find(a => String(a.id) === String(selectedAdminFilter));
         if (!targetAdmin || !isIncubeAssignedToAdmin(i, targetAdmin)) return false;
       }
     } else if (!isSuperAdmin && filterSuivis && user) {
@@ -693,41 +705,41 @@ export default function Annuaire() {
   return (
     <div className="slide-up space-y-6">
       {/* KPI Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="card flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-primary-500/10 text-primary-500 flex items-center justify-center shrink-0">
-            <Users size={24} />
+      <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+        <div className="card flex items-center gap-3 sm:gap-4 p-3.5 sm:p-5">
+          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-primary-500/10 text-primary-500 flex items-center justify-center shrink-0">
+            <Users size={22} />
           </div>
-          <div>
-            <div className="text-2xl font-black text-slate-900 dark:text-white">{stats.total}</div>
-            <div className="text-xs text-slate-500 dark:text-dark-400 font-medium">Total Incubés</div>
-          </div>
-        </div>
-        <div className="card flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-navy-500/10 text-navy-400 flex items-center justify-center shrink-0">
-            <Briefcase size={24} />
-          </div>
-          <div>
-            <div className="text-2xl font-black text-slate-900 dark:text-white">{stats.ideation}</div>
-            <div className="text-xs text-slate-500 dark:text-dark-400 font-medium">En Idéation</div>
+          <div className="min-w-0">
+            <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white truncate">{stats.total}</div>
+            <div className="text-[11px] sm:text-xs text-slate-500 dark:text-dark-400 font-medium truncate">Total Incubés</div>
           </div>
         </div>
-        <div className="card flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
-            <TrendingUp size={24} />
+        <div className="card flex items-center gap-3 sm:gap-4 p-3.5 sm:p-5">
+          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-navy-500/10 text-navy-400 flex items-center justify-center shrink-0">
+            <Briefcase size={22} />
           </div>
-          <div>
-            <div className="text-2xl font-black text-slate-900 dark:text-white">{stats.lancement}</div>
-            <div className="text-xs text-slate-500 dark:text-dark-400 font-medium">En Lancement</div>
+          <div className="min-w-0">
+            <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white truncate">{stats.ideation}</div>
+            <div className="text-[11px] sm:text-xs text-slate-500 dark:text-dark-400 font-medium truncate">En Idéation</div>
           </div>
         </div>
-        <div className="card flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
-            <Filter size={24} />
+        <div className="card flex items-center gap-3 sm:gap-4 p-3.5 sm:p-5">
+          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
+            <TrendingUp size={22} />
           </div>
-          <div>
-            <div className="text-2xl font-black text-slate-900 dark:text-white">{stats.croissance}</div>
-            <div className="text-xs text-slate-500 dark:text-dark-400 font-medium">En Croissance</div>
+          <div className="min-w-0">
+            <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white truncate">{stats.lancement}</div>
+            <div className="text-[11px] sm:text-xs text-slate-500 dark:text-dark-400 font-medium truncate">En Lancement</div>
+          </div>
+        </div>
+        <div className="card flex items-center gap-3 sm:gap-4 p-3.5 sm:p-5">
+          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+            <Filter size={22} />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white truncate">{stats.croissance}</div>
+            <div className="text-[11px] sm:text-xs text-slate-500 dark:text-dark-400 font-medium truncate">En Croissance</div>
           </div>
         </div>
       </div>
@@ -773,8 +785,8 @@ export default function Annuaire() {
       )}
 
       {/* Barre d'outils & Filtres */}
-      <div className="flex flex-col xl:flex-row gap-3 items-stretch xl:items-center justify-between">
-        <div className="flex flex-1 items-center gap-2 flex-wrap sm:flex-nowrap">
+      <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
+        <div className="flex flex-1 items-center gap-2.5 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
             <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-dark-400" />
             <input
@@ -812,14 +824,12 @@ export default function Annuaire() {
                   title="Filtrer les incubés par accompagnateur / admin"
                 >
                   <option value="all">{getAllIncubesOptionLabel()}</option>
-                  <optgroup label="── Portefeuilles par Accompagnateur ──">
-                    {adminsList
-                      .filter(a => a.role !== 'incube' && a.role !== 'super_admin' && a.id !== 1 && !a.nom?.toLowerCase().includes('administrateur') && !a.email?.toLowerCase().startsWith('admin@'))
-                      .map((a) => (
-                        <option key={a.id} value={String(a.id)}>
-                          {getAdminOptionLabel(a)}
-                        </option>
-                      ))}
+                  <optgroup label="── Accompagnateurs ──">
+                    {realAccompagnateurs.map((a) => (
+                      <option key={a.id} value={String(a.id)}>
+                        {getAdminOptionLabel(a)}
+                      </option>
+                    ))}
                   </optgroup>
                 </select>
               </div>
@@ -995,7 +1005,7 @@ export default function Annuaire() {
           ) : null}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
           {filtered.map((inc, idx) => {
             const followUp = getFollowUpStatus(inc);
             const planStatut = getPlanStatus(inc);
@@ -1022,8 +1032,8 @@ export default function Annuaire() {
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h3 className="font-bold text-slate-900 dark:text-white text-sm truncate">{inc.nom_incube}</h3>
-                      <p className="text-slate-500 dark:text-dark-400 text-xs truncate">{inc.raison_sociale || '—'}</p>
+                      <h3 className="font-bold text-slate-900 dark:text-white text-sm truncate" title={inc.nom_incube}>{inc.nom_incube}</h3>
+                      <p className="text-slate-500 dark:text-dark-400 text-xs truncate" title={inc.raison_sociale}>{inc.raison_sociale || '—'}</p>
                     </div>
                     <div className="flex flex-col items-end gap-1.5 shrink-0">
                       <span className={`badge ${PHASE_COLORS[inc.phase_projet] || 'badge-gray'}`}>
@@ -1047,20 +1057,20 @@ export default function Annuaire() {
                     </div>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                    <div><span className="text-slate-500 dark:text-dark-500">Statut :</span> <span className="text-slate-700 dark:text-dark-300 font-medium">{inc.statut_juridique}</span></div>
-                    <div><span className="text-slate-500 dark:text-dark-500">N° PP :</span> <span className="text-slate-700 dark:text-dark-300 font-medium">{inc.pp_numero || '—'}</span></div>
-                    <div>
+                  <div className="mt-3.5 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                    <div className="min-w-0 truncate"><span className="text-slate-500 dark:text-dark-500">Statut :</span> <span className="text-slate-700 dark:text-dark-300 font-medium">{inc.statut_juridique}</span></div>
+                    <div className="min-w-0 truncate"><span className="text-slate-500 dark:text-dark-500">N° PP :</span> <span className="text-slate-700 dark:text-dark-300 font-medium">{inc.pp_numero || '—'}</span></div>
+                    <div className="min-w-0 truncate">
                       <span className="text-slate-500 dark:text-dark-500">Accomp. :</span>{' '}
-                      <span className="text-slate-700 dark:text-dark-300 font-medium truncate inline-block max-w-full">
+                      <span className="text-slate-700 dark:text-dark-300 font-medium truncate inline-block max-w-full" title={inc.accompagnateurAdmin ? `${inc.accompagnateurAdmin.prenom} ${inc.accompagnateurAdmin.nom}` : (inc.accompagnateur || 'Non assigné')}>
                         {inc.accompagnateurAdmin
                           ? `${inc.accompagnateurAdmin.prenom} ${inc.accompagnateurAdmin.nom}`
                           : (inc.accompagnateur || 'Non assigné')}
                       </span>
                     </div>
-                    <div><span className="text-slate-500 dark:text-dark-500">Début :</span> <span className="text-slate-700 dark:text-dark-300 font-medium">{inc.date_demarrage ? new Date(inc.date_demarrage).toLocaleDateString('fr-FR') : '—'}</span></div>
+                    <div className="min-w-0 truncate"><span className="text-slate-500 dark:text-dark-500">Début :</span> <span className="text-slate-700 dark:text-dark-300 font-medium">{inc.date_demarrage ? new Date(inc.date_demarrage).toLocaleDateString('fr-FR') : '—'}</span></div>
                     {inc.promotion && (
-                      <div className="col-span-1">
+                      <div className="col-span-1 min-w-0 truncate">
                         <span className="text-slate-500 dark:text-dark-500">Promo :</span>{' '}
                         <span className="inline-flex items-center gap-1 font-bold text-primary-600 dark:text-primary-400">
                           <GraduationCap size={12} />
@@ -1069,7 +1079,7 @@ export default function Annuaire() {
                       </div>
                     )}
                     {inc.secteur_activite && (
-                      <div className={inc.promotion ? "col-span-1 truncate" : "col-span-2 truncate"}>
+                      <div className={`${inc.promotion ? "col-span-1" : "col-span-2"} min-w-0 truncate`}>
                         <span className="text-slate-500 dark:text-dark-500">Secteur :</span>{' '}
                         <span className="text-slate-700 dark:text-dark-300 font-medium truncate inline-block max-w-[130px]" title={inc.secteur_activite}>
                           {inc.secteur_activite}
@@ -1077,7 +1087,7 @@ export default function Annuaire() {
                       </div>
                     )}
                     {inc.email && (
-                      <div className="col-span-2 pt-1 border-t border-slate-100 dark:border-dark-800/60 text-[11px] text-slate-500 dark:text-dark-400 flex items-center gap-1.5 truncate">
+                      <div className="col-span-2 pt-1 border-t border-slate-100 dark:border-dark-800/60 text-[11px] text-slate-500 dark:text-dark-400 flex items-center gap-1.5 min-w-0 truncate">
                         <span>📧</span> <span className="font-mono text-slate-700 dark:text-dark-200 truncate">{inc.email}</span>
                       </div>
                     )}
@@ -1085,10 +1095,10 @@ export default function Annuaire() {
 
                   {/* Alerte et bouton d'activation rapide sur la carte pour les comptes en attente */}
                   {(inc.compteUtilisateur && !inc.compteUtilisateur.actif) && (
-                    <div className="mt-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 dark:bg-amber-950/30 dark:border-amber-800/50 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 min-w-0">
+                    <div className="mt-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 dark:bg-amber-950/30 dark:border-amber-800/50 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0 shrink-0">
                         <Clock size={13} className="text-amber-500 shrink-0 animate-pulse" />
-                        <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300 truncate">
+                        <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300 whitespace-nowrap">
                           Accès en attente
                         </span>
                       </div>
@@ -1105,7 +1115,7 @@ export default function Annuaire() {
                             toast.error(err.response?.data?.message || "Erreur lors de l'activation", { id: `act-${inc.id}` });
                           }
                         }}
-                        className="btn btn-primary btn-sm !py-1 !px-2.5 text-[11px] font-bold flex items-center gap-1 shadow-md shadow-primary-500/20 hover:scale-105 transition-transform shrink-0"
+                        className="btn btn-primary btn-sm !py-1 !px-2.5 text-[11px] font-bold flex items-center gap-1 shadow-md shadow-primary-500/20 hover:scale-105 transition-transform whitespace-nowrap shrink-0 ml-auto sm:ml-0"
                         title="Valider immédiatement ce compte et expédier les accès par email"
                       >
                         <KeyRound size={12} />
@@ -1115,10 +1125,10 @@ export default function Annuaire() {
                   )}
                   {/* Email présent mais aucun compte lié : activation rapide possible */}
                   {(inc.email && !inc.compteUtilisateur) && (
-                    <div className="mt-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 dark:bg-amber-950/30 dark:border-amber-800/50 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 min-w-0">
+                    <div className="mt-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 dark:bg-amber-950/30 dark:border-amber-800/50 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0 shrink-0">
                         <Clock size={13} className="text-amber-500 shrink-0 animate-pulse" />
-                        <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300 truncate">
+                        <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300 whitespace-nowrap">
                           Compte non activé
                         </span>
                       </div>
@@ -1135,7 +1145,7 @@ export default function Annuaire() {
                             toast.error(err.response?.data?.message || "Erreur lors de l'activation", { id: `act-${inc.id}` });
                           }
                         }}
-                        className="btn btn-primary btn-sm !py-1 !px-2.5 text-[11px] font-bold flex items-center gap-1 shadow-md shadow-primary-500/20 hover:scale-105 transition-transform shrink-0"
+                        className="btn btn-primary btn-sm !py-1 !px-2.5 text-[11px] font-bold flex items-center gap-1 shadow-md shadow-primary-500/20 hover:scale-105 transition-transform whitespace-nowrap shrink-0 ml-auto sm:ml-0"
                         title="Créer le compte portail et envoyer les accès par email"
                       >
                         <KeyRound size={12} />
@@ -1145,10 +1155,10 @@ export default function Annuaire() {
                   )}
                   {/* Si aucun email n'est renseigné pour cet incubé */}
                   {!inc.email && (
-                    <div className="mt-3 p-2.5 rounded-xl bg-slate-100 dark:bg-dark-800/90 border border-slate-200 dark:border-dark-700 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 min-w-0">
+                    <div className="mt-3 p-2.5 rounded-xl bg-slate-100 dark:bg-dark-800/90 border border-slate-200 dark:border-dark-700 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0 shrink-0">
                         <AlertCircle size={13} className="text-amber-500 shrink-0" />
-                        <span className="text-[11px] font-semibold text-slate-600 dark:text-dark-300 truncate">
+                        <span className="text-[11px] font-semibold text-slate-600 dark:text-dark-300 whitespace-nowrap">
                           Email manquant
                         </span>
                       </div>
@@ -1159,7 +1169,7 @@ export default function Annuaire() {
                           setEmailModalIncube(inc);
                           setInputEmail('');
                         }}
-                        className="btn btn-secondary btn-sm !py-1 !px-2.5 text-[11px] font-bold text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/40 border-primary-500/40 shrink-0 flex items-center gap-1 shadow-xs hover:scale-105 transition-transform"
+                        className="btn btn-secondary btn-sm !py-1 !px-2.5 text-[11px] font-bold text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/40 border-primary-500/40 shrink-0 flex items-center gap-1 shadow-xs hover:scale-105 transition-transform whitespace-nowrap ml-auto sm:ml-0"
                         title="Renseigner une adresse e-mail pour activer le compte"
                       >
                         <Mail size={12} />

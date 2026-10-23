@@ -115,7 +115,17 @@ function createSubController(Model, modelName) {
           }
         }
 
-        const withIncubeId = items.map(item => ({ ...item, incube_id: req.params.incubeId }));
+        // Protection SuiviEngagement : les heures de présence sont certifiées par les tourniquets
+        let sanitizedItems = items;
+        if (Model === SuiviEngagement) {
+          sanitizedItems = items.map(item => {
+            const clean = { ...item };
+            delete clean.moyenne_heures_presence;
+            return clean;
+          });
+        }
+
+        const withIncubeId = sanitizedItems.map(item => ({ ...item, incube_id: req.params.incubeId }));
         const created = await Model.bulkCreate(withIncubeId);
         res.status(201).json({ message: `${created.length} élément(s) importé(s)`, data: created });
       } catch (err) { res.status(400).json({ message: err.message }); }

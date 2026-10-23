@@ -245,40 +245,62 @@ function processScansToMonthlyHours(rawScans, targetYear = new Date().getFullYea
 /**
  * Calcul des indicateurs d'engagement contractuel (Section 4)
  */
-function calculateEngagementMetrics(monthlyHours) {
+function calculateEngagementMetrics(monthlyHours, options = {}) {
+  const { hasBadge = true, annee = new Date().getFullYear() } = options;
   const OBJECTIF_HEBDO = 15; // 15h / semaine
   const OBJECTIF_MOIS = 60;  // 60h / mois
   const OBJECTIF_ANNEE = 720; // 720h / an
 
+  const currentYear = new Date().getFullYear();
+  const currentMonthIdx = new Date().getMonth();
+
+  const totalYearHours = Object.values(monthlyHours || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
   let totalHeures = 0;
   let countMoisAvecHeures = 0;
   const statutsParMois = {};
 
-  MOIS_NOMS.forEach(m => {
+  MOIS_NOMS.forEach((m, idx) => {
     const h = monthlyHours[m] || 0;
     if (h > 0) {
       totalHeures += h;
       countMoisAvecHeures++;
     }
 
+    const isFuture = Number(annee) === currentYear && idx > currentMonthIdx;
+
     // Taux mois
     const tauxMois = Math.round((h / OBJECTIF_MOIS) * 100);
     let statut = 'NON CONFORME';
     let statutColor = 'red';
 
-    if (tauxMois >= 100) {
-      statut = 'CONFORME';
-      statutColor = 'emerald';
-    } else if (tauxMois >= 75) {
-      statut = 'ATTENTION';
-      statutColor = 'amber';
+    if (h > 0) {
+      if (tauxMois >= 100) {
+        statut = 'CONFORME';
+        statutColor = 'emerald';
+      } else if (tauxMois >= 75) {
+        statut = 'ATTENTION';
+        statutColor = 'amber';
+      }
+    } else {
+      if (!hasBadge) {
+        statut = 'SANS BADGE';
+        statutColor = 'slate';
+      } else if (isFuture) {
+        statut = 'À VENIR';
+        statutColor = 'slate';
+      } else if (totalYearHours === 0) {
+        statut = 'EN ATTENTE';
+        statutColor = 'slate';
+      }
     }
 
     statutsParMois[m] = {
       heures: h,
       tauxMois,
       statut,
-      statutColor
+      statutColor,
+      isFuture,
+      hasBadge
     };
   });
 
@@ -318,6 +340,7 @@ async function syncIncubeTourniquet(incubeId, annee = new Date().getFullYear()) 
 
   // 2. Trouver l'identifiant badge de l'incubé
   const badgeId = await findBadgeForIncube(incube);
+  const hasBadge = Boolean(badgeId);
 
   // 3. Récupérer les pointages en BDD
   const whereClause = {
@@ -341,36 +364,40 @@ async function syncIncubeTourniquet(incubeId, annee = new Date().getFullYear()) 
 
   // 4. Traitement du signal et calcul des heures mensuelles
   const { monthlyHours, totalHours, daysPresent, totalValidScans } = processScansToMonthlyHours(scans, annee);
-  const metrics = calculateEngagementMetrics(monthlyHours);
+  const metrics = calculateEngagementMetrics(monthlyHours, { hasBadge, annee });
 
-  // 5. Mettre à jour la table suivi_engagement pour chaque mois de façon optimisée (1 seule requête de lecture)
-  const existingRows = await SuiviEngagement.findAll({
-    where: {
-      incube_id: incube.id,
-      annee: Number(annee)
-    }
-  });
-  const rowsByMonth = new Map(existingRows.map(r => [r.mois, r]));
-
-  for (const m of MOIS_NOMS) {
-    const heures = monthlyHours[m] || 0;
-    const engagementRow = rowsByMonth.get(m);
-
-    if (engagementRow) {
-      if (engagementRow.moyenne_heures_presence !== heures) {
-        engagementRow.moyenne_heures_presence = heures;
-        await engagementRow.save();
-      }
-    } else if (heures > 0) {
-      await SuiviEngagement.create({
+  // 5. Mettre à jour la table suivi_engagement de façon strictement protectrice
+  // RÈGLE : Si l'incubé n'a pas de badge ou n'a aucun scan pour cette année, on ne touche JAMAIS aux données déjà enregistrées !
+  if (scans.length > 0) {
+    const existingRows = await SuiviEngagement.findAll({
+      where: {
         incube_id: incube.id,
-        mois: m,
-        annee: Number(annee),
-        moyenne_heures_presence: heures,
-        taux_presence_formation: null,
-        initiatives: '',
-        observations: ''
-      });
+        annee: Number(annee)
+      }
+    });
+    const rowsByMonth = new Map(existingRows.map(r => [r.mois, r]));
+
+    for (const m of MOIS_NOMS) {
+      const heures = monthlyHours[m] || 0;
+      const engagementRow = rowsByMonth.get(m);
+
+      if (engagementRow) {
+        // Ne mettre à jour que si des heures positives réelles ont été mesurées et diffèrent
+        if (heures > 0 && engagementRow.moyenne_heures_presence !== heures) {
+          engagementRow.moyenne_heures_presence = heures;
+          await engagementRow.save();
+        }
+      } else if (heures > 0) {
+        await SuiviEngagement.create({
+          incube_id: incube.id,
+          mois: m,
+          annee: Number(annee),
+          moyenne_heures_presence: heures,
+          taux_presence_formation: null,
+          initiatives: '',
+          observations: ''
+        });
+      }
     }
   }
 
@@ -378,7 +405,8 @@ async function syncIncubeTourniquet(incubeId, annee = new Date().getFullYear()) 
     incube: {
       id: incube.id,
       nom_incube: incube.nom_incube,
-      badge_id: badgeId || null
+      badge_id: badgeId || null,
+      hasBadge
     },
     annee: Number(annee),
     monthlyHours,

@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Building2, Wrench, BarChart3, UsersRound, ClipboardList, DollarSign, Camera, FileSpreadsheet, KeyRound, Mail, UserX, Clock, CheckCircle2, FileText } from 'lucide-react';
+import { ArrowLeft, Building2, Wrench, BarChart3, UsersRound, ClipboardList, DollarSign, Camera, FileSpreadsheet, KeyRound, Mail, UserX, Clock, CheckCircle2, FileText, GraduationCap } from 'lucide-react';
 import api, { getPhotoUrl } from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import TabInfos from '../components/tabs/TabInfos';
 import TabMateriel from '../components/tabs/TabMateriel';
 import TabEngagement from '../components/tabs/TabEngagement';
+import TabFormations from '../components/tabs/TabFormations';
 import TabRH from '../components/tabs/TabRH';
 import TabPlanAction from '../components/tabs/TabPlanAction';
 import TabFinancier from '../components/tabs/TabFinancier';
@@ -17,6 +18,7 @@ const TABS = [
   { key: 'infos', label: 'Infos Générales', icon: Building2 },
   { key: 'materiel', label: 'Matériel', icon: Wrench },
   { key: 'engagement', label: 'Engagement & Présence', icon: BarChart3 },
+  { key: 'formations', label: 'Formations Suivies', icon: GraduationCap },
   { key: 'rh', label: 'Ressources Humaines', icon: UsersRound },
   { key: 'plan', label: "Plan d'Action", icon: ClipboardList },
   { key: 'financier', label: 'Analyse Financière', icon: DollarSign },
@@ -102,6 +104,7 @@ export default function ProfilIncube() {
       case 'infos': return <TabInfos incube={incube} onUpdate={load} />;
       case 'materiel': return <TabMateriel incubeId={incube.id} incube={incube} data={incube.materiels || []} onUpdate={load} />;
       case 'engagement': return <TabEngagement incubeId={incube.id} incube={incube} data={incube.engagements || []} onUpdate={load} />;
+      case 'formations': return <TabFormations incubeId={incube.id} formations={incube.formations || []} onUpdate={load} />;
       case 'rh': return <TabRH incubeId={incube.id} incube={incube} emplois={incube.emplois || []} personnel={incube.personnel || []} onUpdate={load} />;
       case 'plan': return <TabPlanAction incubeId={incube.id} incube={incube} data={incube.plans || []} onUpdate={load} />;
       case 'financier': return <TabFinancier incubeId={incube.id} incube={incube} data={incube.finances || []} onUpdate={load} />;

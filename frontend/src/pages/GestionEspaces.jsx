@@ -941,13 +941,9 @@ export default function GestionEspaces() {
                                     >
                                       {res.nomIncube}
                                     </p>
-                                    {res.salleSpecifique ? (
+                                    {res.salleSpecifique && (
                                       <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
                                         📍 {res.salleSpecifique}
-                                      </span>
-                                    ) : (
-                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 dark:bg-dark-800 text-slate-500">
-                                        {ESPACES.find(e => e.id === res.espace)?.nom || res.espace}
                                       </span>
                                     )}
                                   </div>

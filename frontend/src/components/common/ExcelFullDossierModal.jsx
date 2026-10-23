@@ -199,21 +199,9 @@ export default function ExcelFullDossierModal({ isOpen, onClose, incubeId, incub
         }
       }
 
-      // 7. Engagement
-      if (parsedData.engagement && parsedData.engagement.length > 0) {
-        try {
-          try {
-            await api.post(`/incubes/${incubeId}/engagement/bulk`, parsedData.engagement);
-          } catch (bulkErr) {
-            if (bulkErr.response?.status === 404) {
-              for (const it of parsedData.engagement) await api.post(`/incubes/${incubeId}/engagement`, it);
-            } else throw bulkErr;
-          }
-          successCount += parsedData.engagement.length;
-        } catch (e) {
-          errors.push("Engagement");
-        }
-      }
+      // 7. Engagement : Exclu de l'importation Excel conformément aux règles de traçabilité
+      // Les présences et heures sont strictement réservées et mesurées par les tourniquets physiques ZKTeco
+
 
       // 8. Fiche Technique
       if (parsedData.fiche_technique && parsedData.fiche_technique.length > 0) {
@@ -424,16 +412,12 @@ export default function ExcelFullDossierModal({ isOpen, onClose, incubeId, incub
                 </div>
               </div>
 
-              {/* Engagement */}
-              <div className={`p-2.5 rounded-xl border flex items-center gap-2 text-xs ${
-                parsedData.engagement.length > 0
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300 font-semibold' 
-                  : 'bg-slate-50 dark:bg-dark-800/40 border-slate-200 dark:border-dark-700/50 text-slate-400'
-              }`}>
-                <Calendar size={15} className="shrink-0" />
+              {/* Engagement Tourniquet */}
+              <div className="p-2.5 rounded-xl border flex items-center gap-2 text-xs bg-blue-500/10 border-blue-500/30 text-blue-800 dark:text-blue-300 font-semibold" title="Les heures de présence physique sont mesurées en temps réel par les tourniquets ZKTeco">
+                <Calendar size={15} className="shrink-0 text-blue-600 dark:text-blue-400" />
                 <div className="truncate">
-                  <p className="truncate leading-tight">Engagement</p>
-                  <span className="text-[10px] opacity-75">{parsedData.engagement.length} mois</span>
+                  <p className="truncate leading-tight">Présence & Heures</p>
+                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold">Auto Tourniquets ZKTeco 🔒</span>
                 </div>
               </div>
             </div>

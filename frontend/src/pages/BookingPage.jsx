@@ -236,9 +236,24 @@ export default function BookingPage() {
 
     // 2. Réservations d'espaces (masquées si un accompagnateur spécifique est filtré)
     if (accompagnateurFiltre === 'all' && (categorieFiltre === 'all' || categorieFiltre === 'reservation')) {
+      const isStaff = isSuperAdmin || ['super_admin', 'admin', 'administrateur', 'accompagnateur'].includes(user?.role);
+      const uEmail = (user?.email || '').toLowerCase().trim();
+      const uNom = (user?.nom || '').toLowerCase().trim();
+      const uPrenom = (user?.prenom || '').toLowerCase().trim();
+
       reservationsList.forEach(r => {
-        const isMyRes = r.incubeId === user?.id;
-        if (isRealSuperAdmin || isMyRes) {
+        const rEmail = (r.emailIncube || r.email || '').toLowerCase().trim();
+        const rNom = (r.nomIncube || r.nom || '').toLowerCase().trim();
+
+        const isMyRes = Boolean(
+          (r.incubeId && (String(r.incubeId) === String(user?.id) || String(r.incubeId) === String(user?.pp_id))) ||
+          (uEmail && rEmail && (uEmail === rEmail || uEmail.includes(rEmail) || rEmail.includes(uEmail))) ||
+          (uNom && rNom && (rNom.includes(uNom) || (uPrenom && rNom.includes(uPrenom))))
+        );
+
+        if (isStaff || isMyRes || user?.role !== 'incube') {
+          const espaceLabel = r.espace === 'fablab' ? 'Fablab' : r.espace === 'studio' ? 'Studio Média' : 'Salle de réunion';
+          const salleLabel = r.salleSpecifique ? `${espaceLabel} (${r.salleSpecifique})` : espaceLabel;
           events.push({
             id: `res-${r.id}`,
             originalId: r.id,
@@ -246,9 +261,9 @@ export default function BookingPage() {
             date: r.dateReservation ? String(r.dateReservation).split('T')[0] : '',
             heure: r.heureDebut,
             duree: r.duree || (r.heureFin ? `${r.heureDebut}-${r.heureFin}` : '1h'),
-            titre: `Réservation : ${r.espace}`,
+            titre: `Réservation : ${salleLabel}`,
             sousTitre: r.nomIncube || '—',
-            lieu: r.salleSpecifique || r.espace,
+            lieu: salleLabel,
             statut: r.statut,
             commentaire: r.motifUtilisation,
             originalData: r
