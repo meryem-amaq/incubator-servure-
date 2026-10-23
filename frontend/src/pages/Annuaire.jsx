@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, Plus, Users, Briefcase, TrendingUp, Filter, X, Camera, Upload, FileSpreadsheet, Calendar, AlertCircle, CheckCircle2, XCircle, Clock, Check, Bell, BellRing, RotateCw, UserCheck, KeyRound, Mail, GraduationCap, ClipboardList, Eye } from 'lucide-react';
 import api, { getPhotoUrl } from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -83,6 +83,9 @@ function parseSuiviDate(moisStr, fallbackYear) {
 
 export default function Annuaire() {
   const { user, isSuperAdmin } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const accompagnateurParam = searchParams.get('accompagnateur');
+  const [accompagnateurFilterName, setAccompagnateurFilterName] = useState(accompagnateurParam || '');
   const [incubes, setIncubes] = useState([]);
   const [adminsList, setAdminsList] = useState([]);
   const [search, setSearch] = useState('');
@@ -244,12 +247,31 @@ export default function Annuaire() {
   useEffect(() => { load(); }, [search]);
 
   useEffect(() => {
+    if (accompagnateurParam) {
+      setAccompagnateurFilterName(accompagnateurParam);
+    }
+  }, [accompagnateurParam]);
+
+  useEffect(() => {
     if (isSuperAdmin) {
       api.get('/users/admins')
-        .then(res => setAdminsList(res.data))
+        .then(res => {
+          setAdminsList(res.data);
+          if (accompagnateurParam && Array.isArray(res.data)) {
+            const cleanQ = accompagnateurParam.trim().toLowerCase();
+            const matchedAdmin = res.data.find(a => {
+              const full1 = `${a.prenom || ''} ${a.nom || ''}`.trim().toLowerCase();
+              const full2 = `${a.nom || ''} ${a.prenom || ''}`.trim().toLowerCase();
+              return full1 === cleanQ || full2 === cleanQ || (a.nom && cleanQ.includes(a.nom.toLowerCase()));
+            });
+            if (matchedAdmin) {
+              setSelectedAdminFilter(String(matchedAdmin.id));
+            }
+          }
+        })
         .catch(() => {});
     }
-  }, [isSuperAdmin]);
+  }, [isSuperAdmin, accompagnateurParam]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -460,8 +482,15 @@ export default function Annuaire() {
 
     if (!matchesSearch) return false;
 
-    // 1. Filtrage Super Admin par liste d'accompagnateur
-    if (isSuperAdmin && selectedAdminFilter && selectedAdminFilter !== 'all') {
+    // 1. Filtrage par accompagnateur (URL ou sélection Super Admin)
+    if (accompagnateurFilterName) {
+      const q = accompagnateurFilterName.trim().toLowerCase();
+      const incAcc = (i.accompagnateur || '').trim().toLowerCase();
+      const targetAdmin = adminsList.find(a => String(a.id) === String(selectedAdminFilter));
+      const matchText = incAcc === q || incAcc.includes(q) || q.includes(incAcc);
+      const matchAdmin = targetAdmin ? isIncubeAssignedToAdmin(i, targetAdmin) : false;
+      if (!matchText && !matchAdmin) return false;
+    } else if (isSuperAdmin && selectedAdminFilter && selectedAdminFilter !== 'all') {
       if (selectedAdminFilter === 'unassigned') {
         const hasAdmin = Boolean(i.admin_id) || Boolean((i.accompagnateur || '').trim());
         if (hasAdmin) return false;
@@ -703,6 +732,46 @@ export default function Annuaire() {
         </div>
       </div>
 
+      {/* Bannière de filtrage dynamique par accompagnateur */}
+      {accompagnateurFilterName && (
+        <div className="flex items-center justify-between p-3.5 mb-2 rounded-2xl bg-gradient-to-r from-primary-500/15 via-primary-500/10 to-transparent border border-primary-500/30 text-primary-900 dark:text-primary-100 shadow-sm animate-fadeIn">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-primary-600 text-white flex items-center justify-center font-bold shadow-sm shrink-0">
+              <UserCheck size={18} />
+            </div>
+            <div>
+              <div className="text-xs sm:text-sm font-extrabold flex items-center gap-2 flex-wrap">
+                <span>Portefeuille de : <span className="underline decoration-primary-500 font-black">{accompagnateurFilterName}</span></span>
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-primary-600 text-white shadow-xs">
+                  {filtered.length} incubé{filtered.length > 1 ? 's' : ''}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-dark-300">
+                Affichage filtré depuis le Tableau de Bord (Contrôle du suivi mensuel).
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setAccompagnateurFilterName('');
+              setSelectedAdminFilter('all');
+              setSearchParams(prev => {
+                const next = new URLSearchParams(prev);
+                next.delete('accompagnateur');
+                return next;
+              });
+            }}
+            className="btn btn-secondary btn-sm flex items-center gap-1.5 font-bold cursor-pointer hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 border border-slate-200 dark:border-dark-700 shrink-0"
+            title="Réinitialiser pour voir tous les incubés"
+          >
+            <X size={14} />
+            <span className="hidden sm:inline">Afficher tous les incubés</span>
+            <span className="sm:hidden">Tous</span>
+          </button>
+        </div>
+      )}
+
       {/* Barre d'outils & Filtres */}
       <div className="flex flex-col xl:flex-row gap-3 items-stretch xl:items-center justify-between">
         <div className="flex flex-1 items-center gap-2 flex-wrap sm:flex-nowrap">
@@ -726,9 +795,17 @@ export default function Annuaire() {
                 </div>
                 <select
                   value={selectedAdminFilter}
-                  onChange={(e) => setSelectedAdminFilter(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedAdminFilter(e.target.value);
+                    setAccompagnateurFilterName('');
+                    setSearchParams(prev => {
+                      const next = new URLSearchParams(prev);
+                      next.delete('accompagnateur');
+                      return next;
+                    });
+                  }}
                   className={`input pl-9 pr-8 py-2 text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-all border ${
-                    selectedAdminFilter !== 'all'
+                    selectedAdminFilter !== 'all' || Boolean(accompagnateurFilterName)
                       ? 'border-primary-500 bg-primary-50/70 dark:bg-primary-950/40 text-primary-800 dark:text-primary-200 ring-2 ring-primary-500/20'
                       : 'border-slate-200 dark:border-dark-700 bg-white dark:bg-dark-900 text-slate-800 dark:text-dark-100'
                   }`}
@@ -747,10 +824,18 @@ export default function Annuaire() {
                 </select>
               </div>
 
-              {selectedAdminFilter !== 'all' && (
+              {(selectedAdminFilter !== 'all' || Boolean(accompagnateurFilterName)) && (
                 <button
                   type="button"
-                  onClick={() => setSelectedAdminFilter('all')}
+                  onClick={() => {
+                    setSelectedAdminFilter('all');
+                    setAccompagnateurFilterName('');
+                    setSearchParams(prev => {
+                      const next = new URLSearchParams(prev);
+                      next.delete('accompagnateur');
+                      return next;
+                    });
+                  }}
                   className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-slate-200 dark:border-dark-700 transition-colors"
                   title="Réinitialiser le filtre"
                 >

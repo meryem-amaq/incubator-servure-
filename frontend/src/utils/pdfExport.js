@@ -334,23 +334,23 @@ export const generateGlobalPVDocument = (incube, rows = [], signatureImage = nul
   const columns = [
     { header: 'Séance', dataKey: 'numero_ordre' },
     { header: 'Date', dataKey: 'date_suivi' },
-    { header: 'Statut Juridique', dataKey: 'statut_juridique' },
-    { header: 'Avancement', dataKey: 'statut_avancement' },
-    { header: 'Anomalies Signalées', dataKey: 'anomalie_signalee' },
+    { header: 'Objet de la réunion', dataKey: 'objet_reunion' },
+    { header: 'Changement Juridique', dataKey: 'statut_juridique' },
+    { header: 'Changement Avancement', dataKey: 'statut_avancement' },
     { header: 'Observations & Décisions', dataKey: 'observations' },
-    { header: 'Statut', dataKey: 'statut' }
+    { header: 'RDV', dataKey: 'statut' }
   ];
 
   const tableData = rows.length === 0 ? [
-    ['—', '—', '—', '—', 'Aucune séance de suivi enregistrée à ce jour.', '—', '—']
+    ['—', '—', '—', '—', '—', 'Aucune séance de suivi enregistrée à ce jour.', '—']
   ] : rows.map((r, i) => [
     r.numero_ordre ? `N° ${r.numero_ordre}` : `N° ${i + 1}`,
     formatDateFr(r.date_suivi),
+    r.objet_reunion?.trim() || 'Séance de suivi',
     r.statut_juridique || '—',
     r.statut_avancement || '—',
-    r.anomalie_signalee?.trim() || 'Néant',
     r.observations?.trim() || 'Conforme',
-    r.declaration_echec === 'Oui' ? 'Alerte' : 'Validé'
+    r.rendezvous_id ? 'Effectué' : 'Direct'
   ]);
 
   autoTable(doc, {
@@ -358,8 +358,8 @@ export const generateGlobalPVDocument = (incube, rows = [], signatureImage = nul
     head: [columns.map(c => c.header)],
     body: tableData,
     styles: {
-      fontSize: 8.5,
-      cellPadding: 3.5,
+      fontSize: 8,
+      cellPadding: 3,
       textColor: [51, 65, 85],
       valign: 'middle'
     },
@@ -367,20 +367,20 @@ export const generateGlobalPVDocument = (incube, rows = [], signatureImage = nul
       fillColor: [15, 23, 42],
       textColor: [255, 255, 255],
       fontStyle: 'bold',
-      fontSize: 8.8,
-      cellPadding: 4.5
+      fontSize: 8.2,
+      cellPadding: 4
     },
     alternateRowStyles: {
       fillColor: [248, 250, 252]
     },
     columnStyles: {
-      0: { cellWidth: 18, halign: 'center' },
-      1: { cellWidth: 24, halign: 'center' },
-      2: { cellWidth: 32 },
-      3: { cellWidth: 32 },
-      4: { cellWidth: 65 },
+      0: { cellWidth: 16, halign: 'center' },
+      1: { cellWidth: 22, halign: 'center' },
+      2: { cellWidth: 38 },
+      3: { cellWidth: 28 },
+      4: { cellWidth: 28 },
       5: { cellWidth: 'auto' },
-      6: { cellWidth: 22, halign: 'center', fontStyle: 'bold' }
+      6: { cellWidth: 18, halign: 'center', fontStyle: 'bold' }
     },
     margin: { top: 67, left: marginX, right: marginX, bottom: 40 }
   });
@@ -616,52 +616,53 @@ export const generateSeancePVDocument = (incube, row = {}, signatureImage = null
   doc.setTextColor(15, 23, 42);
   doc.text(incube?.secteur_activite || '—', 142, 56);
 
-  // 3. Section 1 : Situation & Avancement
+  // 3. Section 1 : Objet & Évolutions
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(15, 23, 42);
-  doc.text("1. État d'avancement & Cadre Juridique", 16, 70);
+  doc.text("1. Objet de la Réunion & Évolutions constatées", 16, 68);
 
-  // Deux cartes
+  // Bannière Objet de la réunion
+  doc.setFillColor(241, 245, 249);
+  doc.setDrawColor(203, 213, 225);
+  doc.roundedRect(16, 71, pageWidth - 32, 11, 2, 2, 'FD');
+  doc.setFontSize(8.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(15, 23, 42);
+  doc.text("Objet de la réunion :", 20, 78);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(37, 99, 235);
+  doc.text(row.objet_reunion || 'Séance de suivi périodique', 56, 78);
+
+  // Deux cartes : Changement juridique & Changement d'avancement
   const cardW = (pageWidth - 32 - 8) / 2;
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(16, 73, cardW, 19, 2, 2, 'FD');
-  doc.roundedRect(16 + cardW + 8, 73, cardW, 19, 2, 2, 'FD');
+  doc.roundedRect(16, 85, cardW, 19, 2, 2, 'FD');
+  doc.roundedRect(16 + cardW + 8, 85, cardW, 19, 2, 2, 'FD');
 
   doc.setFontSize(8.5);
   // Carte gauche
   doc.setFont("helvetica", "bold");
   doc.setTextColor(71, 85, 105);
-  doc.text("Statut Juridique constaté :", 20, 80);
+  doc.text("Changement Juridique :", 20, 92);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(37, 99, 235);
-  doc.text(row.statut_juridique || 'Non renseigné', 20, 87);
+  doc.text(row.statut_juridique || 'Non renseigné', 20, 99);
 
   // Carte droite
   doc.setFont("helvetica", "bold");
   doc.setTextColor(71, 85, 105);
-  doc.text("Stade de maturité :", 16 + cardW + 12, 80);
+  doc.text("Changement de l'état d'avancement :", 16 + cardW + 12, 92);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(15, 23, 42);
-  doc.text(row.statut_avancement || 'Idéation', 16 + cardW + 12, 87);
-
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(71, 85, 105);
-  doc.text("Déclaration d'échec :", 16 + cardW + 55, 80);
-  doc.setFont("helvetica", "bold");
-  if (row.declaration_echec === 'Oui') {
-    doc.setTextColor(225, 29, 72);
-  } else {
-    doc.setTextColor(16, 185, 129);
-  }
-  doc.text(row.declaration_echec || 'Non', 16 + cardW + 55, 87);
+  doc.text(row.statut_avancement || 'Idéation', 16 + cardW + 12, 99);
 
   // 4. Section 2 : Observations de l'accompagnateur et recommandations
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(15, 23, 42);
-  doc.text("2. Observations de l'accompagnateur et recommandations", 16, 100);
+  doc.text("2. Observations de l'accompagnateur et recommandations", 16, 112);
 
   const obsText = row.observations?.trim() || "Séance de suivi conforme aux jalons fixés. Le porteur poursuit l'exécution de sa feuille de route.";
   const obsLines = doc.splitTextToSize(obsText, pageWidth - 42);
@@ -669,15 +670,15 @@ export const generateSeancePVDocument = (incube, row = {}, signatureImage = null
 
   doc.setFillColor(255, 255, 255);
   doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(16, 104, pageWidth - 32, obsHeight, 2, 2, 'FD');
+  doc.roundedRect(16, 116, pageWidth - 32, obsHeight, 2, 2, 'FD');
 
   doc.setFontSize(8.5);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(51, 65, 85);
-  doc.text(obsLines, 21, 112);
+  doc.text(obsLines, 21, 124);
 
   // 5. Section 3 : Attestation
-  let nextY = 104 + obsHeight + 10;
+  let nextY = 116 + obsHeight + 10;
   doc.setFontSize(8);
   doc.setFont("helvetica", "italic");
   doc.setTextColor(100, 116, 139);

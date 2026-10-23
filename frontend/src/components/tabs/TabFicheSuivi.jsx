@@ -13,12 +13,14 @@ import {
   Pencil,
   Calendar,
   CalendarCheck,
-  CalendarPlus
+  Eye,
+  Link2,
+  Clock,
+  MapPin
 } from 'lucide-react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import SignatureModal from '../common/SignatureModal';
-import CalendrierBookingModal from '../common/CalendrierBookingModal';
 import {
   exportGlobalPVToPDF,
   getGlobalPVBlobUrl,
@@ -56,32 +58,31 @@ const formatDateFr = (d) => {
 const sortRowsDesc = (list) => {
   if (!Array.isArray(list)) return [];
   return [...list].sort((a, b) => {
-    // 1. Priorité par date (la plus récente d'abord)
     const dateA = a.date_suivi ? new Date(a.date_suivi).getTime() : 0;
     const dateB = b.date_suivi ? new Date(b.date_suivi).getTime() : 0;
     if (dateA !== dateB) return dateB - dateA;
-
-    // 2. Fallback sur l'ID décroissant (le plus récent d'abord)
     return (b.id || 0) - (a.id || 0);
   });
 };
 
 export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate }) {
   const [rows, setRows] = useState(() => sortRowsDesc(fiches || []));
+  const [rdvList, setRdvList] = useState([]);
 
-  // Modal d'ajout / modification de séance (style Formation)
+  // Modales
   const [showModal, setShowModal] = useState(false);
-  const [showBookingModal, setShowBookingModal] = useState(false);
   const [editingRow, setEditingRow] = useState(null);
+  const [detailModal, setDetailModal] = useState({ open: false, row: null });
   const [submitting, setSubmitting] = useState(false);
+
+  // Formulaire d'ajout / modification
   const [formData, setFormData] = useState({
     date_suivi: new Date().toISOString().split('T')[0],
+    objet_reunion: '',
     statut_juridique: incube?.statut_juridique || 'Auto-entrepreneur',
     statut_avancement: incube?.phase_projet || 'Idéation',
     observations: '',
-    enregistrerRdv: true,
-    heure_rdv: '10:00',
-    statut_rdv: 'effectue',
+    rendezvous_id: '',
   });
 
   // Modal de lecture agrandie des observations
@@ -94,7 +95,7 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
   const [exportType, setExportType] = useState('global'); // 'global' | 'seance'
   const [selectedRow, setSelectedRow] = useState(null);
 
-  // Synchronisation des options avec la valeur active de l'incubé
+  // Options synchronisées avec l'incubé
   const statutOptions = useMemo(() => {
     const list = [...BASE_STATUT_OPTS];
     if (incube?.statut_juridique && !list.includes(incube.statut_juridique)) {
@@ -111,81 +112,99 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
     return list;
   }, [incube?.phase_projet]);
 
-  // Synchronisation lors de la réception des fiches depuis le serveur
+  // Synchronisation des fiches depuis le parent
   useEffect(() => {
     setRows(sortRowsDesc(fiches || []));
   }, [fiches]);
 
+  // Chargement des rendez-vous existants de l'incubé (pour sélection sans doublon)
+  const loadRendezVous = async () => {
+    if (!incubeId) return;
+    try {
+      const res = await api.get(`/rendezvous?incubeId=${incubeId}`);
+      if (Array.isArray(res.data)) {
+        setRdvList(res.data);
+      }
+    } catch (err) {
+      console.warn("Erreur chargement rendez-vous incubé:", err);
+    }
+  };
+
+  useEffect(() => {
+    loadRendezVous();
+  }, [incubeId]);
+
   // Ouvrir le formulaire d'ajout
   const handleOpenAddModal = () => {
+    loadRendezVous();
     setEditingRow(null);
     setFormData({
       date_suivi: new Date().toISOString().split('T')[0],
+      objet_reunion: '',
       statut_juridique: incube?.statut_juridique || 'Auto-entrepreneur',
       statut_avancement: incube?.phase_projet || 'Idéation',
       observations: '',
-      enregistrerRdv: true,
-      heure_rdv: '10:00',
-      statut_rdv: 'effectue',
+      rendezvous_id: '',
     });
     setShowModal(true);
   };
 
   // Ouvrir le formulaire d'édition
   const handleOpenEditModal = (row) => {
+    loadRendezVous();
     setEditingRow(row);
     setFormData({
       date_suivi: row.date_suivi ? String(row.date_suivi).split('T')[0] : new Date().toISOString().split('T')[0],
+      objet_reunion: row.objet_reunion || '',
       statut_juridique: row.statut_juridique || incube?.statut_juridique || 'Auto-entrepreneur',
       statut_avancement: row.statut_avancement || incube?.phase_projet || 'Idéation',
       observations: row.observations || '',
-      enregistrerRdv: false,
-      heure_rdv: '10:00',
-      statut_rdv: 'effectue',
+      rendezvous_id: row.rendezvous_id ? String(row.rendezvous_id) : '',
     });
     setShowModal(true);
   };
 
-  // Enregistrement de la séance (Création ou Mise à jour)
+  // Sélection d'un rendez-vous existant dans la modale
+  const handleSelectRdv = (rdvId) => {
+    if (!rdvId) {
+      setFormData(prev => ({ ...prev, rendezvous_id: '' }));
+      return;
+    }
+    const selected = rdvList.find(r => String(r.id) === String(rdvId));
+    if (selected) {
+      setFormData(prev => ({
+        ...prev,
+        rendezvous_id: String(selected.id),
+        date_suivi: selected.dateRdv ? String(selected.dateRdv).split('T')[0] : prev.date_suivi,
+        objet_reunion: prev.objet_reunion?.trim() ? prev.objet_reunion : (selected.sujet || 'Point de suivi'),
+      }));
+    }
+  };
+
+  // Enregistrement de la séance (Création ou Modification)
   const handleSaveForm = async (e) => {
     e.preventDefault();
     setSubmitting(true);
 
     const dataToSave = {
       date_suivi: formData.date_suivi || null,
+      objet_reunion: formData.objet_reunion?.trim() || '',
       statut_juridique: formData.statut_juridique || incube?.statut_juridique || 'Auto-entrepreneur',
       statut_avancement: formData.statut_avancement || incube?.phase_projet || 'Idéation',
       observations: formData.observations || '',
-      // Ordre et anomalie signalée sont supprimés de la saisie
+      rendezvous_id: formData.rendezvous_id ? parseInt(formData.rendezvous_id, 10) : null,
       numero_ordre: editingRow?.numero_ordre || null,
       anomalie_signalee: '',
       declaration_echec: 'Non',
     };
 
     try {
-      // 1. Enregistrement automatique comme Rendez-vous si demandé (pour affichage immédiat sur le Dashboard)
-      if (formData.enregistrerRdv) {
+      // 1. Si un RDV est sélectionné, le marquer automatiquement comme "effectué" (sans recréer de doublon)
+      if (dataToSave.rendezvous_id) {
         try {
-          const rdvPayload = {
-            accompagnateurNom: incube?.accompagnateur || 'Accompagnateur IDS',
-            incubeIds: [incubeId],
-            incubeNoms: incube?.nom_incube || 'Incubé',
-            dateRdv: formData.date_suivi,
-            heureRdv: formData.heure_rdv || '10:00',
-            duree: '1h',
-            sujet: `Séance de Suivi • ${formData.statut_avancement || 'Étape'}`,
-            statut: formData.statut_rdv || 'effectue',
-            lieu: 'Bureaux Incubateur IDS / Fablab'
-          };
-          const rdvRes = await api.post('/rendezvous/creer', rdvPayload);
-          if (rdvRes.data?.data?.id) {
-            dataToSave.rendezvous_id = rdvRes.data.data.id;
-            if (formData.statut_rdv === 'effectue') {
-              await api.put(`/rendezvous/${rdvRes.data.data.id}`, { statut: 'effectue' }).catch(() => { });
-            }
-          }
+          await api.put(`/rendezvous/${dataToSave.rendezvous_id}`, { statut: 'effectue' });
         } catch (rdvErr) {
-          console.warn("Synchronisation RDV:", rdvErr);
+          console.warn("Mise à jour statut RDV:", rdvErr);
         }
       }
 
@@ -193,16 +212,29 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
       if (editingRow?.id) {
         const res = await api.put(`/incubes/${incubeId}/fiche-suivi/${editingRow.id}`, dataToSave);
         savedResult = res.data;
+        // Conserver les données du rendez-vous lié si présentes
+        if (dataToSave.rendezvous_id) {
+          const linkedRdv = rdvList.find(r => r.id === dataToSave.rendezvous_id);
+          if (linkedRdv) savedResult.rendezvous = linkedRdv;
+        }
         setRows(prev => sortRowsDesc(prev.map(r => r.id === editingRow.id ? savedResult : r)));
         toast.success("Séance de suivi modifiée avec succès");
       } else {
         const res = await api.post(`/incubes/${incubeId}/fiche-suivi`, dataToSave);
         savedResult = res.data;
+        if (dataToSave.rendezvous_id) {
+          const linkedRdv = rdvList.find(r => r.id === dataToSave.rendezvous_id);
+          if (linkedRdv) savedResult.rendezvous = linkedRdv;
+        }
         setRows(prev => sortRowsDesc([savedResult, ...prev]));
-        toast.success("Nouvelle séance de suivi enregistrée avec succès (affichée sur le Dashboard)");
+        toast.success(
+          dataToSave.rendezvous_id 
+            ? "Séance enregistrée & Rendez-vous marqué comme effectué !" 
+            : "Séance de suivi enregistrée avec succès"
+        );
       }
 
-      // Synchronisation vers Infos Générales si c'est la séance la plus récente (par date)
+      // Synchronisation vers Infos Générales si c'est la séance la plus récente
       const currentNewestTime = rows.length && rows[0]?.date_suivi ? new Date(rows[0].date_suivi).getTime() : 0;
       const thisTime = dataToSave.date_suivi ? new Date(dataToSave.date_suivi).getTime() : 0;
       if (thisTime >= currentNewestTime) {
@@ -221,48 +253,12 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
       }
 
       setShowModal(false);
+      loadRendezVous();
       if (onUpdate) onUpdate();
     } catch (err) {
       toast.error(err.response?.data?.message || "Erreur lors de l'enregistrement de la séance");
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  // 📅 Enregistrement d'une séance comme Rendez-vous (pour affichage sur le Dashboard)
-  const handleRegisterRdvForRow = async (row) => {
-    if (row.rendezvous_id) {
-      toast.success("Cette séance est déjà enregistrée comme Rendez-vous officiel.", { icon: '📅' });
-      setShowBookingModal(true);
-      return;
-    }
-
-    const toastId = toast.loading("Enregistrement du rendez-vous pour le Dashboard...");
-    try {
-      const rdvDate = row.date_suivi ? String(row.date_suivi).split('T')[0] : new Date().toISOString().split('T')[0];
-      const rdvPayload = {
-        accompagnateurNom: incube?.accompagnateur || 'Accompagnateur IDS',
-        incubeIds: [incubeId],
-        incubeNoms: incube?.nom_incube || 'Incubé',
-        dateRdv: rdvDate,
-        heureRdv: '10:00',
-        duree: '1h',
-        sujet: `Séance de Suivi • ${row.statut_avancement || 'Étape'}`,
-        statut: 'effectue',
-        lieu: 'Bureaux Incubateur IDS / Fablab'
-      };
-
-      const res = await api.post('/rendezvous/creer', rdvPayload);
-      const newRdvId = res.data?.data?.id;
-      if (newRdvId && row.id) {
-        await api.put(`/incubes/${incubeId}/fiche-suivi/${row.id}`, { rendezvous_id: newRdvId }).catch(() => { });
-        setRows(prev => prev.map(r => r.id === row.id ? { ...r, rendezvous_id: newRdvId } : r));
-      }
-
-      toast.success("Rendez-vous enregistré avec succès ! Il apparaît maintenant sur le Tableau de Bord.", { id: toastId, icon: '📅' });
-      if (onUpdate) onUpdate();
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Erreur lors de l'enregistrement du rendez-vous", { id: toastId });
     }
   };
 
@@ -281,7 +277,7 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
     }
   };
 
-  // 📜 Ouvrir la signature pour la Fiche de Suivi Globale (toutes les séances)
+  // Signature Fiche de Suivi Globale
   const handleOpenGlobalPV = () => {
     if (!rows || rows.length === 0) {
       toast.error("Aucune séance de suivi enregistrée pour générer la Fiche de Suivi");
@@ -295,7 +291,7 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
     setShowSigModal(true);
   };
 
-  // 📜 Ouvrir la signature électronique pour la séance / rendez-vous individuel
+  // Signature PV de Séance individuelle
   const handleOpenSeancePV = (row) => {
     setExportType('seance');
     setSelectedRow(row);
@@ -306,7 +302,7 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
     setShowSigModal(true);
   };
 
-  // ✍️ Validation de la signature & téléchargement du PDF (séance ou global)
+  // Validation signature
   const handleValidateSignature = (signatureImage) => {
     const safeName = (incube?.nom_incube || 'Incube').replace(/[^a-zA-Z0-9_-]/g, '_');
     const dateStamp = new Date().toISOString().split('T')[0];
@@ -341,7 +337,7 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
             Fiche de Suivi
           </h2>
           <p className="text-xs text-slate-500 dark:text-dark-400 mt-0.5">
-            Séances de suivi d'accompagnement, évolution des statuts et génération des Fiches de Suivi officielles signées
+            Suivi des réunions d'accompagnement, évolution juridique et d'avancement, et génération des PV officiels
           </p>
         </div>
 
@@ -351,20 +347,12 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
             className="btn btn-secondary btn-sm flex items-center gap-1.5 border-rose-500/40 text-rose-700 dark:text-rose-400 hover:bg-rose-500/10 font-bold shadow-sm"
             onClick={handleOpenGlobalPV}
             disabled={rows.length === 0}
-            title="Générer et signer la Fiche de Suivi officielle (PV de suivi récapitulatif)"
+            title="Générer et signer la Fiche de Suivi officielle récapitulative"
           >
             <FileDown size={14} className="text-rose-500" />
             <span>Exporter Fiche de Suivi (PDF)</span>
           </button>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm flex items-center gap-1.5 border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 font-bold shadow-sm"
-            onClick={() => setShowBookingModal(true)}
-            title="Planifier et enregistrer un nouveau rendez-vous pour cet incubé (affiché sur le Dashboard)"
-          >
-            <CalendarPlus size={14} className="text-amber-500" />
-            <span>Planifier un rendez-vous</span>
-          </button>
+
           <button
             type="button"
             className="btn btn-primary btn-sm flex items-center gap-1.5 font-bold shadow-sm"
@@ -380,14 +368,14 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
         <div className="flex items-center gap-2 flex-wrap">
           <span className="inline-flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-200">
             <Sparkles size={14} className="text-primary-500" />
-            Synchronisé avec Infos Générales :
+            Situation actuelle de l'incubé :
           </span>
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white dark:bg-dark-700 border border-slate-200 dark:border-dark-600 shadow-xs">
-            <span className="text-slate-500 dark:text-dark-400">Statut juridique :</span>
+            <span className="text-slate-500 dark:text-dark-400">Changement juridique :</span>
             <span className="font-bold text-primary-600 dark:text-primary-400">{incube?.statut_juridique || 'Non défini'}</span>
           </div>
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white dark:bg-dark-700 border border-slate-200 dark:border-dark-600 shadow-xs">
-            <span className="text-slate-500 dark:text-dark-400">Phase projet :</span>
+            <span className="text-slate-500 dark:text-dark-400">Changement avancement :</span>
             <span className="font-bold text-emerald-600 dark:text-emerald-400">{incube?.phase_projet || 'Idéation'}</span>
           </div>
         </div>
@@ -397,29 +385,42 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
         </div>
       </div>
 
-      {/* Tableau des séances de suivi (sans ordre ni anomalie signalée) */}
+      {/* Tableau des séances de suivi */}
       <div className="card p-0 overflow-hidden border border-slate-200 dark:border-dark-700/60 shadow-md">
         <div className="table-container">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-100 dark:bg-dark-800 text-slate-700 dark:text-dark-300">
-                <th className="py-3 px-4 font-bold border-b border-slate-200 dark:border-dark-700/60 w-36">
+                <th className="py-3 px-3 font-bold border-b border-slate-200 dark:border-dark-700/60 w-28">
                   <span className="inline-flex items-center gap-1.5">
                     <Calendar size={13} className="text-primary-500" />
                     Date
-                    <ArrowDown size={12} className="text-primary-500" title="Du plus récent vers le moins récent" />
                   </span>
                 </th>
-                <th className="py-3 px-4 font-bold border-b border-slate-200 dark:border-dark-700/60 w-44">Statut juridique</th>
-                <th className="py-3 px-4 font-bold border-b border-slate-200 dark:border-dark-700/60 w-44">État d'avancement</th>
-                <th className="py-3 px-4 font-bold border-b border-slate-200 dark:border-dark-700/60 min-w-[280px]">Observations & Recommandations</th>
-                <th className="py-3 px-4 font-bold border-b border-slate-200 dark:border-dark-700/60 text-center w-28">Actions</th>
+                <th className="py-3 px-3 font-bold border-b border-slate-200 dark:border-dark-700/60 min-w-[160px]">
+                  Objet de la réunion
+                </th>
+                <th className="py-3 px-3 font-bold border-b border-slate-200 dark:border-dark-700/60 w-36">
+                  Changement juridique
+                </th>
+                <th className="py-3 px-3 font-bold border-b border-slate-200 dark:border-dark-700/60 w-36">
+                  Changement d'avancement
+                </th>
+                <th className="py-3 px-3 font-bold border-b border-slate-200 dark:border-dark-700/60 min-w-[200px]">
+                  Observations & Recommandations
+                </th>
+                <th className="py-3 px-3 font-bold border-b border-slate-200 dark:border-dark-700/60 text-center w-28">
+                  Rendez-vous
+                </th>
+                <th className="py-3 px-3 font-bold border-b border-slate-200 dark:border-dark-700/60 text-center w-28">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-dark-700/50">
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="text-center py-10 text-slate-400">
+                  <td colSpan="7" className="text-center py-10 text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <FileText size={32} className="text-slate-300 dark:text-dark-600" />
                       <p className="font-semibold text-slate-500 dark:text-dark-400">Aucune séance de suivi enregistrée.</p>
@@ -437,33 +438,38 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
                 rows.map((row) => (
                   <tr key={row.id || row._key} className="hover:bg-slate-50 dark:hover:bg-dark-800/40 transition-colors">
                     {/* Date */}
-                    <td className="py-3 px-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900 dark:text-white text-xs">
-                          {formatDateFr(row.date_suivi)}
-                        </span>
-                      </div>
+                    <td className="py-3 px-3 whitespace-nowrap">
+                      <span className="font-bold text-slate-900 dark:text-white text-xs">
+                        {formatDateFr(row.date_suivi)}
+                      </span>
                     </td>
 
-                    {/* Statut Juridique */}
-                    <td className="py-3 px-4">
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-dark-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-dark-600">
+                    {/* Objet de la réunion */}
+                    <td className="py-3 px-3">
+                      <span className="font-bold text-slate-800 dark:text-slate-200">
+                        {row.objet_reunion?.trim() || <span className="text-slate-400 italic">Séance de suivi</span>}
+                      </span>
+                    </td>
+
+                    {/* Changement Juridique */}
+                    <td className="py-3 px-3">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-slate-100 dark:bg-dark-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-dark-600">
                         {row.statut_juridique || incube?.statut_juridique || 'Auto-entrepreneur'}
                       </span>
                     </td>
 
-                    {/* État d'avancement */}
-                    <td className="py-3 px-4">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border ${PHASE_STYLES[row.statut_avancement || incube?.phase_projet] || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
+                    {/* Changement de l'état d'avancement */}
+                    <td className="py-3 px-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold border ${PHASE_STYLES[row.statut_avancement || incube?.phase_projet] || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
                         {row.statut_avancement || incube?.phase_projet || 'Idéation'}
                       </span>
                     </td>
 
                     {/* Observations */}
-                    <td className="py-3 px-4">
-                      <div className="relative group flex items-start justify-between gap-2">
+                    <td className="py-3 px-3">
+                      <div className="relative group flex items-start justify-between gap-1.5">
                         <p className="text-slate-700 dark:text-slate-300 line-clamp-2 leading-relaxed text-xs">
-                          {row.observations?.trim() || <span className="text-slate-400 italic">Aucune observation renseignée.</span>}
+                          {row.observations?.trim() || <span className="text-slate-400 italic">Aucune observation.</span>}
                         </p>
                         {row.observations && (
                           <button
@@ -476,36 +482,60 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
                             className="p-1 text-slate-400 hover:text-primary-500 opacity-60 group-hover:opacity-100 transition-opacity cursor-pointer rounded hover:bg-slate-200 dark:hover:bg-dark-700 shrink-0"
                             title="Agrandir et voir tout le compte-rendu"
                           >
-                            <Maximize2 size={13} />
+                            <Maximize2 size={12} />
                           </button>
                         )}
                       </div>
                     </td>
 
+                    {/* Statut Rendez-vous lié */}
+                    <td className="py-3 px-3 text-center whitespace-nowrap">
+                      {row.rendezvous_id ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30" title="Rendez-vous planifié marqué comme Effectué">
+                          <CalendarCheck size={11} className="text-emerald-500" />
+                          Effectué
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 dark:bg-dark-700 text-slate-500 dark:text-dark-400" title="Séance directe sans créneau calendrier">
+                          Direct
+                        </span>
+                      )}
+                    </td>
+
                     {/* Actions */}
-                    <td className="py-3 px-4">
-                      <div className="flex items-center justify-center gap-1.5">
-                        {/* Modifier */}
+                    <td className="py-3 px-3">
+                      <div className="flex items-center justify-center gap-1">
+                        {/* 1. 👁️ Voir le détail */}
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm btn-icon text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-dark-700"
+                          onClick={() => setDetailModal({ open: true, row })}
+                          title="Voir les détails complets de cette séance"
+                        >
+                          <Eye size={13} />
+                        </button>
+
+                        {/* 2. ✏️ Modifier */}
                         <button
                           type="button"
                           className="btn btn-secondary btn-sm btn-icon hover:bg-primary-50 dark:hover:bg-primary-950/40 text-primary-600 dark:text-primary-400"
                           onClick={() => handleOpenEditModal(row)}
-                          title="Modifier cette séance de suivi"
+                          title="Modifier les informations de la séance"
                         >
                           <Pencil size={13} />
                         </button>
 
-                        {/* Signer et exporter le PV de ce rendez-vous */}
+                        {/* 3. 📥 Signer et exporter le PV */}
                         <button
                           type="button"
                           className="btn btn-secondary btn-sm btn-icon text-rose-600 dark:text-rose-400 hover:bg-rose-500/10"
                           onClick={() => handleOpenSeancePV(row)}
-                          title="Signer électroniquement et télécharger le PV de ce rendez-vous"
+                          title="Signer électroniquement et télécharger le PV de la séance"
                         >
                           <FileDown size={13} />
                         </button>
 
-                        {/* Suppression */}
+                        {/* 4. 🗑️ Supprimer */}
                         <button
                           type="button"
                           className="btn btn-danger btn-sm btn-icon"
@@ -524,7 +554,155 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
         </div>
       </div>
 
-      {/* Formulaire Modal Ajouter / Modifier une séance (Style Formations) */}
+      {/* ======================================================== */}
+      {/* 👁️ MODALE DÉTAIL D'UNE SÉANCE DE SUIVI                     */}
+      {/* ======================================================== */}
+      {detailModal.open && detailModal.row && (
+        <div
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
+          onClick={() => setDetailModal({ open: false, row: null })}
+        >
+          <div
+            className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white rounded-3xl border border-slate-200 dark:border-dark-700 shadow-2xl max-w-xl w-full overflow-hidden slide-up my-8 max-h-[90vh] flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header Modal Détail */}
+            <div className="p-5 border-b border-slate-100 dark:border-dark-800 bg-gradient-to-r from-slate-800 to-navy-900 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center text-white font-black shadow-inner">
+                  <FileText size={20} />
+                </div>
+                <div>
+                  <h3 className="font-black text-base tracking-tight">
+                    Détails de la Séance de Suivi
+                  </h3>
+                  <p className="text-xs text-white/80">
+                    Séance tenue le {formatDateFr(detailModal.row.date_suivi)}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailModal({ open: false, row: null })}
+                className="p-1.5 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Corps Modal Détail */}
+            <div className="p-5 overflow-y-auto space-y-4 flex-1 text-xs">
+              {/* Objet de la réunion */}
+              <div className="p-4 rounded-2xl bg-primary-500/10 border border-primary-500/20">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-primary-700 dark:text-primary-300 mb-1">
+                  Objet de la réunion
+                </div>
+                <div className="text-sm font-black text-slate-900 dark:text-white">
+                  {detailModal.row.objet_reunion?.trim() || 'Séance de suivi périodique'}
+                </div>
+              </div>
+
+              {/* Statuts : Changement juridique & Changement d'avancement */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-dark-800 border border-slate-200 dark:border-dark-700">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-dark-400 block mb-1">
+                    Changement juridique
+                  </span>
+                  <span className="text-xs font-bold text-primary-600 dark:text-primary-400">
+                    {detailModal.row.statut_juridique || incube?.statut_juridique || 'Non défini'}
+                  </span>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-dark-800 border border-slate-200 dark:border-dark-700">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-dark-400 block mb-1">
+                    Changement d'avancement
+                  </span>
+                  <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                    {detailModal.row.statut_avancement || incube?.phase_projet || 'Idéation'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Rendez-vous associé */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-dark-800 border border-slate-200 dark:border-dark-700 space-y-1.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-dark-400 block">
+                  Rendez-vous Calendrier
+                </span>
+                {detailModal.row.rendezvous_id ? (
+                  <div className="flex items-center gap-2 flex-wrap text-xs">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-bold border border-emerald-500/30">
+                      <CalendarCheck size={14} className="text-emerald-500" />
+                      Rendez-vous Effectué (Fait)
+                    </span>
+                    {detailModal.row.rendezvous?.sujet && (
+                      <span className="text-slate-600 dark:text-dark-300 font-medium">
+                        • {detailModal.row.rendezvous.sujet}
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-slate-500 dark:text-dark-400 italic">
+                    Séance enregistrée directement (non rattachée à un créneau du calendrier).
+                  </p>
+                )}
+              </div>
+
+              {/* Observations & Recommandations */}
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-dark-200 block">
+                  Observations & Recommandations de l'accompagnateur
+                </span>
+                <div className="p-4 bg-slate-50 dark:bg-dark-800 rounded-2xl border border-slate-200 dark:border-dark-700 text-xs text-slate-800 dark:text-dark-100 whitespace-pre-wrap leading-relaxed max-h-[35vh] overflow-y-auto">
+                  {detailModal.row.observations?.trim() || <span className="italic text-slate-400">Aucune observation enregistrée.</span>}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Modal Détail */}
+            <div className="p-4 border-t border-slate-100 dark:border-dark-800 bg-slate-50/50 dark:bg-dark-800/30 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                className="btn btn-secondary text-xs"
+                onClick={() => setDetailModal({ open: false, row: null })}
+              >
+                Fermer
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="btn btn-secondary text-xs border-rose-500/30 text-rose-700 dark:text-rose-400 hover:bg-rose-500/10 flex items-center gap-1.5"
+                  onClick={() => {
+                    const rowToExport = detailModal.row;
+                    setDetailModal({ open: false, row: null });
+                    handleOpenSeancePV(rowToExport);
+                  }}
+                >
+                  <FileDown size={13} className="text-rose-500" />
+                  <span>Exporter PV (PDF)</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-primary text-xs flex items-center gap-1.5 font-bold"
+                  onClick={() => {
+                    const rowToEdit = detailModal.row;
+                    setDetailModal({ open: false, row: null });
+                    handleOpenEditModal(rowToEdit);
+                  }}
+                >
+                  <Pencil size={13} />
+                  <span>Modifier</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* ✏️ MODALE AJOUTER / MODIFIER UNE SÉANCE                  */}
+      {/* ======================================================== */}
       {showModal && (
         <div
           className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
@@ -534,7 +712,7 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
             className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white rounded-3xl border border-slate-200 dark:border-dark-700 shadow-2xl max-w-xl w-full overflow-hidden slide-up my-8 max-h-[90vh] flex flex-col"
             onClick={e => e.stopPropagation()}
           >
-            {/* Header Modal - style formations */}
+            {/* Header Modal Form */}
             <div className="p-5 border-b border-slate-100 dark:border-dark-800 bg-gradient-to-r from-primary-600 to-navy-700 text-white flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center text-white font-black shadow-inner">
@@ -544,7 +722,7 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
                   <h3 className="font-black text-base tracking-tight">
                     {editingRow ? 'Modifier la Séance de Suivi' : 'Ajouter une Séance de Suivi'}
                   </h3>
-                  <p className="text-xs text-white/80">Renseignez la date, les statuts et vos observations</p>
+                  <p className="text-xs text-white/80">Renseignez l'objet, les évolutions et vos observations</p>
                 </div>
               </div>
               <button
@@ -558,25 +736,68 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
 
             {/* Corps du Formulaire */}
             <form onSubmit={handleSaveForm} className="p-5 overflow-y-auto space-y-4 flex-1">
-              {/* 1. Date de la séance */}
-              <div>
-                <label className="text-xs font-bold text-slate-700 dark:text-dark-200 block mb-1 uppercase tracking-wider">
-                  Date de la séance <span className="text-rose-500">*</span>
+              {/* Optionnel : Lier à un rendez-vous existant du Calendrier (ZÉRO doublon) */}
+              <div className="p-3.5 bg-slate-50 dark:bg-dark-800/80 rounded-2xl border border-slate-200 dark:border-dark-700 space-y-2">
+                <label className="text-xs font-bold text-slate-700 dark:text-dark-200 flex items-center gap-1.5">
+                  <Link2 size={14} className="text-primary-500" />
+                  <span>Rattacher à un rendez-vous existant du Calendrier</span>
+                  <span className="text-[10px] font-normal text-slate-500 dark:text-dark-400">(Optionnel)</span>
                 </label>
-                <input
-                  type="date"
-                  required
-                  value={formData.date_suivi}
-                  onChange={e => setFormData(prev => ({ ...prev, date_suivi: e.target.value }))}
-                  className="input !py-2.5 !text-xs w-full bg-slate-50 dark:bg-dark-800 font-bold border-slate-300 dark:border-dark-700 rounded-xl"
-                />
+                <select
+                  value={formData.rendezvous_id}
+                  onChange={e => handleSelectRdv(e.target.value)}
+                  className="input !py-2 !text-xs w-full bg-white dark:bg-dark-900 border-slate-300 dark:border-dark-700 rounded-xl cursor-pointer"
+                >
+                  <option value="">— Aucun rendez-vous sélectionné (séance libre) —</option>
+                  {rdvList.map(r => (
+                    <option key={r.id} value={r.id}>
+                      {r.dateRdv ? formatDateFr(r.dateRdv) : 'Date ?'} à {r.heureRdv || '10:00'} • {r.sujet} ({r.statut === 'effectue' ? 'Déjà effectué' : 'Programmé'})
+                    </option>
+                  ))}
+                </select>
+                {formData.rendezvous_id && (
+                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                    <Check size={12} />
+                    Ce rendez-vous sera automatiquement marqué comme "Effectué" sur le tableau de bord (aucun doublon créé).
+                  </p>
+                )}
               </div>
 
-              {/* 2. Statut Juridique & État d'avancement (grid 2 cols) */}
+              {/* 1. Date et Objet de la réunion (grid 2 cols) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-1">
+                  <label className="text-xs font-bold text-slate-700 dark:text-dark-200 block mb-1 uppercase tracking-wider">
+                    Date de la séance <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.date_suivi}
+                    onChange={e => setFormData(prev => ({ ...prev, date_suivi: e.target.value }))}
+                    className="input !py-2.5 !text-xs w-full bg-slate-50 dark:bg-dark-800 font-bold border-slate-300 dark:border-dark-700 rounded-xl"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-700 dark:text-dark-200 block mb-1 uppercase tracking-wider">
+                    Objet de la réunion <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="ex: Revue d'avancement, Démarches juridiques, Plan commercial..."
+                    value={formData.objet_reunion}
+                    onChange={e => setFormData(prev => ({ ...prev, objet_reunion: e.target.value }))}
+                    className="input !py-2.5 !text-xs w-full bg-slate-50 dark:bg-dark-800 font-bold border-slate-300 dark:border-dark-700 rounded-xl"
+                  />
+                </div>
+              </div>
+
+              {/* 2. Changement Juridique & Changement de l'état d'avancement (grid 2 cols) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-bold text-slate-700 dark:text-dark-200 block mb-1 uppercase tracking-wider">
-                    Statut Juridique <span className="text-rose-500">*</span>
+                    Changement juridique <span className="text-rose-500">*</span>
                   </label>
                   <select
                     value={formData.statut_juridique}
@@ -589,7 +810,7 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
 
                 <div>
                   <label className="text-xs font-bold text-slate-700 dark:text-dark-200 block mb-1 uppercase tracking-wider">
-                    État d'avancement <span className="text-rose-500">*</span>
+                    Changement de l'état d'avancement <span className="text-rose-500">*</span>
                   </label>
                   <select
                     value={formData.statut_avancement}
@@ -610,60 +831,16 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
                   rows={4}
                   value={formData.observations}
                   onChange={e => setFormData(prev => ({ ...prev, observations: e.target.value }))}
-                  placeholder="Saisissez vos observations, jalons atteints, décisions et recommandations pour l'étape suivante..."
+                  placeholder="Saisissez vos observations, décisions prises et recommandations pour l'étape suivante..."
                   className="input !py-2.5 !text-xs w-full bg-slate-50 dark:bg-dark-800 border-slate-300 dark:border-dark-700 rounded-xl resize-y min-h-[110px]"
                 />
               </div>
 
-              {/* Option d'enregistrement automatique comme Rendez-vous (pour Dashboard) */}
-              <div className="p-3.5 bg-primary-50/70 dark:bg-primary-950/30 rounded-xl border border-primary-200/80 dark:border-primary-800/40 space-y-2.5">
-                <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={formData.enregistrerRdv}
-                    onChange={e => setFormData(prev => ({ ...prev, enregistrerRdv: e.target.checked }))}
-                    className="rounded text-primary-600 focus:ring-primary-500 w-4 h-4 cursor-pointer"
-                  />
-                  <span className="text-xs font-bold text-slate-800 dark:text-dark-100 flex items-center gap-1.5">
-                    <CalendarCheck size={15} className="text-primary-600 dark:text-primary-400" />
-                    Enregistrer aussi comme Rendez-vous (Affiché sur le Tableau de Bord)
-                  </span>
-                </label>
-                {formData.enregistrerRdv && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 pl-6">
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-600 dark:text-dark-300 block mb-1">
-                        Heure de la séance
-                      </label>
-                      <input
-                        type="time"
-                        value={formData.heure_rdv}
-                        onChange={e => setFormData(prev => ({ ...prev, heure_rdv: e.target.value }))}
-                        className="input !py-1.5 !text-xs w-full bg-white dark:bg-dark-800 font-bold border-slate-300 dark:border-dark-700 rounded-lg"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-600 dark:text-dark-300 block mb-1">
-                        Statut du Rendez-vous
-                      </label>
-                      <select
-                        value={formData.statut_rdv}
-                        onChange={e => setFormData(prev => ({ ...prev, statut_rdv: e.target.value }))}
-                        className="input !py-1.5 !text-xs w-full font-bold bg-white dark:bg-dark-800 border-slate-300 dark:border-dark-700 rounded-lg cursor-pointer"
-                      >
-                        <option value="effectue">Effectué (Séance réalisée)</option>
-                        <option value="programme">Programmé (À venir)</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Alerte d'information sur la synchronisation */}
+              {/* Alerte d'information sur la mise à jour du profil */}
               <div className="p-3 bg-slate-50 dark:bg-dark-800/60 rounded-xl border border-slate-200 dark:border-dark-700 flex items-start gap-2.5 text-xs text-slate-600 dark:text-dark-300">
                 <Sparkles size={16} className="text-primary-500 shrink-0 mt-0.5" />
                 <span>
-                  L'enregistrement mettra à jour automatiquement le statut juridique et la phase du projet dans les informations générales de l'incubé s'il s'agit de la séance la plus récente.
+                  L'enregistrement mettra à jour automatiquement le statut juridique et la phase du projet dans le profil de l'incubé s'il s'agit de la séance la plus récente.
                 </span>
               </div>
 
@@ -745,18 +922,6 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
         onValidate={handleValidateSignature}
         title={sigModalTitle}
         pdfPreviewUrl={pdfPreviewUrl}
-      />
-
-      {/* Modale de prise de rendez-vous & calendrier booking */}
-      <CalendrierBookingModal
-        isOpen={showBookingModal}
-        onClose={() => setShowBookingModal(false)}
-        incubesList={incube ? [incube] : []}
-        currentAccompagnateurNom={incube?.accompagnateur || 'Accompagnateur IDS'}
-        initialIncubeId={incube?.id}
-        onSuccess={() => {
-          if (onUpdate) onUpdate();
-        }}
       />
     </div>
   );

@@ -75,6 +75,14 @@ function createSubController(Model, modelName) {
         }
 
         const item = await Model.create(createData);
+        if (Model === FicheSuivi && item.rendezvous_id) {
+          try {
+            const { RendezVous } = require('../models');
+            await RendezVous.update({ statut: 'effectue' }, { where: { id: item.rendezvous_id } });
+          } catch (e) {
+            console.warn('⚠️ Erreur mise à jour statut RDV:', e.message);
+          }
+        }
         res.status(201).json(item);
       } catch (err) { res.status(400).json({ message: err.message }); }
     },
@@ -145,6 +153,14 @@ function createSubController(Model, modelName) {
         }
 
         await item.update(updateData);
+        if (Model === FicheSuivi && item.rendezvous_id) {
+          try {
+            const { RendezVous } = require('../models');
+            await RendezVous.update({ statut: 'effectue' }, { where: { id: item.rendezvous_id } });
+          } catch (e) {
+            console.warn('⚠️ Erreur mise à jour statut RDV:', e.message);
+          }
+        }
         res.json(item);
       } catch (err) { res.status(400).json({ message: err.message }); }
     },

@@ -161,7 +161,8 @@ exports.getStats = async (req, res) => {
       domaineStats,
       statutStats,
       rawEtudeStats,
-      incubesParAccompagnateur
+      incubesParAccompagnateur,
+      allIncubesList
     ] = await Promise.all([
       Incube.count({ where: whereIncube }),
       Incube.findAll({
@@ -217,6 +218,11 @@ exports.getStats = async (req, res) => {
         where: whereIncube,
         attributes: ['accompagnateur', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
         group: ['accompagnateur'],
+        raw: true
+      }),
+      Incube.findAll({
+        where: whereIncube,
+        attributes: ['id', 'nom_incube', 'raison_sociale', 'accompagnateur', 'telephone', 'email', 'phase_projet', 'statut_juridique'],
         raw: true
       })
     ]);
@@ -298,7 +304,8 @@ exports.getStats = async (req, res) => {
       [yearsRows],
       [promoRows],
       rhMoisStats,
-      analyseIncubesMois
+      analyseIncubesMois,
+      allMaterielsRaw
     ] = await Promise.all([
       RhDetail.count({ where: whereRelations }),
       RhDetail.findAll({
@@ -423,10 +430,69 @@ exports.getStats = async (req, res) => {
         ${whereSql}
         GROUP BY COALESCE(af.annee, 2026), af.mois, i.id, i.nom_incube, i.raison_sociale, COALESCE(i.statut_juridique, 'Non spécifié')
         ORDER BY annee DESC, af.mois ASC
-      `, { replacements, type: sequelize.QueryTypes.SELECT })
+      `, { replacements, type: sequelize.QueryTypes.SELECT }),
+      GestionMateriel.findAll({
+        where: whereRelations,
+        raw: true
+      })
     ]);
 
     const caTotal = finances.reduce((sum, f) => sum + (Number(f.ventes) || 0) + (Number(f.autres_revenus) || 0), 0);
+
+    // Calcul des statistiques d'investissements matériel par catégorie
+    let totalInvestissementMateriel = 0;
+    let totalMaterielIds = 0;
+    let totalMaterielPropre = 0;
+    let totalArticlesMateriel = 0;
+    const catMaterielMap = {};
+
+    (allMaterielsRaw || []).forEach(m => {
+      let raw = String(m.valeur || '').trim().replace(/(?:dh|mad|dhs|\$|€)/gi, '').replace(/\s+/g, '');
+      if (/^\d+,\d{1,2}$/.test(raw)) raw = raw.replace(',', '.');
+      else if (/^\d{1,3}(?:\.\d{3})+(?:,\d+)?$/.test(raw)) raw = raw.replace(/\./g, '').replace(',', '.');
+      else raw = raw.replace(/,/g, '.').replace(/[^\d.]/g, '');
+      const val = parseFloat(raw) || 0;
+      const qty = parseInt(m.quantite, 10) || 1;
+      const cat = (m.secteur_action || '').trim() || 'Non catégorisé';
+      const isIds = m.type_origine === 'ids';
+
+      totalInvestissementMateriel += val;
+      totalArticlesMateriel += qty;
+      if (isIds) totalMaterielIds += val;
+      else totalMaterielPropre += val;
+
+      if (!catMaterielMap[cat]) {
+        catMaterielMap[cat] = {
+          nom: cat,
+          montantTotal: 0,
+          quantite: 0,
+          countLignes: 0,
+          idsMontant: 0,
+          propreMontant: 0
+        };
+      }
+      catMaterielMap[cat].montantTotal += val;
+      catMaterielMap[cat].quantite += qty;
+      catMaterielMap[cat].countLignes += 1;
+      if (isIds) catMaterielMap[cat].idsMontant += val;
+      else catMaterielMap[cat].propreMontant += val;
+    });
+
+    const categoriesMateriel = Object.values(catMaterielMap)
+      .sort((a, b) => b.montantTotal - a.montantTotal)
+      .map(c => ({
+        ...c,
+        percentage: totalInvestissementMateriel > 0 ? Number(((c.montantTotal / totalInvestissementMateriel) * 100).toFixed(1)) : 0
+      }));
+
+    const materielStats = {
+      totalInvestissement: totalInvestissementMateriel,
+      totalArticles: totalArticlesMateriel,
+      totalIds: totalMaterielIds,
+      totalPropre: totalMaterielPropre,
+      categories: categoriesMateriel,
+      rawList: allMaterielsRaw || []
+    };
 
     // 1 ligne dans FicheSuivi = 1 RDV Réalisé prouvé par l'accompagnateur
     const allFichesSuivi = allRdvsRaw || [];
@@ -471,6 +537,7 @@ exports.getStats = async (req, res) => {
       planActionList,
       suiviStats: {
         incubes: incubesParAccompagnateur,
+        allIncubes: allIncubesList,
         rdvs: rdvParAccompagnateur,
         fichesSuiviList: allFichesSuivi
       },
@@ -478,7 +545,8 @@ exports.getStats = async (req, res) => {
       analyseIncubesMois,
       rhMoisStats,
       anneesDisponibles: distinctAnnees,
-      statutsDisponibles: distinctStatuts
+      statutsDisponibles: distinctStatuts,
+      materielStats
     });
   } catch (err) {
     console.error('Erreur getStats:', err);
@@ -516,7 +584,13 @@ exports.getMonProfil = async (req, res) => {
         { model: AnalyseFinanciere, as: 'finances', separate: true, order: [['annee', 'DESC'], ['mois', 'ASC']] },
         { model: HistoriquePhase, as: 'historique_phases', separate: true, order: [['created_at', 'DESC']] },
         { model: HistoriqueStatut, as: 'historique_statuts', separate: true, order: [['created_at', 'DESC']] },
-        { model: FicheSuivi, as: 'fiches_suivi', separate: true, order: [['date_suivi', 'DESC']] },
+        { 
+          model: FicheSuivi, 
+          as: 'fiches_suivi', 
+          separate: true, 
+          order: [['date_suivi', 'DESC']],
+          include: [{ model: RendezVous, as: 'rendezvous', attributes: ['id', 'dateRdv', 'heureRdv', 'sujet', 'statut', 'lieu'] }]
+        },
         { model: Formation, as: 'formations', separate: true, order: [['date_formation', 'DESC']] },
       ],
     });
@@ -555,7 +629,13 @@ exports.getOne = async (req, res) => {
         { model: AnalyseFinanciere, as: 'finances', separate: true, order: [['annee', 'DESC'], ['mois', 'ASC']] },
         { model: HistoriquePhase, as: 'historique_phases', separate: true, order: [['created_at', 'DESC']] },
         { model: HistoriqueStatut, as: 'historique_statuts', separate: true, order: [['created_at', 'DESC']] },
-        { model: FicheSuivi, as: 'fiches_suivi', separate: true, order: [['date_suivi', 'DESC']] },
+        { 
+          model: FicheSuivi, 
+          as: 'fiches_suivi', 
+          separate: true, 
+          order: [['date_suivi', 'DESC']],
+          include: [{ model: RendezVous, as: 'rendezvous', attributes: ['id', 'dateRdv', 'heureRdv', 'sujet', 'statut', 'lieu'] }]
+        },
         { model: Formation, as: 'formations', separate: true, order: [['date_formation', 'DESC']] },
       ],
     });

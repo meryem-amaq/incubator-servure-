@@ -24,12 +24,14 @@ import {
   CalendarCheck,
   CalendarPlus,
   MapPin,
-  User
+  User,
+  Coins
 } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { KpiEconomique, KpiDemographie, KpiAssiduite, KpiMaterielChart } from '../components/common/KpiCharts';
+import KpiMaterielInvestissement from '../components/common/KpiMaterielInvestissement';
 import DashboardPdfStage from '../components/common/DashboardPdfStage';
 
 const PHASE_COLORS = {
@@ -147,7 +149,7 @@ export default function Dashboard() {
         pdf.setFont('helvetica', 'normal');
         pdf.setFontSize(7.5);
         pdf.setTextColor(100, 116, 139);
-        const pageSubtitle = activeTab === 'economique'
+        const pageSubtitle = (activeTab === 'economique' || activeTab === 'materiel')
           ? (pageNum === 1
             ? `Page 1 sur 2 : Indicateurs Clés & Analyse Financière Globale  •  Promotion : ${promoLabel}`
             : `Page 2 sur 2 : Performance des Projets & Démographie  •  Promotion : ${promoLabel}`)
@@ -349,6 +351,18 @@ export default function Dashboard() {
 
             <button
               type="button"
+              onClick={() => setActiveTab('materiel')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${activeTab === 'materiel'
+                ? 'bg-amber-500 text-white shadow-sm'
+                : 'text-slate-500 hover:text-slate-800 dark:text-dark-300'
+                }`}
+            >
+              <Coins size={14} className={activeTab === 'materiel' ? 'text-white' : 'text-amber-500'} />
+              <span>Investissements Matériel</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setActiveTab('impact')}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${activeTab === 'impact'
                 ? 'bg-emerald-600 text-white shadow-sm'
@@ -462,8 +476,20 @@ export default function Dashboard() {
           {/* Graphiques Économiques & Financiers */}
           <KpiEconomique stats={stats} />
 
+          {/* Répartition des Investissements Matériel par Catégorie */}
+          <KpiMaterielInvestissement stats={stats} />
+
           {/* Démographie */}
           <KpiDemographie stats={stats} />
+        </div>
+      )}
+
+      {/* =========================================================================
+         VUE DÉDIÉE : INVESTISSEMENTS MATÉRIEL PAR CATÉGORIE
+         ========================================================================= */}
+      {activeTab === 'materiel' && (
+        <div className="space-y-6 slide-up">
+          <KpiMaterielInvestissement stats={stats} />
         </div>
       )}
 

@@ -9,8 +9,22 @@ import {
   Legend,
   ArcElement,
 } from 'chart.js';
-import { Bar, Pie, Doughnut } from 'react-chartjs-2';
-import { Briefcase, Users, LayoutDashboard, CalendarCheck, Calendar, Download } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Bar, Doughnut, Pie, Line } from 'react-chartjs-2';
+import { 
+  Briefcase, 
+  Users, 
+  LayoutDashboard, 
+  CalendarCheck, 
+  Calendar, 
+  Download,
+  ExternalLink,
+  CheckCircle2,
+  AlertCircle,
+  X,
+  ChevronRight,
+  UserCheck
+} from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import RepartitionGenre from './RepartitionGenre';
 import RepartitionPhases from './RepartitionPhases';
@@ -1062,6 +1076,7 @@ export function KpiDemographie({ stats }) {
 // 3. KPI ASSIDUITÉ & UTILISATION DES ESPACES
 // ============================================================================
 export function KpiAssiduite({ impactStats, stats }) {
+  const navigate = useNavigate();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const [periodeReservation, setPeriodeReservation] = useState('mois'); // 'jour' | 'semaine' | 'mois'
@@ -1069,6 +1084,8 @@ export function KpiAssiduite({ impactStats, stats }) {
   const [suiviMode, setSuiviMode] = useState('mois'); // 'mois' | 'annee'
   const [selectedMoisSuivi, setSelectedMoisSuivi] = useState(() => new Date().toISOString().substring(0, 7)); // 'YYYY-MM' ou 'tous'
   const [selectedAnneeSuivi, setSelectedAnneeSuivi] = useState(() => String(new Date().getFullYear())); // 'YYYY' ou 'toutes'
+  const [selectedAccompagnateurModal, setSelectedAccompagnateurModal] = useState(null);
+  const [accModalTab, setAccModalTab] = useState('followed'); // 'followed' | 'unfollowed'
   const [selectedPlanAccompagnateur, setSelectedPlanAccompagnateur] = useState('tous');
   const [planGranularite, setPlanGranularite] = useState('trimestre'); // 'trimestre' | 'mois'
   const [selectedPlanYear, setSelectedPlanYear] = useState(() => String(new Date().getFullYear())); // 'YYYY' ou 'toutes'
@@ -1295,9 +1312,9 @@ export function KpiAssiduite({ impactStats, stats }) {
     };
   }, [commonOpts, isDark, capacites]);
 
-  // 2. Suivi des Incubés avec filtrage temporel (Mois / Année)
   const suivisIncubes = stats?.suiviStats?.incubes || [];
   const fichesSuiviRaw = stats?.suiviStats?.fichesSuiviList || [];
+  const allIncubesRaw = stats?.suiviStats?.allIncubes || [];
 
   // Mois disponibles pour le suivi
   const availableSuiviMonths = useMemo(() => {
@@ -1350,49 +1367,118 @@ export function KpiAssiduite({ impactStats, stats }) {
     }
   }, [fichesSuiviRaw, suiviMode, selectedMoisSuivi, selectedAnneeSuivi]);
 
-  const rdvCountsByAcc = useMemo(() => {
-    const map = {};
-    fichesSuiviFiltered.forEach(f => {
-      const nom = (f.incube?.accompagnateur || '').trim() || 'Non spécifié';
-      map[nom] = (map[nom] || 0) + 1;
-    });
-    return map;
-  }, [fichesSuiviFiltered]);
-
   const accSet = new Set([
     ...suivisIncubes.map(i => i.accompagnateur),
+    ...allIncubesRaw.map(i => (i.accompagnateur || '').trim()),
     ...fichesSuiviRaw.map(f => (f.incube?.accompagnateur || '').trim()),
     ...(stats?.suiviStats?.rdvs || []).map(r => r.accompagnateurNom)
   ].filter(Boolean));
   const accompagnateurs = Array.from(accSet);
 
-  const dataIncubes = accompagnateurs.map(acc =>
-    suivisIncubes.find(i => i.accompagnateur === acc)?.count || 0
-  );
+  const suiviStatsDetail = useMemo(() => {
+    return accompagnateurs.map(acc => {
+      const cleanAcc = (acc || '').trim().toLowerCase();
 
-  const dataRdvs = accompagnateurs.map(acc =>
-    rdvCountsByAcc[acc] || 0
-  );
+      // 1. Tous les incubés assignés à cet accompagnateur
+      let assigned = allIncubesRaw.filter(i => (i.accompagnateur || '').trim().toLowerCase() === cleanAcc);
 
-  const totalRdvsPeriod = dataRdvs.reduce((acc, v) => acc + v, 0);
+      // Si allIncubesRaw n'est pas encore synchronisé (fallback sur fichesSuiviRaw)
+      if (assigned.length === 0) {
+        const foundMap = new Map();
+        fichesSuiviRaw.forEach(f => {
+          if ((f.incube?.accompagnateur || '').trim().toLowerCase() === cleanAcc && f.incube?.id) {
+            foundMap.set(f.incube.id, {
+              id: f.incube.id,
+              nom_incube: f.incube.nom_incube,
+              raison_sociale: f.incube.raison_sociale,
+              accompagnateur: acc,
+            });
+          }
+        });
+        assigned = Array.from(foundMap.values());
+      }
+
+      const totalAssigned = Math.max(
+        assigned.length, 
+        suivisIncubes.find(i => (i.accompagnateur || '').trim().toLowerCase() === cleanAcc)?.count || 0
+      );
+
+      // 2. Fiches de suivi réalisées sur la période filtrée
+      const fichesAcc = fichesSuiviFiltered.filter(f => 
+        (f.incube?.accompagnateur || '').trim().toLowerCase() === cleanAcc
+      );
+      const totalSessions = fichesAcc.length;
+
+      // 3. Incubés uniques suivis
+      const followedIncubeIds = new Set(fichesAcc.map(f => f.incube_id || f.incube?.id).filter(Boolean));
+
+      // Liste des suivis
+      const followedList = [];
+      followedIncubeIds.forEach(incId => {
+        const incubeObj = assigned.find(i => i.id === incId) || fichesAcc.find(f => (f.incube_id || f.incube?.id) === incId)?.incube || { id: incId, nom_incube: 'Incubé #' + incId };
+        const fichesOfIncube = fichesAcc.filter(f => (f.incube_id || f.incube?.id) === incId).sort((a, b) => (b.date_suivi || '').localeCompare(a.date_suivi || ''));
+        const lastFiche = fichesOfIncube[0];
+        followedList.push({
+          ...incubeObj,
+          id: incId,
+          nbSeances: fichesOfIncube.length,
+          lastDate: lastFiche?.date_suivi,
+          lastObjet: lastFiche?.objet_reunion || 'Point de suivi',
+          lastStatutJuridique: lastFiche?.statut_juridique,
+          lastStatutAvancement: lastFiche?.statut_avancement,
+          lastObservations: lastFiche?.observations
+        });
+      });
+
+      // Liste des non suivis (assignés sans aucune fiche sur la période)
+      const unfollowedList = assigned.filter(i => !followedIncubeIds.has(i.id));
+
+      const uniqueFollowedCount = followedList.length;
+      const coverageRate = totalAssigned > 0 ? Math.round((uniqueFollowedCount / totalAssigned) * 100) : 0;
+
+      return {
+        accompagnateur: acc,
+        totalAssigned,
+        uniqueFollowedCount,
+        totalSessions,
+        coverageRate,
+        followedList,
+        unfollowedList
+      };
+    });
+  }, [accompagnateurs, allIncubesRaw, fichesSuiviRaw, fichesSuiviFiltered, suivisIncubes]);
+
+  const dataIncubes = suiviStatsDetail.map(d => d.totalAssigned);
+  const dataUniques = suiviStatsDetail.map(d => d.uniqueFollowedCount);
+  const dataSessions = suiviStatsDetail.map(d => d.totalSessions);
+
+  const totalRdvsPeriod = dataSessions.reduce((acc, v) => acc + v, 0);
 
   const suiviData = {
     labels: accompagnateurs.length > 0 ? accompagnateurs : ['Non spécifié'],
     datasets: [
       {
-        label: 'Total Incubés',
+        label: 'Incubés Assignés',
         data: dataIncubes.length > 0 ? dataIncubes : [0],
         backgroundColor: '#10b981',
         borderRadius: 6,
-        barPercentage: 0.6,
+        barPercentage: 0.7,
         categoryPercentage: 0.8,
       },
       {
-        label: 'RDV Réalisés',
-        data: dataRdvs.length > 0 ? dataRdvs : [0],
+        label: 'Incubés Suivis (Uniques)',
+        data: dataUniques.length > 0 ? dataUniques : [0],
         backgroundColor: '#0ea5e9',
         borderRadius: 6,
-        barPercentage: 0.6,
+        barPercentage: 0.7,
+        categoryPercentage: 0.8,
+      },
+      {
+        label: 'Volume Total Séances',
+        data: dataSessions.length > 0 ? dataSessions : [0],
+        backgroundColor: '#8b5cf6',
+        borderRadius: 6,
+        barPercentage: 0.7,
         categoryPercentage: 0.8,
       }
     ]
@@ -1788,10 +1874,16 @@ export function KpiAssiduite({ impactStats, stats }) {
       <div className="card p-5 flex flex-col justify-between min-w-0 hover:border-amber-500/40 transition-all">
         <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-2 mb-3">
           <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight">
-              RÉSERVATIONS & TAUX D'OCCUPATION
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-dark-400 mt-0.5">
+            <button
+              type="button"
+              onClick={() => navigate('/espaces')}
+              className="group text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-1.5 hover:text-amber-600 dark:hover:text-amber-400 transition-colors text-left cursor-pointer"
+              title="Cliquer pour accéder à la Gestion des Espaces & Réservations"
+            >
+              <span>RÉSERVATIONS & TAUX D'OCCUPATION</span>
+              <ExternalLink size={13} className="text-amber-500 opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+            </button>
+            <p className="text-xs text-slate-500 dark:text-dark-400 mt-0.5 truncate">
               Capacité : FabLab (8/j), Studio (4/j), Salles (6/j)
             </p>
           </div>
@@ -1850,7 +1942,7 @@ export function KpiAssiduite({ impactStats, stats }) {
           </div>
         </div>
 
-        <div className="flex-1 min-h-[190px]">
+        <div className="h-[210px] w-full my-auto flex items-center justify-center">
           <Bar key={`espace-${periodeReservation}-${selectedMoisRes}-${theme}`} data={espaceData} options={espaceOptions} />
         </div>
 
@@ -1934,10 +2026,18 @@ export function KpiAssiduite({ impactStats, stats }) {
       <div className="card p-5 flex flex-col justify-between min-w-0 hover:border-emerald-500/40 transition-all">
         <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-2 mb-3">
           <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
-              SUIVI DES INCUBÉS
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-dark-400 mt-0.5">Vue comparative : incubés assignés et RDV réalisés</p>
+            <button
+              type="button"
+              onClick={() => navigate('/incubes')}
+              className="group text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-1.5 hover:text-primary-600 dark:hover:text-primary-400 transition-colors text-left cursor-pointer"
+              title="Cliquer pour accéder à l'Annuaire & la source de toutes les données"
+            >
+              <span>SUIVI DES INCUBÉS</span>
+              <ExternalLink size={13} className="text-primary-500 opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+            </button>
+            <p className="text-xs text-slate-500 dark:text-dark-400 mt-0.5 truncate">
+              Vue comparative : assignés, suivis uniques et séances
+            </p>
           </div>
 
           {/* Filtres Temporels : Mois / Année à droite avec navigation < > */}
@@ -2007,24 +2107,314 @@ export function KpiAssiduite({ impactStats, stats }) {
           </div>
         </div>
 
-        <div className="flex-1 min-h-[190px]">
+        <div className="h-[210px] w-full my-auto flex items-center justify-center">
           <Bar key={`suivi-${theme}-${suiviMode}-${selectedMoisSuivi}-${selectedAnneeSuivi}`} data={suiviData} options={commonOpts} />
         </div>
 
-        <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {accompagnateurs.map((acc, idx) => (
-            <div key={idx} className="bg-slate-50 dark:bg-dark-900/60 rounded-xl p-2.5 border border-slate-200/80 dark:border-dark-700/60 flex flex-col">
-              <span className="text-xs font-bold text-slate-900 dark:text-white mb-1 truncate">{acc}</span>
-              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mb-0.5 flex items-center gap-1">
-                <Users size={11} /> {dataIncubes[idx]} incubé(s)
-              </span>
-              <span className="text-[10px] text-sky-600 dark:text-sky-400 font-semibold flex items-center gap-1">
-                <Calendar size={11} /> {dataRdvs[idx]} RDV
-              </span>
+        {/* Cartes interactives des accompagnateurs */}
+        <div className="mt-3 grid grid-cols-2 lg:grid-cols-4 gap-2">
+          {suiviStatsDetail.map((detail, idx) => (
+            <div 
+              key={idx} 
+              onClick={() => {
+                setSelectedAccompagnateurModal(detail);
+                setAccModalTab(detail.unfollowedList.length > 0 && detail.uniqueFollowedCount === 0 ? 'unfollowed' : 'followed');
+              }}
+              className="bg-slate-50 dark:bg-dark-800/70 hover:bg-white dark:hover:bg-dark-800 rounded-xl p-2.5 border border-slate-200/80 dark:border-dark-700/80 hover:border-primary-500/60 dark:hover:border-primary-500/60 shadow-xs hover:shadow-sm transition-all cursor-pointer group flex flex-col justify-between"
+              title={`Cliquer pour voir la liste détaillée des suivis de ${detail.accompagnateur}`}
+            >
+              {/* Ligne 1 : Nom de l'accompagnateur et bouton "Détails >" en haut à droite */}
+              <div className="flex items-center justify-between gap-1 mb-1.5">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="w-2 h-2 rounded-full bg-primary-500 shrink-0"></span>
+                  <span className="text-[11px] font-bold text-slate-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                    {detail.accompagnateur}
+                  </span>
+                </div>
+
+                <span className="text-[10px] font-bold text-primary-600 dark:text-primary-400 group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5 shrink-0 px-1.5 py-0.5 rounded-md bg-primary-50 dark:bg-primary-950/40 border border-primary-200/60 dark:border-primary-800/40">
+                  <span>Détails</span>
+                  <ChevronRight size={10} />
+                </span>
+              </div>
+
+              {/* Ligne 2 : Séances et incubés assignés discrets */}
+              <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-dark-700/60 text-[10px] text-slate-500 dark:text-dark-400 font-medium">
+                <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400 font-semibold">
+                  <Calendar size={10} /> {detail.totalSessions} séance{detail.totalSessions > 1 ? 's' : ''}
+                </span>
+                <span className="text-slate-600 dark:text-dark-300 font-bold">
+                  {detail.totalAssigned} incubé{detail.totalAssigned > 1 ? 's' : ''}
+                </span>
+              </div>
             </div>
           ))}
         </div>
       </div>
+
+      {/* ======================================================== */}
+      {/* 📊 MODALE DÉTAIL SUIVI ACCOMPAGNATEUR                    */}
+      {/* ======================================================== */}
+      {selectedAccompagnateurModal && (
+        <div
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
+          onClick={() => setSelectedAccompagnateurModal(null)}
+        >
+          <div
+            className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white rounded-3xl border border-slate-200 dark:border-dark-700 shadow-2xl max-w-3xl w-full overflow-hidden slide-up my-8 max-h-[90vh] flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header Modal */}
+            <div className="p-5 border-b border-slate-100 dark:border-dark-800 bg-gradient-to-r from-navy-800 to-slate-900 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center text-white font-black shadow-inner">
+                  <UserCheck size={22} />
+                </div>
+                <div>
+                  <h3 className="font-black text-base tracking-tight flex items-center gap-2">
+                    <span>Suivi Mensuel • {selectedAccompagnateurModal.accompagnateur}</span>
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-white/20 text-white">
+                      {suiviMode === 'mois' ? (selectedMoisSuivi === 'tous' ? 'Année (Cumul)' : formatMoisNom(selectedMoisSuivi)) : `Année ${selectedAnneeSuivi}`}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-white/80">
+                    Contrôle de conformité de l'accompagnement individuel (1 suivi par incubé par mois)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedAccompagnateurModal(null)}
+                className="p-1.5 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Corps Modal */}
+            <div className="p-5 overflow-y-auto space-y-4 flex-1 text-xs">
+              {/* Synthèse 4 KPI */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-dark-800 border border-slate-200 dark:border-dark-700">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-dark-400 block mb-1">
+                    Incubés Assignés
+                  </span>
+                  <span className="text-xl font-black text-slate-900 dark:text-white">
+                    {selectedAccompagnateurModal.totalAssigned}
+                  </span>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 block mb-1">
+                    Suivis Réalisés
+                  </span>
+                  <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">
+                    {selectedAccompagnateurModal.uniqueFollowedCount} <span className="text-xs font-bold text-slate-500 dark:text-dark-400">({selectedAccompagnateurModal.coverageRate}%)</span>
+                  </span>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 block mb-1">
+                    En Attente de Suivi
+                  </span>
+                  <span className="text-xl font-black text-amber-600 dark:text-amber-400">
+                    {selectedAccompagnateurModal.unfollowedList.length}
+                  </span>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-purple-500/10 border border-purple-500/20">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-400 block mb-1">
+                    Séances Totales
+                  </span>
+                  <span className="text-xl font-black text-purple-600 dark:text-purple-400">
+                    {selectedAccompagnateurModal.totalSessions}
+                  </span>
+                </div>
+              </div>
+
+              {/* Onglets Suivis vs En Attente */}
+              <div className="flex items-center gap-2 border-b border-slate-200 dark:border-dark-700 pb-2">
+                <button
+                  type="button"
+                  onClick={() => setAccModalTab('followed')}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer ${
+                    accModalTab === 'followed'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'bg-slate-100 dark:bg-dark-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-dark-700'
+                  }`}
+                >
+                  <CheckCircle2 size={13} />
+                  <span>✅ Incubés Suivis ({selectedAccompagnateurModal.followedList.length})</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setAccModalTab('unfollowed')}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer ${
+                    accModalTab === 'unfollowed'
+                      ? 'bg-amber-600 text-white shadow-sm'
+                      : 'bg-slate-100 dark:bg-dark-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-dark-700'
+                  }`}
+                >
+                  <AlertCircle size={13} />
+                  <span>⚠️ Non Suivis ce mois ({selectedAccompagnateurModal.unfollowedList.length})</span>
+                </button>
+              </div>
+
+              {/* Contenu Onglet 1 : Suivis */}
+              {accModalTab === 'followed' && (
+                <div className="space-y-2">
+                  {selectedAccompagnateurModal.followedList.length === 0 ? (
+                    <div className="text-center py-8 text-slate-400">
+                      <p className="font-semibold text-slate-500 dark:text-dark-400">Aucun incubé n'a encore été suivi sur cette période.</p>
+                    </div>
+                  ) : (
+                    <div className="border border-slate-200 dark:border-dark-700 rounded-2xl overflow-hidden">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-100 dark:bg-dark-800 text-slate-700 dark:text-dark-300 font-bold">
+                            <th className="py-2.5 px-3">Incubé / Projet</th>
+                            <th className="py-2.5 px-3">Dernière Séance</th>
+                            <th className="py-2.5 px-3">Objet de la Réunion</th>
+                            <th className="py-2.5 px-3 text-center">Séance(s)</th>
+                            <th className="py-2.5 px-3 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 dark:divide-dark-700/60">
+                          {selectedAccompagnateurModal.followedList.map(item => (
+                            <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-dark-800/40">
+                              <td className="py-2.5 px-3">
+                                <div className="font-bold text-slate-900 dark:text-white">{item.nom_incube}</div>
+                                <div className="text-[10px] text-slate-500 dark:text-dark-400">{item.raison_sociale || 'Projet'}</div>
+                              </td>
+                              <td className="py-2.5 px-3 whitespace-nowrap font-medium text-slate-700 dark:text-dark-300">
+                                {formatDateFr(item.lastDate)}
+                              </td>
+                              <td className="py-2.5 px-3 font-semibold text-primary-600 dark:text-primary-400">
+                                {item.lastObjet}
+                              </td>
+                              <td className="py-2.5 px-3 text-center">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20">
+                                  {item.nbSeances} séance{item.nbSeances > 1 ? 's' : ''}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedAccompagnateurModal(null);
+                                    navigate(`/incubes/${item.id}`);
+                                  }}
+                                  className="btn btn-secondary btn-xs inline-flex items-center gap-1 text-[11px]"
+                                >
+                                  <span>Voir fiche</span>
+                                  <ExternalLink size={11} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Contenu Onglet 2 : Non Suivis */}
+              {accModalTab === 'unfollowed' && (
+                <div className="space-y-2">
+                  {selectedAccompagnateurModal.unfollowedList.length === 0 ? (
+                    <div className="text-center py-8 text-emerald-600 dark:text-emerald-400 font-bold">
+                      🎉 Bravo ! Tous les incubés assignés à cet accompagnateur ont été suivis ce mois-ci !
+                    </div>
+                  ) : (
+                    <div className="border border-slate-200 dark:border-dark-700 rounded-2xl overflow-hidden">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-amber-50 dark:bg-amber-950/20 text-amber-900 dark:text-amber-200 font-bold">
+                            <th className="py-2.5 px-3">Incubé / Projet</th>
+                            <th className="py-2.5 px-3">Contact</th>
+                            <th className="py-2.5 px-3">Phase</th>
+                            <th className="py-2.5 px-3">Statut du mois</th>
+                            <th className="py-2.5 px-3 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 dark:divide-dark-700/60">
+                          {selectedAccompagnateurModal.unfollowedList.map(item => (
+                            <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-dark-800/40">
+                              <td className="py-2.5 px-3">
+                                <div className="font-bold text-slate-900 dark:text-white">{item.nom_incube}</div>
+                                <div className="text-[10px] text-slate-500 dark:text-dark-400">{item.raison_sociale || 'Projet'}</div>
+                              </td>
+                              <td className="py-2.5 px-3 whitespace-nowrap text-[11px] text-slate-600 dark:text-dark-300">
+                                {item.telephone || item.email || '—'}
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 dark:bg-dark-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-dark-600">
+                                  {item.phase_projet || 'Idéation'}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 whitespace-nowrap">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                                  <AlertCircle size={10} className="text-amber-500" />
+                                  Séance non réalisée
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedAccompagnateurModal(null);
+                                    navigate(`/incubes/${item.id}`);
+                                  }}
+                                  className="btn btn-primary btn-xs inline-flex items-center gap-1 text-[11px] font-bold"
+                                >
+                                  <span>Ouvrir dossier</span>
+                                  <ExternalLink size={11} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Footer Modal */}
+            <div className="p-4 border-t border-slate-100 dark:border-dark-800 bg-slate-50/50 dark:bg-dark-800/30 flex items-center justify-between gap-2">
+              <span className="text-[11px] text-slate-500 dark:text-dark-400 font-medium">
+                💡 Règle de conformité : chaque incubé doit bénéficier d'au moins 1 séance par mois.
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="btn btn-secondary text-xs"
+                  onClick={() => setSelectedAccompagnateurModal(null)}
+                >
+                  Fermer
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary text-xs font-bold flex items-center gap-1.5 shadow-sm"
+                  onClick={() => {
+                    const acc = selectedAccompagnateurModal.accompagnateur;
+                    setSelectedAccompagnateurModal(null);
+                    navigate(`/incubes?accompagnateur=${encodeURIComponent(acc)}`);
+                  }}
+                  title={`Voir uniquement les ${selectedAccompagnateurModal.totalAssigned} incubés de ${selectedAccompagnateurModal.accompagnateur}`}
+                >
+                  <Users size={13} />
+                  <span>Voir les incubés de {selectedAccompagnateurModal.accompagnateur} ({selectedAccompagnateurModal.totalAssigned})</span>
+                  <ExternalLink size={12} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 3. Événements Faits (Affichage par mois) */}
       <div className="card p-5 flex flex-col justify-between min-w-0 hover:border-amber-500/40 transition-all">

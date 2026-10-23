@@ -24,6 +24,7 @@ import {
   RefreshCw,
   GraduationCap
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
@@ -36,6 +37,7 @@ const MOIS_NOMS = [
 ];
 
 export default function BookingPage() {
+  const navigate = useNavigate();
   const { user, isSuperAdmin } = useAuth();
   const [incubes, setIncubes] = useState([]);
   const [rdvList, setRdvList] = useState([]);
@@ -484,6 +486,75 @@ export default function BookingPage() {
       i.pp_numero?.toLowerCase().includes(searchIncube.toLowerCase())
     );
   }, [incubes, searchIncube]);
+
+  // Helper pour extraire les incubés associés à un événement (RDV ou Réservation)
+  function resolveIncubesForEvent(event) {
+    if (!event) return [];
+
+    // 1. Si c'est une réservation d'espace
+    if (event.type === 'reservation') {
+      const incId = event.originalData?.incubeId;
+      const nom = event.sousTitre || event.originalData?.nomIncube;
+      if (incId) {
+        const found = incubes.find(i => String(i.id) === String(incId));
+        return [{ id: incId, nom: found?.nom_incube || nom || 'Incubé' }];
+      }
+      if (nom && nom !== '—') {
+        const found = incubes.find(i => i.nom_incube?.toLowerCase().trim() === nom.toLowerCase().trim());
+        return [{ id: found?.id || null, nom: found?.nom_incube || nom }];
+      }
+      return [];
+    }
+
+    // 2. Si c'est un rendez-vous
+    if (event.type === 'rendezvous') {
+      const rawIds = event.originalData?.incubeIds;
+      let ids = [];
+      if (Array.isArray(rawIds)) {
+        ids = rawIds;
+      } else if (typeof rawIds === 'string' && rawIds.trim()) {
+        try {
+          const parsed = JSON.parse(rawIds);
+          if (Array.isArray(parsed)) ids = parsed;
+          else if (parsed) ids = [parsed];
+        } catch {
+          ids = rawIds.split(',').map(s => s.trim().replace(/[\[\]"']/g, '')).filter(Boolean);
+        }
+      } else if (rawIds) {
+        ids = [rawIds];
+      }
+
+      // Si on a des IDs trouvés
+      if (ids.length > 0) {
+        return ids.map(id => {
+          const found = incubes.find(i => String(i.id) === String(id));
+          return {
+            id: found ? found.id : id,
+            nom: found?.nom_incube || `Incubé #${id}`
+          };
+        });
+      }
+
+      // Fallback si pas d'IDs : recherche par correspondance de nom dans la liste des incubés
+      const rawNoms = event.originalData?.incubeNoms || event.sousTitre;
+      if (rawNoms && rawNoms !== '—') {
+        const names = rawNoms.split(',').map(s => s.trim()).filter(Boolean);
+        return names.map(name => {
+          const norm = name.toLowerCase().trim();
+          const found = incubes.find(i => {
+            const iNom = (i.nom_incube || '').toLowerCase().trim();
+            return iNom === norm || iNom.includes(norm) || norm.includes(iNom);
+          });
+          return {
+            id: found?.id || null,
+            nom: found?.nom_incube || name
+          };
+        });
+      }
+    }
+
+    return [];
+  }
 
   return (
     <div className="slide-up space-y-6 w-full pb-10">
@@ -1039,6 +1110,7 @@ export default function BookingPage() {
   function renderRdvCard(rdv, isHistory = false) {
     const isToday = rdv.date === todayStr;
     const gcalUrl = rdv.type === 'rendezvous' ? generateGoogleCalendarUrl(rdv.originalData) : null;
+    const incubesForEvent = resolveIncubesForEvent(rdv);
 
     return (
       <div
@@ -1091,15 +1163,45 @@ export default function BookingPage() {
 
           {/* Détails : Incubé(s) / Formateur & Lieu */}
           <div className="mt-2 space-y-1 text-xs text-slate-600 dark:text-dark-300">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               {rdv.type === 'formation' ? (
                 <GraduationCap size={13} className="text-blue-500 shrink-0" />
               ) : (
                 <Users size={13} className="text-amber-500 shrink-0" />
               )}
-              <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">
-                {rdv.sousTitre}
-              </span>
+              {incubesForEvent.length > 0 ? (
+                <div className="inline-flex items-center gap-1 flex-wrap">
+                  {incubesForEvent.map((inc, idx) => (
+                    <span key={inc.id || idx} className="inline-flex items-center">
+                      {inc.id ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/incube/${inc.id}`);
+                          }}
+                          className="font-bold text-slate-800 dark:text-slate-100 hover:text-amber-600 dark:hover:text-amber-400 hover:underline inline-flex items-center gap-1 group cursor-pointer transition-colors text-left"
+                          title={`Cliquer pour ouvrir la fiche et les informations de ${inc.nom}`}
+                        >
+                          <span>{inc.nom}</span>
+                          <ExternalLink size={11} className="text-amber-500 opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all shrink-0" />
+                        </button>
+                      ) : (
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">
+                          {inc.nom}
+                        </span>
+                      )}
+                      {idx < incubesForEvent.length - 1 && (
+                        <span className="text-slate-400 font-bold mr-0.5">,</span>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">
+                  {rdv.sousTitre}
+                </span>
+              )}
             </div>
 
             {/* Coach / Accompagnateur si RDV */}

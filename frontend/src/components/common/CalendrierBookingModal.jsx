@@ -23,6 +23,7 @@ import {
   Search,
   Filter
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
 import { generateGoogleCalendarUrl, downloadIcsFile } from '../../utils/calendarHelper';
@@ -41,6 +42,7 @@ export default function CalendrierBookingModal({
   initialIncubeId = null,
   onSuccess = null
 }) {
+  const navigate = useNavigate();
   const [rdvList, setRdvList] = useState([]);
   const [activeTab, setActiveTab] = useState('calendrier'); // 'calendrier' | 'prochains' | 'historique' | 'nouveau'
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -223,6 +225,58 @@ export default function CalendrierBookingModal({
     i.nom_incube?.toLowerCase().includes(incubeSearch.toLowerCase()) ||
     i.pp_numero?.toLowerCase().includes(incubeSearch.toLowerCase())
   );
+
+  // Helper pour extraire les incubés associés au RDV
+  function resolveIncubesForRdv(rdv) {
+    if (!rdv) return [];
+    const rawIds = rdv.incubeIds;
+    let ids = [];
+    if (Array.isArray(rawIds)) {
+      ids = rawIds;
+    } else if (typeof rawIds === 'string' && rawIds.trim()) {
+      try {
+        const parsed = JSON.parse(rawIds);
+        if (Array.isArray(parsed)) ids = parsed;
+        else if (parsed) ids = [parsed];
+      } catch {
+        ids = rawIds.split(',').map(s => s.trim().replace(/[\[\]"']/g, '')).filter(Boolean);
+      }
+    } else if (rawIds) {
+      ids = [rawIds];
+    }
+
+    if (ids.length > 0) {
+      return ids.map(id => {
+        const found = (incubesList || []).find(i => String(i.id) === String(id));
+        return {
+          id: found ? found.id : id,
+          nom: found?.nom_incube || rdv.incubeNoms || `Incubé #${id}`
+        };
+      });
+    }
+
+    if (initialIncubeId && rdv.incubeNoms) {
+      return [{ id: initialIncubeId, nom: rdv.incubeNoms }];
+    }
+
+    const rawNoms = rdv.incubeNoms;
+    if (rawNoms && rawNoms !== '—') {
+      const names = rawNoms.split(',').map(s => s.trim()).filter(Boolean);
+      return names.map(name => {
+        const norm = name.toLowerCase().trim();
+        const found = (incubesList || []).find(i => {
+          const iNom = (i.nom_incube || '').toLowerCase().trim();
+          return iNom === norm || iNom.includes(norm) || norm.includes(iNom);
+        });
+        return {
+          id: found?.id || null,
+          nom: found?.nom_incube || name
+        };
+      });
+    }
+
+    return [];
+  }
 
   return createPortal(
     <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[9999] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
@@ -708,6 +762,7 @@ export default function CalendrierBookingModal({
   function renderRdvCard(rdv, isHistory = false) {
     const isToday = rdv.dateRdv === todayStr;
     const gcalUrl = generateGoogleCalendarUrl(rdv);
+    const incubesForRdv = resolveIncubesForRdv(rdv);
 
     return (
       <div
@@ -755,11 +810,42 @@ export default function CalendrierBookingModal({
 
           {/* Détails : Incubé(s) & Accompagnateur */}
           <div className="mt-2 space-y-1 text-xs text-slate-600 dark:text-dark-300">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <Users size={13} className="text-amber-500 shrink-0" />
-              <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">
-                {rdv.incubeNoms || '—'}
-              </span>
+              {incubesForRdv.length > 0 ? (
+                <div className="inline-flex items-center gap-1 flex-wrap">
+                  {incubesForRdv.map((inc, idx) => (
+                    <span key={inc.id || idx} className="inline-flex items-center">
+                      {inc.id ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onClose) onClose();
+                            navigate(`/incube/${inc.id}`);
+                          }}
+                          className="font-bold text-slate-800 dark:text-slate-100 hover:text-amber-600 dark:hover:text-amber-400 hover:underline inline-flex items-center gap-1 group cursor-pointer transition-colors text-left"
+                          title={`Cliquer pour voir la fiche et les informations de ${inc.nom}`}
+                        >
+                          <span>{inc.nom}</span>
+                          <ExternalLink size={11} className="text-amber-500 opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all shrink-0" />
+                        </button>
+                      ) : (
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">
+                          {inc.nom}
+                        </span>
+                      )}
+                      {idx < incubesForRdv.length - 1 && (
+                        <span className="text-slate-400 font-bold mr-0.5">,</span>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">
+                  {rdv.incubeNoms || '—'}
+                </span>
+              )}
             </div>
 
             <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-dark-400">
