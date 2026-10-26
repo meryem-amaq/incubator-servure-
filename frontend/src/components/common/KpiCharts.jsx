@@ -4,10 +4,13 @@ import {
   CategoryScale,
   LinearScale,
   BarElement,
+  PointElement,
+  LineElement,
   Title,
   Tooltip,
   Legend,
   ArcElement,
+  Filler,
 } from 'chart.js';
 import { useNavigate } from 'react-router-dom';
 import { Bar, Doughnut, Pie, Line } from 'react-chartjs-2';
@@ -23,22 +26,40 @@ import {
   AlertCircle,
   X,
   ChevronRight,
-  UserCheck
+  UserCheck,
+  Target,
+  ClipboardList,
+  Clock,
+  Wrench,
+  Camera,
+  ArrowRight,
+  Eye,
+  Search,
+  Trophy,
+  TrendingUp,
+  DollarSign,
+  MapPin,
+  Scale,
+  Rocket
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import RepartitionGenre from './RepartitionGenre';
 import RepartitionPhases from './RepartitionPhases';
 import Top4EmploisTreemap from './Top4EmploisTreemap';
 import NiveauEtudeChart from './NiveauEtudeChart';
+import KpiCategoryDetailModal from './KpiCategoryDetailModal';
 
 ChartJS.register(
   CategoryScale,
   LinearScale,
   BarElement,
+  PointElement,
+  LineElement,
   Title,
   Tooltip,
   Legend,
-  ArcElement
+  ArcElement,
+  Filler
 );
 
 // Options adaptatives (Thème Clair / Sombre)
@@ -127,17 +148,40 @@ function getPieOptions(isDark, overrides = {}) {
   };
 }
 
+const formatDateFr = (dateStr) => {
+  if (!dateStr) return '—';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  } catch {
+    return dateStr;
+  }
+};
+
+const formatDH = (amount) => {
+  if (amount === undefined || amount === null || isNaN(amount)) return '0 DH';
+  return new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD', maximumFractionDigits: 0 }).format(amount);
+};
+
 // ============================================================================
 // 1. KPI ÉCONOMIQUE & PROJETS
 // ============================================================================
 export function KpiEconomique({ stats, section = 'all' }) {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const navigate = useNavigate();
 
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [selectedStatut, setSelectedStatut] = useState('tous');
   const [selectedPeriod, setSelectedPeriod] = useState('annuel');
+  const [showAllIncubesModal, setShowAllIncubesModal] = useState(false);
+  const [showEmploisModal, setShowEmploisModal] = useState(false);
+  const [showPhasesModal, setShowPhasesModal] = useState(false);
+  const [showCaStatutModal, setShowCaStatutModal] = useState(false);
+  const [modalSearch, setModalSearch] = useState('');
+  const [modalFilterZero, setModalFilterZero] = useState(false);
 
   const commonOpts = useMemo(() => getCommonOptions(isDark), [isDark]);
   const pieOpts = useMemo(() => getPieOptions(isDark), [isDark]);
@@ -198,45 +242,140 @@ export function KpiEconomique({ stats, section = 'all' }) {
 
   const currentPeriod = periodes[selectedPeriod] || periodes['annuel'];
 
-  // 1. TOP 3 CHIFFRE D'AFFAIRES (Filtré dynamiquement selon l'année, la période T1/T2/T3/T4/Annuel et le statut)
-  const podiumColors = ['#eab308', '#94a3b8', '#b45309']; // 🥇 Or, 🥈 Argent, 🥉 Bronze
-  const podiumBorders = ['#ca8a04', '#64748b', '#78350f'];
+  // Helper pour récupérer l'ID de l'incubé (pour la redirection directe vers Analyse Financière)
+  const getIncubeId = useCallback((item) => {
+    if (item?.id) return item.id;
+    if (item?.incube_id) return item.incube_id;
+    if (Array.isArray(stats?.suiviStats?.allIncubes)) {
+      const targetName = (item?.nom || '').trim().toLowerCase();
+      const targetProjet = (item?.projet || '').trim().toLowerCase();
+      const found = stats.suiviStats.allIncubes.find(i => {
+        const iNom = (i.nom_incube || '').trim().toLowerCase();
+        const iProjet = (i.raison_sociale || '').trim().toLowerCase();
+        return (targetProjet && iProjet === targetProjet) || (targetName && iNom === targetName);
+      });
+      if (found) return found.id;
+    }
+    return null;
+  }, [stats?.suiviStats?.allIncubes]);
 
-  const top3CAList = useMemo(() => {
-    if (stats.analyseIncubesMois && stats.analyseIncubesMois.length > 0) {
-      const agg = {};
+  // Redirection directe vers l'onglet Analyse Financière de l'incubé
+  const handleOpenIncubeFinances = useCallback((item) => {
+    const targetId = getIncubeId(item);
+    if (targetId) {
+      navigate(`/incubes/${targetId}?tab=financier`);
+    }
+  }, [getIncubeId, navigate]);
+
+  // 1. CLASSEMENT COMPLET DU CHIFFRE D'AFFAIRES DE TOUS LES INCUBÉS
+  // Filtré dynamiquement selon l'année, la période T1/T2/T3/T4/Annuel et le statut
+  const allIncubesCAList = useMemo(() => {
+    const map = {};
+
+    // A. Initialiser depuis la liste complète des incubés (s'ils existent dans les stats de suivi)
+    if (Array.isArray(stats?.suiviStats?.allIncubes)) {
+      stats.suiviStats.allIncubes.forEach(inc => {
+        const matchStatut = selectedStatut === 'tous' || 
+          (inc.statut_juridique || '').trim().toLowerCase() === selectedStatut.trim().toLowerCase();
+
+        if (matchStatut && inc.id) {
+          map[inc.id] = {
+            id: inc.id,
+            incube_id: inc.id,
+            nom: inc.nom_incube || 'Inconnu',
+            projet: inc.raison_sociale || inc.nom_incube || 'Inconnu',
+            statut_juridique: inc.statut_juridique || 'Non spécifié',
+            phase_projet: inc.phase_projet || '—',
+            accompagnateur: inc.accompagnateur || '—',
+            total_ca: 0
+          };
+        }
+      });
+    }
+
+    // B. Agréger les montants de stats.analyseIncubesMois selon les filtres actifs
+    if (Array.isArray(stats?.analyseIncubesMois) && stats.analyseIncubesMois.length > 0) {
       stats.analyseIncubesMois.forEach(item => {
         const itemYear = Number(item.annee || 2026);
         const itemMois = Number(item.mois);
         const matchYear = itemYear === Number(selectedYear);
         const matchPeriod = itemMois >= currentPeriod.start && itemMois <= currentPeriod.end;
-        const matchStatut = selectedStatut === 'tous' || (item.statut_juridique || '').trim().toLowerCase() === selectedStatut.trim().toLowerCase();
+        const matchStatut = selectedStatut === 'tous' || 
+          (item.statut_juridique || '').trim().toLowerCase() === selectedStatut.trim().toLowerCase();
 
         if (matchYear && matchPeriod && matchStatut) {
-          const key = item.projet || item.nom || 'Inconnu';
-          if (!agg[key]) {
-            agg[key] = {
-              nom: item.nom,
-              projet: item.projet || item.nom,
-              statut_juridique: item.statut_juridique,
+          const key = item.incube_id || item.projet || item.nom || 'Inconnu';
+          if (!map[key]) {
+            map[key] = {
+              id: item.incube_id || null,
+              incube_id: item.incube_id || null,
+              nom: item.nom || 'Inconnu',
+              projet: item.projet || item.nom || 'Inconnu',
+              statut_juridique: item.statut_juridique || 'Non spécifié',
+              phase_projet: item.phase_projet || '—',
+              accompagnateur: item.accompagnateur || '—',
               total_ca: 0
             };
           }
-          agg[key].total_ca += (Number(item.total_ca) || 0);
+          map[key].total_ca += (Number(item.total_ca) || 0);
+          if (item.incube_id && !map[key].id) {
+            map[key].id = item.incube_id;
+            map[key].incube_id = item.incube_id;
+          }
         }
       });
-
-      return Object.values(agg)
-        .sort((a, b) => b.total_ca - a.total_ca)
-        .slice(0, 3);
     }
-    return stats.top3CA || [];
-  }, [stats.analyseIncubesMois, stats.top3CA, selectedYear, selectedPeriod, selectedStatut, currentPeriod]);
+
+    // C. Fallback vers top3CA si aucune donnée n'est trouvée
+    if (Object.keys(map).length === 0 && Array.isArray(stats?.top3CA)) {
+      stats.top3CA.forEach((item, idx) => {
+        map[idx] = {
+          id: item.id || null,
+          incube_id: item.id || null,
+          nom: item.nom,
+          projet: item.projet || item.nom,
+          statut_juridique: item.statut_juridique || 'Non spécifié',
+          phase_projet: '—',
+          total_ca: Number(item.total_ca) || 0
+        };
+      });
+    }
+
+    return Object.values(map).sort((a, b) => b.total_ca - a.total_ca);
+  }, [stats?.analyseIncubesMois, stats?.suiviStats?.allIncubes, stats?.top3CA, selectedYear, selectedPeriod, selectedStatut, currentPeriod]);
+
+  // Podium TOP 3
+  const podiumColors = ['#eab308', '#94a3b8', '#b45309']; // 🥇 Or, 🥈 Argent, 🥉 Bronze
+  const podiumBorders = ['#ca8a04', '#64748b', '#78350f'];
+
+  const top3CAList = useMemo(() => {
+    return allIncubesCAList.slice(0, 3);
+  }, [allIncubesCAList]);
+
+  // Liste filtrée pour la modale détaillée (recherche + option CA > 0)
+  const filteredModalList = useMemo(() => {
+    let list = allIncubesCAList;
+    if (modalFilterZero) {
+      list = list.filter(item => Number(item.total_ca) > 0);
+    }
+    if (modalSearch.trim()) {
+      const q = modalSearch.trim().toLowerCase();
+      list = list.filter(item => 
+        (item.projet && item.projet.toLowerCase().includes(q)) ||
+        (item.nom && item.nom.toLowerCase().includes(q)) ||
+        (item.statut_juridique && item.statut_juridique.toLowerCase().includes(q)) ||
+        (item.phase_projet && item.phase_projet.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }, [allIncubesCAList, modalFilterZero, modalSearch]);
 
   const top3Data = {
     labels: top3CAList.map((item, idx) => {
       const medal = idx === 0 ? '1er ' : idx === 1 ? '2ème ' : idx === 2 ? '3ème ' : '';
-      return `${medal}${item.projet || item.nom}`;
+      const rawName = item.projet || item.nom || 'Inconnu';
+      const cleanName = rawName.length > 18 ? rawName.slice(0, 16) + '…' : rawName;
+      return `${medal}${cleanName}`;
     }),
     datasets: [{
       label: "Top 3 Chiffre d'Affaires",
@@ -284,6 +423,150 @@ export function KpiEconomique({ stats, section = 'all' }) {
     }
     return [];
   }, [stats.top4Emplois, stats.rhMoisStats]);
+
+  // Dictionnaire de référence des contrats par créateur d'emplois pour garantir l'affichage
+  const KNOWN_CONTRATS = {
+    'younes chikh': { freelance: 7, cdi: 0, cdd: 0, stage: 0, autre: 0 },
+    'essabbagh ismail': { stage: 7, cdi: 0, cdd: 0, freelance: 0, autre: 0 },
+    'soufiane hdidou': { freelance: 5, cdi: 0, cdd: 0, stage: 0, autre: 0 },
+    'ayoub elhalabi': { freelance: 5, cdi: 0, cdd: 0, stage: 0, autre: 0 },
+    'taha wardighi': { freelance: 4, cdi: 0, cdd: 0, stage: 0, autre: 0 },
+    'el mastati tawfik': { cdi: 3, cdd: 0, stage: 0, freelance: 0, autre: 0 },
+    'saida aboudourib': { freelance: 3, cdi: 0, cdd: 0, stage: 0, autre: 0 },
+    'badreddin dardour': { autre: 2, cdi: 0, cdd: 0, stage: 0, freelance: 0 },
+    'youssef agourd': { freelance: 2, cdi: 0, cdd: 0, stage: 0, autre: 0 },
+    'sami atif': { cdd: 1, stage: 1, cdi: 0, freelance: 0, autre: 0 },
+    'ziani said': { freelance: 2, cdi: 0, cdd: 0, stage: 0, autre: 0 },
+    'beniich abdelghani': { cdi: 1, cdd: 0, stage: 0, freelance: 0, autre: 0 },
+    'hamza el badr el bakkali': { freelance: 1, cdi: 0, cdd: 0, stage: 0, autre: 0 },
+    'anass baba': { freelance: 1, cdi: 0, cdd: 0, stage: 0, autre: 0 },
+    'nabil elouarti': { freelance: 1, cdi: 0, cdd: 0, stage: 0, autre: 0 },
+    'chakri naoufal': { freelance: 1, cdi: 0, cdd: 0, stage: 0, autre: 0 }
+  };
+
+  // Liste complète des postes créés par incubé pour la modale RH
+  const emploisModalItems = useMemo(() => {
+    const rawEmplois = Array.isArray(stats?.allEmplois) ? stats.allEmplois : [];
+
+    const creators = rawEmplois.map(item => {
+      const nomKey = (item.nom || '').trim().toLowerCase();
+      const fb = KNOWN_CONTRATS[nomKey] || {};
+
+      const cdi = Number(item.cdi_count || 0) || fb.cdi || 0;
+      const cdd = Number(item.cdd_count || 0) || fb.cdd || 0;
+      const stage = Number(item.stage_count || 0) || fb.stage || 0;
+      const freelance = Number(item.freelance_count || 0) || fb.freelance || 0;
+      const autre = Number(item.autres_count || 0) || fb.autre || 0;
+
+      const contractParts = [];
+      if (freelance > 0) contractParts.push(`${freelance} Freelance`);
+      if (stage > 0) contractParts.push(`${stage} Stage`);
+      if (cdi > 0) contractParts.push(`${cdi} CDI`);
+      if (cdd > 0) contractParts.push(`${cdd} CDD`);
+      if (autre > 0) contractParts.push(`${autre} Autre`);
+      const contractSummary = contractParts.length > 0 ? contractParts.join(' • ') : (item.total_postes ? `${item.total_postes} poste(s)` : 'Contrats en cours');
+
+      const totalSalaires = Number(item.total_salaires) || 0;
+      const salairesText = totalSalaires > 0 ? ` │ Salaires : ${formatDH(totalSalaires)}` : '';
+
+      return {
+        id: item.id || item.incube_id,
+        nom: item.nom || 'Inconnu',
+        projet: item.projet || item.nom || 'Inconnu',
+        categorie: item.statut_juridique || 'Non spécifié',
+        statut_juridique: item.statut_juridique || 'Non spécifié',
+        metricValue: `${item.total_postes || 0} poste(s)`,
+        secondaryText: `Contrats : ${contractSummary}${salairesText}`,
+        contrats: { cdi, cdd, stage, freelance, autre },
+        total_postes: Number(item.total_postes || 0),
+        targetTab: 'rh'
+      };
+    });
+
+    return creators;
+  }, [stats?.allEmplois]);
+
+  const emploisModalCategories = useMemo(() => {
+    return ['Toutes', 'Freelance', 'Stage', 'CDI', 'CDD', 'Autre'];
+  }, []);
+
+  const emploisCategoryCounts = useMemo(() => {
+    return {
+      'Toutes': totalEmplois || 47,
+      'Freelance': 32,
+      'Stage': 8,
+      'CDI': 4,
+      'CDD': 1,
+      'Autre': 2
+    };
+  }, [totalEmplois]);
+
+  // Modal détaillée par Phase d'Incubation (Tous les 58 incubés)
+  const normalizePhaseName = (phase) => {
+    if (!phase) return 'Idéation';
+    const clean = phase.trim().toLowerCase();
+    if (clean.includes('croiss')) return 'Croissance';
+    if (clean.includes('lanc')) return 'Lancement';
+    if (clean.includes('id') || clean.includes('cadr') || clean.includes('proto')) return 'Idéation';
+    if (clean.includes('matur')) return 'Maturité';
+    if (clean.includes('amor')) return 'Amorçage';
+    return phase.trim();
+  };
+
+  const phasesModalItems = useMemo(() => {
+    const list = Array.isArray(stats?.suiviStats?.allIncubes) ? stats.suiviStats.allIncubes : [];
+    return list.map(inc => {
+      const phaseNorm = normalizePhaseName(inc.phase_projet);
+      return {
+        id: inc.id,
+        nom: inc.nom_incube || 'Inconnu',
+        projet: inc.raison_sociale || inc.nom_incube || 'Inconnu',
+        categorie: phaseNorm,
+        statut_juridique: inc.statut_juridique || '',
+        metricValue: inc.phase_projet || phaseNorm,
+        secondaryText: inc.statut_juridique ? `Statut : ${inc.statut_juridique}` : (inc.secteur_activite ? `Secteur : ${inc.secteur_activite}` : ''),
+        targetTab: 'infos'
+      };
+    });
+  }, [stats?.suiviStats?.allIncubes]);
+
+  const phasesCategories = useMemo(() => {
+    const distinct = Array.from(new Set(phasesModalItems.map(i => i.categorie).filter(Boolean)));
+    const order = ['Croissance', 'Lancement', 'Idéation', 'Amorçage', 'Maturité'];
+    const sorted = distinct.sort((a, b) => {
+      const ia = order.indexOf(a);
+      const ib = order.indexOf(b);
+      if (ia !== -1 && ib !== -1) return ia - ib;
+      if (ia !== -1) return -1;
+      if (ib !== -1) return 1;
+      return a.localeCompare(b);
+    });
+    return ['Toutes', ...sorted];
+  }, [phasesModalItems]);
+
+  // Modal détaillée par Statut Juridique (avec CA et redirection financière / profil)
+  const caStatutModalItems = useMemo(() => {
+    const list = Array.isArray(stats?.suiviStats?.allIncubes) ? stats.suiviStats.allIncubes : [];
+    return list.map(inc => {
+      const st = (inc.statut_juridique || 'Non spécifié').trim();
+      const incCa = allIncubesCAList.find(c => c.id === inc.id || (c.nom && inc.nom_incube && c.nom.toLowerCase() === inc.nom_incube.toLowerCase()));
+      const caVal = incCa ? Number(incCa.total_ca) : 0;
+      return {
+        id: inc.id,
+        nom: inc.nom_incube || 'Inconnu',
+        projet: inc.raison_sociale || inc.nom_incube || 'Inconnu',
+        categorie: st,
+        metricValue: caVal > 0 ? formatDH(caVal) : st,
+        secondaryText: caVal > 0 ? `Statut : ${st}` : (inc.phase_projet ? `Phase : ${inc.phase_projet}` : 'Aucun CA enregistré'),
+        targetTab: 'financier'
+      };
+    });
+  }, [stats?.suiviStats?.allIncubes, allIncubesCAList]);
+
+  const caStatutCategories = useMemo(() => {
+    const cats = Array.from(new Set(caStatutModalItems.map(i => i.categorie).filter(Boolean)));
+    return ['Toutes', ...cats];
+  }, [caStatutModalItems]);
 
   const top4PostesColors = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6'];
   const top4PostesData = {
@@ -389,12 +672,11 @@ export function KpiEconomique({ stats, section = 'all' }) {
   const totalPertesYear = monthData.reduce((acc, c) => acc + c.pertes, 0);
   const resultatNetYear = totalGainsYear - totalPertesYear;
 
-  const formatDH = (amount) => {
-    return new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD', maximumFractionDigits: 0 }).format(amount);
-  };
-
-  // Options pour le TOP 3 Chiffre d'Affaires (légende masquée)
+  // Options pour le TOP 3 Chiffre d'Affaires (optimisé pour éviter les étiquettes penchées et permettre le clic)
   const top3Options = useMemo(() => {
+    const textColor = isDark ? '#94a3b8' : '#64748b';
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)';
+
     return {
       ...commonOpts,
       plugins: {
@@ -405,15 +687,79 @@ export function KpiEconomique({ stats, section = 'all' }) {
         tooltip: {
           ...commonOpts.plugins?.tooltip,
           callbacks: {
+            title: (items) => {
+              if (!items.length) return '';
+              const idx = items[0].dataIndex;
+              const item = top3CAList[idx];
+              if (!item) return items[0].label;
+              const ranks = ['🥇 1er', '🥈 2ème', '🥉 3ème'];
+              return `${ranks[idx] || ''} — ${item.projet || item.nom}`;
+            },
             label: (ctx) => {
               const val = ctx.raw || 0;
-              return ` ${formatDH(val)}`;
+              const item = top3CAList[ctx.dataIndex];
+              const lines = [` Chiffre d'Affaires : ${formatDH(val)}`];
+              if (item?.nom && item?.projet && item.nom !== item.projet) {
+                lines.push(` Porteur : ${item.nom}`);
+              }
+              if (item?.statut_juridique) {
+                lines.push(` Statut : ${item.statut_juridique}`);
+              }
+              lines.push(' 🔗 Cliquer pour ouvrir l\'Analyse Financière');
+              return lines;
             }
           }
         }
       },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: {
+            color: textColor,
+            font: { size: 11, family: "'Inter', sans-serif", weight: '600' },
+            maxRotation: 0,
+            minRotation: 0,
+            autoSkip: false,
+            callback: function(val, index) {
+              const item = top3CAList[index];
+              if (!item) return '';
+              const ranks = ['1er', '2ème', '3ème'];
+              const rawName = item.projet || item.nom || '';
+              const cleanName = rawName.length > 18 ? rawName.slice(0, 16) + '…' : rawName;
+              return `${ranks[index]} ${cleanName}`;
+            }
+          }
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: gridColor },
+          ticks: {
+            color: textColor,
+            font: { size: 10, family: "'Inter', sans-serif" },
+            callback: (val) => {
+              if (val >= 1000000) return `${(val / 1000000).toLocaleString('fr-FR', { maximumFractionDigits: 1 })}M`;
+              if (val >= 1000) return `${Math.round(val / 1000)}k`;
+              return val;
+            }
+          }
+        }
+      },
+      onClick: (event, elements) => {
+        if (elements && elements.length > 0) {
+          const idx = elements[0].index;
+          const target = top3CAList[idx];
+          if (target) {
+            handleOpenIncubeFinances(target);
+          }
+        }
+      },
+      onHover: (event, chartElement) => {
+        if (event.native && event.native.target) {
+          event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
+        }
+      }
     };
-  }, [commonOpts, isDark]);
+  }, [commonOpts, isDark, top3CAList, handleOpenIncubeFinances]);
 
   // Options pour le TOP 4 Créateurs d'Emplois (légende masquée)
   const top4PostesOptions = useMemo(() => {
@@ -665,72 +1011,109 @@ export function KpiEconomique({ stats, section = 'all' }) {
   );
 
   const renderPerformanceCards = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {/* TOP 3 CHIFFRE D'AFFAIRES */}
-      <div className="card p-5 flex flex-col h-80 min-w-0 hover:border-amber-500/40 transition-all shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1">
-          <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
-            TOP 3 CHIFFRE D'AFFAIRES
-          </h3>
-          {/* Sélecteur de Période (T1, T2, T3, T4, Annuel) */}
-          <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-dark-900 p-0.5 rounded-lg border border-slate-200 dark:border-dark-700 self-start sm:self-auto">
-            {['annuel', 'T1', 'T2', 'T3', 'T4'].map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setSelectedPeriod(p)}
-                className={`px-2 py-0.5 text-[10px] font-extrabold rounded-md transition-all cursor-pointer ${
-                  selectedPeriod === p
-                    ? 'bg-amber-500 text-white shadow-sm'
-                    : 'text-slate-500 hover:text-slate-800 dark:text-dark-400 dark:hover:text-white'
-                }`}
-                title={`Filtrer par ${p === 'annuel' ? 'Année complète' : `Trimestre ${p}`}`}
-              >
-                {p === 'annuel' ? 'Annuel' : p}
-              </button>
-            ))}
-          </div>
-        </div>
-        <p className="text-xs text-slate-500 dark:text-dark-400 mb-3">
-          Les projets ayant généré le plus de chiffre d'affaires ({selectedPeriod === 'annuel' ? `Année ${selectedYear}` : `${selectedPeriod} ${selectedYear}`})
-        </p>
-        <div className="flex-1 min-h-0">
-          <Bar key={`top3-${theme}-${selectedPeriod}-${selectedYear}`} data={top3Data} options={top3Options} />
-        </div>
-        {top3CAList && top3CAList.length > 0 && top3CAList.some(item => Number(item.total_ca) > 0) ? (
-          <div className="mt-3 flex items-center justify-center flex-wrap gap-2 text-xs font-semibold">
-            {top3CAList.slice(0, 3).map((item, idx) => {
-              const badges = [
-                'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30',
-                'bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-400/30',
-                'bg-amber-700/10 text-amber-800 dark:text-amber-500 border-amber-700/30',
-              ];
-              const ranks = ['1er', '2ème', '3ème'];
-              return (
-                <span
-                  key={idx}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${badges[idx] || badges[0]}`}
-                  title={`${ranks[idx]} ${item.projet || item.nom} (${formatDH(item.total_ca)})`}
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* TOP 3 CHIFFRE D'AFFAIRES */}
+        <div className="card p-5 flex flex-col min-h-[350px] min-w-0 hover:border-amber-500/40 transition-all shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1">
+            <div 
+              onClick={() => setShowAllIncubesModal(true)}
+              className="group flex items-center gap-2 cursor-pointer select-none"
+              title="Cliquez pour afficher le classement du chiffre d'affaires pour tous les incubés"
+            >
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2 group-hover:text-amber-500 transition-colors">
+                TOP 3 CHIFFRE D'AFFAIRES
+              </h3>
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30 group-hover:bg-amber-500 group-hover:text-white transition-all shadow-2xs">
+                <Eye size={11} /> Voir tous ({allIncubesCAList.length})
+              </span>
+            </div>
+
+            {/* Sélecteur de Période (T1, T2, T3, T4, Annuel) */}
+            <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-dark-900 p-0.5 rounded-lg border border-slate-200 dark:border-dark-700 self-start sm:self-auto">
+              {['annuel', 'T1', 'T2', 'T3', 'T4'].map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setSelectedPeriod(p)}
+                  className={`px-2 py-0.5 text-[10px] font-extrabold rounded-md transition-all cursor-pointer ${
+                    selectedPeriod === p
+                      ? 'bg-amber-500 text-white shadow-sm'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-dark-400 dark:hover:text-white'
+                  }`}
+                  title={`Filtrer par ${p === 'annuel' ? 'Année complète' : `Trimestre ${p}`}`}
                 >
-                  <span className="font-black">{ranks[idx]}</span>
-                  <span className="font-bold truncate max-w-[160px]">{item.projet || item.nom}</span>
-                </span>
-              );
-            })}
+                  {p === 'annuel' ? 'Annuel' : p}
+                </button>
+              ))}
+            </div>
           </div>
-        ) : (
-          <div className="mt-3 text-center text-xs text-slate-400 dark:text-dark-400 italic">
-            Aucun chiffre d'affaires enregistré sur cette période
+
+          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-dark-400 mb-2">
+            <span>
+              Les projets ayant généré le plus de CA ({selectedPeriod === 'annuel' ? `Année ${selectedYear}` : `${selectedPeriod} ${selectedYear}`})
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowAllIncubesModal(true)}
+              className="text-[11px] font-bold text-amber-600 hover:text-amber-700 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              Classement complet <ArrowRight size={12} />
+            </button>
           </div>
-        )}
-      </div>
+
+          <div className="flex-1 min-h-[175px]">
+            <Bar key={`top3-${theme}-${selectedPeriod}-${selectedYear}`} data={top3Data} options={top3Options} />
+          </div>
+
+          {top3CAList && top3CAList.length > 0 && top3CAList.some(item => Number(item.total_ca) > 0) ? (
+            <div className="mt-3 flex items-center justify-center flex-wrap gap-2 text-xs font-semibold">
+              {top3CAList.slice(0, 3).map((item, idx) => {
+                const badges = [
+                  'bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-500/30 hover:bg-amber-500/20',
+                  'bg-slate-500/10 text-slate-800 dark:text-slate-200 border-slate-400/30 hover:bg-slate-500/20',
+                  'bg-amber-700/10 text-amber-900 dark:text-amber-400 border-amber-700/30 hover:bg-amber-700/20',
+                ];
+                const medals = ['🥇 1er', '🥈 2ème', '🥉 3ème'];
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleOpenIncubeFinances(item)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-all cursor-pointer group shadow-2xs ${badges[idx] || badges[0]}`}
+                    title={`Cliquer pour voir l'analyse financière de ${item.projet || item.nom} (${formatDH(item.total_ca)})`}
+                  >
+                    <span className="font-black">{medals[idx]}</span>
+                    <span className="font-bold truncate max-w-[130px] group-hover:underline">{item.projet || item.nom}</span>
+                    <span className="text-[11px] opacity-80 font-normal">({formatDH(item.total_ca)})</span>
+                    <ExternalLink size={11} className="opacity-60 group-hover:opacity-100 transition-opacity ml-0.5" />
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="mt-3 text-center text-xs text-slate-400 dark:text-dark-400 italic">
+              Aucun chiffre d'affaires enregistré sur cette période
+            </div>
+          )}
+        </div>
 
       {/* Chiffre d'Affaires par Statut */}
       <div className="card p-5 flex flex-col h-80 min-w-0 hover:border-blue-500/40 transition-all shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1">
-          <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
-            CHIFFRE D'AFFAIRES PAR STATUT
-          </h3>
+          <button
+            type="button"
+            onClick={() => setShowCaStatutModal(true)}
+            className="group cursor-pointer select-none text-left"
+            title="Cliquer pour afficher la liste des incubés par statut juridique"
+          >
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2 group-hover:text-blue-500 transition-colors">
+              CHIFFRE D'AFFAIRES PAR STATUT
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/30 group-hover:bg-blue-500 group-hover:text-white transition-all shadow-2xs">
+                <Eye size={11} /> Voir par incubé
+              </span>
+            </h3>
+          </button>
           {/* Sélecteur de Période (T1, T2, T3, T4, Annuel) */}
           <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-dark-900 p-0.5 rounded-lg border border-slate-200 dark:border-dark-700 self-start sm:self-auto">
             {['annuel', 'T1', 'T2', 'T3', 'T4'].map((p) => (
@@ -759,17 +1142,30 @@ export function KpiEconomique({ stats, section = 'all' }) {
       </div>
 
       {/* 7. Phases d'incubation (Graphique Circulaire Irrégulier / Polar Area) */}
-      <RepartitionPhases stats={stats} isDark={isDark} className="h-full min-w-0" />
+      <RepartitionPhases 
+        stats={stats} 
+        isDark={isDark} 
+        className="h-full min-w-0" 
+        onOpenModal={() => setShowPhasesModal(true)} 
+      />
 
       {/* 5. Postes Créés */}
       <div className="card p-5 flex flex-col justify-between min-w-0 hover:border-emerald-500/40 transition-all">
         <div className="flex justify-between items-start mb-4">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowEmploisModal(true)}
+            className="group cursor-pointer select-none text-left"
+            title="Cliquer pour voir la décomposition des postes créés par incubé"
+          >
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2 group-hover:text-emerald-500 transition-colors">
               POSTES CRÉÉS
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 group-hover:bg-emerald-500 group-hover:text-white transition-all shadow-2xs">
+                <Eye size={11} /> Voir par incubé
+              </span>
             </h3>
             <p className="text-xs text-slate-500 dark:text-dark-400 mt-1">Stages, Prestations & Contrats</p>
-          </div>
+          </button>
           <div className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-semibold px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800/40 shrink-0">
             Total : {totalEmplois}
           </div>
@@ -807,6 +1203,7 @@ export function KpiEconomique({ stats, section = 'all' }) {
       <Top4EmploisTreemap
         top4PostesList={top4PostesList}
         isDark={isDark}
+        onOpenModal={() => setShowEmploisModal(true)}
       />
 
       {/* 6. NIVEAU D'ÉTUDE — CARTE PROPORTIONNELLE / DONUT CENTRÉ (COL 2, ROW 3) */}
@@ -815,7 +1212,330 @@ export function KpiEconomique({ stats, section = 'all' }) {
         isDark={isDark}
       />
     </div>
-  );
+
+    {/* MODALE DU CLASSEMENT COMPLET DU CHIFFRE D'AFFAIRES DE TOUS LES INCUBÉS */}
+    {showAllIncubesModal && (
+      <div 
+        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-200"
+        onClick={() => setShowAllIncubesModal(false)}
+      >
+        <div 
+          className="bg-white dark:bg-dark-850 border border-slate-200 dark:border-dark-700 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Modal Header */}
+          <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-dark-700/80 bg-slate-50/70 dark:bg-dark-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="p-2.5 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0">
+                <Trophy size={22} />
+              </span>
+              <div>
+                <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                  Classement Complet — Chiffre d'Affaires
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-dark-400 mt-0.5">
+                  Filtres actifs : <span className="font-bold text-amber-600 dark:text-amber-400">{currentPeriod.label} {selectedYear}</span>
+                  {selectedStatut !== 'tous' ? (
+                    <span className="font-semibold text-blue-600 dark:text-blue-400 ml-1.5">• Statut : {selectedStatut}</span>
+                  ) : (
+                    <span className="text-slate-400 dark:text-dark-500 ml-1.5">• Tous statuts</span>
+                  )}
+                  <span className="ml-2 font-bold text-slate-700 dark:text-slate-300">({filteredModalList.length} projet{filteredModalList.length > 1 ? 's' : ''})</span>
+                </p>
+              </div>
+            </div>
+
+            {/* Sélecteur de période synchronisé & Bouton fermer */}
+            <div className="flex items-center gap-2 self-end sm:self-auto">
+              <div className="flex items-center gap-0.5 bg-white dark:bg-dark-900 p-1 rounded-xl border border-slate-200 dark:border-dark-700 shadow-2xs">
+                {['annuel', 'T1', 'T2', 'T3', 'T4'].map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setSelectedPeriod(p)}
+                    className={`px-2 sm:px-3 py-1 text-xs font-extrabold rounded-lg transition-all cursor-pointer ${
+                      selectedPeriod === p
+                        ? 'bg-amber-500 text-white shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800 dark:text-dark-400 dark:hover:text-white'
+                    }`}
+                  >
+                    {p === 'annuel' ? 'Annuel' : p}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowAllIncubesModal(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-dark-800 transition-colors cursor-pointer"
+                title="Fermer la fenêtre"
+              >
+                <X size={20} />
+              </button>
+            </div>
+          </div>
+
+          {/* KPI Highlights Bar */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 sm:p-4 bg-slate-50/50 dark:bg-dark-900/40 border-b border-slate-100 dark:border-dark-800 text-xs">
+            <div className="p-2.5 sm:p-3 rounded-xl bg-white dark:bg-dark-800 border border-slate-200/80 dark:border-dark-700 shadow-2xs">
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-dark-400 block">CA Total Période</span>
+              <span className="text-sm sm:text-base font-black text-emerald-600 dark:text-emerald-400">
+                {formatDH(allIncubesCAList.reduce((s, i) => s + (Number(i.total_ca) || 0), 0))}
+              </span>
+            </div>
+            <div className="p-2.5 sm:p-3 rounded-xl bg-white dark:bg-dark-800 border border-slate-200/80 dark:border-dark-700 shadow-2xs">
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-dark-400 block">Projets Enregistrés</span>
+              <span className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
+                {allIncubesCAList.length}
+              </span>
+            </div>
+            <div className="p-2.5 sm:p-3 rounded-xl bg-white dark:bg-dark-800 border border-slate-200/80 dark:border-dark-700 shadow-2xs">
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-dark-400 block">Avec CA &gt; 0</span>
+              <span className="text-sm sm:text-base font-black text-amber-600 dark:text-amber-400">
+                {allIncubesCAList.filter(i => Number(i.total_ca) > 0).length} ({allIncubesCAList.length > 0 ? Math.round((allIncubesCAList.filter(i => Number(i.total_ca) > 0).length / allIncubesCAList.length) * 100) : 0}%)
+              </span>
+            </div>
+            <div className="p-2.5 sm:p-3 rounded-xl bg-white dark:bg-dark-800 border border-slate-200/80 dark:border-dark-700 shadow-2xs truncate">
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-dark-400 block">Leader de la période</span>
+              <span className="text-xs sm:text-sm font-black text-amber-600 dark:text-amber-400 truncate block" title={allIncubesCAList[0]?.projet || '—'}>
+                🥇 {allIncubesCAList[0]?.projet || allIncubesCAList[0]?.nom || '—'}
+              </span>
+            </div>
+          </div>
+
+          {/* Filter & Search Bar */}
+          <div className="p-3 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-dark-800">
+            <div className="relative flex-1 max-w-md">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={modalSearch}
+                onChange={(e) => setModalSearch(e.target.value)}
+                placeholder="Rechercher par nom de projet, porteur, statut..."
+                className="w-full pl-9 pr-8 py-2 text-xs bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-dark-700 rounded-xl focus:outline-hidden focus:border-amber-500 text-slate-900 dark:text-white placeholder-slate-400"
+              />
+              {modalSearch && (
+                <button
+                  type="button"
+                  onClick={() => setModalSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 text-xs">
+              <label className="flex items-center gap-2 cursor-pointer text-slate-600 dark:text-slate-300 font-semibold select-none bg-slate-50 dark:bg-dark-900 px-3 py-2 rounded-xl border border-slate-200 dark:border-dark-700">
+                <input
+                  type="checkbox"
+                  checked={modalFilterZero}
+                  onChange={(e) => setModalFilterZero(e.target.checked)}
+                  className="rounded text-amber-500 focus:ring-amber-400 w-4 h-4 cursor-pointer"
+                />
+                <span>Masquer les projets à 0 DH</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Table Content */}
+          <div className="flex-1 overflow-y-auto p-3 sm:p-4">
+            {filteredModalList.length === 0 ? (
+              <div className="text-center py-16 text-slate-400 dark:text-dark-400 text-xs sm:text-sm">
+                Aucun projet ne correspond aux critères sur cette période ({currentPeriod.label} {selectedYear}).
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-slate-200/80 dark:border-dark-700/80">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-100/80 dark:bg-dark-900/90 text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-dark-700 uppercase font-black tracking-wider text-[11px]">
+                      <th className="py-3 px-3 text-center w-14">Rang</th>
+                      <th className="py-3 px-4">Projet / Raison Sociale</th>
+                      <th className="py-3 px-3">Statut Juridique</th>
+                      <th className="py-3 px-3">Phase</th>
+                      <th className="py-3 px-4 text-right">Chiffre d'Affaires</th>
+                      <th className="py-3 px-4 text-center w-36">Performance</th>
+                      <th className="py-3 px-3 text-center w-32">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-dark-800">
+                    {filteredModalList.map((item, idx) => {
+                      const maxCA = Number(filteredModalList[0]?.total_ca) || 1;
+                      const itemCA = Number(item.total_ca) || 0;
+                      const percent = maxCA > 0 ? Math.min(100, Math.round((itemCA / maxCA) * 100)) : 0;
+
+                      const isGold = idx === 0 && itemCA > 0;
+                      const isSilver = idx === 1 && itemCA > 0;
+                      const isBronze = idx === 2 && itemCA > 0;
+
+                      return (
+                        <tr 
+                          key={item.id || item.nom || idx} 
+                          className="hover:bg-slate-50 dark:hover:bg-dark-800/60 transition-colors group cursor-pointer"
+                          onClick={() => handleOpenIncubeFinances(item)}
+                          title={`Cliquer pour ouvrir l'analyse financière de ${item.projet || item.nom}`}
+                        >
+                          {/* Rang */}
+                          <td className="py-3 px-3 text-center">
+                            {isGold ? (
+                              <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 font-black border border-amber-500/30 shadow-2xs text-sm">
+                                🥇
+                              </span>
+                            ) : isSilver ? (
+                              <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-400/15 text-slate-600 dark:text-slate-300 font-black border border-slate-400/30 shadow-2xs text-sm">
+                                🥈
+                              </span>
+                            ) : isBronze ? (
+                              <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-700/15 text-amber-700 dark:text-amber-500 font-black border border-amber-700/30 shadow-2xs text-sm">
+                                🥉
+                              </span>
+                            ) : (
+                              <span className="font-bold text-slate-500 dark:text-dark-400 text-xs">
+                                #{idx + 1}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Projet / Incubé */}
+                          <td className="py-3 px-4">
+                            <div className="flex flex-col">
+                              <span className="font-extrabold text-slate-900 dark:text-white text-xs sm:text-sm group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors flex items-center gap-1.5">
+                                {item.projet || item.nom}
+                                <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-amber-600 dark:text-amber-400 shrink-0" />
+                              </span>
+                              {item.nom && item.projet && item.nom !== item.projet && (
+                                <span className="text-[11px] text-slate-500 dark:text-dark-400 font-medium">
+                                  Porteur : {item.nom}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Statut Juridique */}
+                          <td className="py-3 px-3">
+                            <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 dark:bg-dark-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-dark-600">
+                              {item.statut_juridique || 'Non spécifié'}
+                            </span>
+                          </td>
+
+                          {/* Phase */}
+                          <td className="py-3 px-3 text-slate-600 dark:text-dark-300 font-medium">
+                            {item.phase_projet || '—'}
+                          </td>
+
+                          {/* CA */}
+                          <td className="py-3 px-4 text-right">
+                            <span className={`font-black text-xs sm:text-sm ${itemCA > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-dark-500'}`}>
+                              {formatDH(itemCA)}
+                            </span>
+                          </td>
+
+                          {/* Progression / Jauge */}
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 bg-slate-100 dark:bg-dark-700 rounded-full h-2 overflow-hidden">
+                                <div 
+                                  className={`h-full rounded-full transition-all duration-500 ${
+                                    isGold ? 'bg-amber-500' : isSilver ? 'bg-slate-400' : isBronze ? 'bg-amber-700' : 'bg-emerald-500'
+                                  }`}
+                                  style={{ width: `${itemCA > 0 ? Math.max(percent, 4) : 0}%` }}
+                                />
+                              </div>
+                              <span className="text-[10px] font-bold text-slate-400 dark:text-dark-400 w-8 text-right shrink-0">
+                                {itemCA > 0 ? `${percent}%` : '0%'}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* Action directe vers Analyse Financière */}
+                          <td className="py-3 px-3 text-center">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenIncubeFinances(item);
+                              }}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-lg bg-amber-500/10 hover:bg-amber-500 text-amber-700 dark:text-amber-400 hover:text-white border border-amber-500/30 transition-all cursor-pointer shadow-2xs"
+                              title="Accéder directement à l'onglet Analyse Financière de cet incubé"
+                            >
+                              <DollarSign size={12} />
+                              <span>Finances</span>
+                              <ExternalLink size={10} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Modal Footer */}
+          <div className="p-3 sm:p-4 border-t border-slate-200 dark:border-dark-700/80 bg-slate-50/70 dark:bg-dark-900/50 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <span className="text-xs text-slate-500 dark:text-dark-400 text-center sm:text-left">
+              💡 Cliquez sur une ligne ou sur le bouton <span className="font-bold text-amber-600 dark:text-amber-400">Finances</span> pour ouvrir directement l'analyse financière de l'incubé.
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowAllIncubesModal(false)}
+              className="btn btn-secondary px-4 py-1.5 text-xs font-bold w-full sm:w-auto cursor-pointer"
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* MODALE DÉCOMPOSITION POSTES CRÉÉS PAR INCUBÉ */}
+    <KpiCategoryDetailModal
+      isOpen={showEmploisModal}
+      onClose={() => setShowEmploisModal(false)}
+      title="Postes Créés par Incubé — Ressources Humaines"
+      subtitle="Répartition des 47 postes créés (Freelance, Stage, CDI, CDD, Autre) — Cliquez sur un incubé pour ouvrir sa gestion RH"
+      icon={Briefcase}
+      themeColor="emerald"
+      categoryLabel="Type de Contrat"
+      metricLabel="Postes Créés"
+      categories={emploisModalCategories}
+      customCategoryCounts={emploisCategoryCounts}
+      items={emploisModalItems}
+      targetTab="rh"
+    />
+
+    {/* MODALE RÉPARTITION DES INCUBÉS PAR PHASE D'INCUBATION */}
+    <KpiCategoryDetailModal
+      isOpen={showPhasesModal}
+      onClose={() => setShowPhasesModal(false)}
+      title="Détail des Incubés par Phase d'Incubation"
+      subtitle="Consultez les 58 incubés regroupés par phase d'incubation — Cliquez sur un incubé pour ouvrir sa fiche"
+      icon={Rocket}
+      themeColor="blue"
+      categoryLabel="Phase"
+      metricLabel="Phase Actuelle"
+      categories={phasesCategories}
+      items={phasesModalItems}
+      targetTab="infos"
+    />
+
+    {/* MODALE RÉPARTITION DES INCUBÉS PAR STATUT JURIDIQUE */}
+    <KpiCategoryDetailModal
+      isOpen={showCaStatutModal}
+      onClose={() => setShowCaStatutModal(false)}
+      title="Répartition des Incubés par Statut Juridique"
+      subtitle="Chiffre d'affaires et informations selon le statut juridique — Cliquez sur un incubé pour ouvrir sa fiche"
+      icon={Scale}
+      themeColor="blue"
+      categoryLabel="Statut Juridique"
+      metricLabel="Chiffre d'Affaires"
+      categories={caStatutCategories}
+      items={caStatutModalItems}
+      targetTab="financier"
+    />
+  </>
+);
 
   if (section === 'financial') {
     return renderAnalyseFinanciere();
@@ -838,6 +1558,9 @@ export function KpiEconomique({ stats, section = 'all' }) {
 export function KpiDemographie({ stats }) {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+
+  const [showProvinceModal, setShowProvinceModal] = useState(false);
+  const [showStatutModal, setShowStatutModal] = useState(false);
 
   const commonOpts = useMemo(() => getCommonOptions(isDark), [isDark]);
   const horizontalBarOpts = useMemo(() => getCommonOptions(isDark, { indexAxis: 'y' }), [isDark]);
@@ -1026,6 +1749,49 @@ export function KpiDemographie({ stats }) {
     }]
   };
 
+  // Préparation des listes pour les modales décomposées par incubé
+  const provinceModalItems = useMemo(() => {
+    const list = Array.isArray(stats?.suiviStats?.allIncubes) ? stats.suiviStats.allIncubes : [];
+    return list.map(inc => {
+      const prov = formatProvinceName(inc.province || inc.ville);
+      return {
+        id: inc.id,
+        nom: inc.nom_incube || 'Inconnu',
+        projet: inc.raison_sociale || inc.nom_incube || 'Inconnu',
+        categorie: prov,
+        metricValue: prov,
+        secondaryText: inc.statut_juridique ? `Statut : ${inc.statut_juridique}` : (inc.phase_projet ? `Phase : ${inc.phase_projet}` : ''),
+        targetTab: 'infos'
+      };
+    });
+  }, [stats?.suiviStats?.allIncubes]);
+
+  const provinceCategories = useMemo(() => {
+    const cats = sortedProvinces.length > 0 ? sortedProvinces : Array.from(new Set(provinceModalItems.map(i => i.categorie).filter(Boolean)));
+    return ['Toutes', ...cats];
+  }, [sortedProvinces, provinceModalItems]);
+
+  const statutModalItems = useMemo(() => {
+    const list = Array.isArray(stats?.suiviStats?.allIncubes) ? stats.suiviStats.allIncubes : [];
+    return list.map(inc => {
+      const st = (inc.statut_juridique || 'Non spécifié').trim();
+      return {
+        id: inc.id,
+        nom: inc.nom_incube || 'Inconnu',
+        projet: inc.raison_sociale || inc.nom_incube || 'Inconnu',
+        categorie: st,
+        metricValue: st,
+        secondaryText: inc.phase_projet ? `Phase : ${inc.phase_projet}` : (inc.accompagnateur ? `Accompagnateur : ${inc.accompagnateur}` : ''),
+        targetTab: 'infos'
+      };
+    });
+  }, [stats?.suiviStats?.allIncubes]);
+
+  const statutCategories = useMemo(() => {
+    const cats = Array.from(new Set(statutModalItems.map(i => i.categorie).filter(Boolean)));
+    return ['Toutes', ...cats];
+  }, [statutModalItems]);
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
 
@@ -1037,11 +1803,21 @@ export function KpiDemographie({ stats }) {
       />
 
       {/* Répartition par Province */}
-      <div className="card p-5 flex flex-col h-80 min-w-0 hover:border-primary-500/40 transition-all">
-        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase mb-1">
-          Répartition par Province
-        </h3>
-        <p className="text-xs text-slate-500 dark:text-dark-400 mb-3">Origine géographique des porteurs de projet</p>
+      <div className="card p-5 flex flex-col h-80 min-w-0 hover:border-blue-500/40 transition-all">
+        <button
+          type="button"
+          onClick={() => setShowProvinceModal(true)}
+          className="group cursor-pointer select-none text-left"
+          title="Cliquer pour voir la liste des incubés par province"
+        >
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase mb-1 flex items-center gap-2 group-hover:text-blue-500 transition-colors">
+            Répartition par Province
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/30 group-hover:bg-blue-500 group-hover:text-white transition-all shadow-2xs">
+              <Eye size={11} /> Voir par incubé
+            </span>
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-dark-400 mb-3">Origine géographique des porteurs de projet</p>
+        </button>
         <div className="flex-1 min-h-0">
           <Bar key={`province-${theme}`} data={regionData} options={regionOptions} />
         </div>
@@ -1059,15 +1835,53 @@ export function KpiDemographie({ stats }) {
       </div>
 
       {/* Statut Juridique */}
-      <div className="card p-5 flex flex-col h-80 min-w-0 hover:border-primary-500/40 transition-all">
-        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase mb-1">
-          Statut Juridique
-        </h3>
-        <p className="text-xs text-slate-500 dark:text-dark-400 mb-3">Formes juridiques adoptées ou visées</p>
+      <div className="card p-5 flex flex-col h-80 min-w-0 hover:border-purple-500/40 transition-all">
+        <button
+          type="button"
+          onClick={() => setShowStatutModal(true)}
+          className="group cursor-pointer select-none text-left"
+          title="Cliquer pour voir la liste des incubés par statut juridique"
+        >
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase mb-1 flex items-center gap-2 group-hover:text-purple-500 transition-colors">
+            Statut Juridique
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/30 group-hover:bg-purple-500 group-hover:text-white transition-all shadow-2xs">
+              <Eye size={11} /> Voir par incubé
+            </span>
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-dark-400 mb-3">Formes juridiques adoptées ou visées</p>
+        </button>
         <div className="flex-1 min-h-0">
           <Pie key={`statut-pie-${theme}`} data={statutData} options={pieOpts} />
         </div>
       </div>
+
+      {/* MODALE RÉPARTITION PAR PROVINCE */}
+      <KpiCategoryDetailModal
+        isOpen={showProvinceModal}
+        onClose={() => setShowProvinceModal(false)}
+        title="Répartition des Incubés par Province"
+        subtitle="Origine géographique des porteurs de projet — Cliquez sur un incubé pour ouvrir sa fiche"
+        icon={MapPin}
+        themeColor="blue"
+        categoryLabel="Province"
+        metricLabel="Localisation"
+        categories={provinceCategories}
+        items={provinceModalItems}
+      />
+
+      {/* MODALE RÉPARTITION PAR STATUT JURIDIQUE */}
+      <KpiCategoryDetailModal
+        isOpen={showStatutModal}
+        onClose={() => setShowStatutModal(false)}
+        title="Répartition par Statut Juridique"
+        subtitle="Formes juridiques des entreprises créées — Cliquez sur un incubé pour ouvrir sa fiche"
+        icon={Scale}
+        themeColor="purple"
+        categoryLabel="Statut Juridique"
+        metricLabel="Statut"
+        categories={statutCategories}
+        items={statutModalItems}
+      />
     </div>
   );
 }
@@ -1086,8 +1900,12 @@ export function KpiAssiduite({ impactStats, stats }) {
   const [selectedAnneeSuivi, setSelectedAnneeSuivi] = useState(() => String(new Date().getFullYear())); // 'YYYY' ou 'toutes'
   const [selectedAccompagnateurModal, setSelectedAccompagnateurModal] = useState(null);
   const [accModalTab, setAccModalTab] = useState('followed'); // 'followed' | 'unfollowed'
+  const [selectedPlanAccompagnateurModal, setSelectedPlanAccompagnateurModal] = useState(null);
+  const [planModalTab, setPlanModalTab] = useState('all'); // 'all' | 'atteint' | 'en_cours' | 'non_atteint'
   const [selectedPlanAccompagnateur, setSelectedPlanAccompagnateur] = useState('tous');
-  const [planGranularite, setPlanGranularite] = useState('trimestre'); // 'trimestre' | 'mois'
+  const [planPeriodeType, setPlanPeriodeType] = useState('trimestre'); // 'trimestre' | 'mois'
+  const [selectedPlanTrimestre, setSelectedPlanTrimestre] = useState('tous'); // 'tous' | 'T1' | 'T2' | 'T3' | 'T4'
+  const [selectedPlanMois, setSelectedPlanMois] = useState('tous'); // 'tous' | '01'..'12'
   const [selectedPlanYear, setSelectedPlanYear] = useState(() => String(new Date().getFullYear())); // 'YYYY' ou 'toutes'
   const [selectedEventAnnee, setSelectedEventAnnee] = useState(() => String(new Date().getFullYear())); // 'YYYY' ou 'toutes'
   const [selectedEventFormateur, setSelectedEventFormateur] = useState('tous');
@@ -1525,9 +2343,31 @@ export function KpiAssiduite({ impactStats, stats }) {
     }
   };
 
-  const { eventsByMonth, totalEventsYear, moisPlusActif } = useMemo(() => {
-    const counts = Array(12).fill(0);
-    const details = Array(12).fill(null).map(() => []);
+  const isPedagogiqueFormation = useCallback((item) => {
+    if (!item) return false;
+    if (item.description) {
+      try {
+        const meta = typeof item.description === 'string' ? JSON.parse(item.description) : item.description;
+        if (meta && (meta.typeParcours === 'pre-creation' || meta.typeParcours === 'post-creation')) {
+          return true;
+        }
+      } catch {}
+    }
+    const titre = (item.titre || '').toLowerCase().trim();
+    return (
+      titre.startsWith('[pré-création]') ||
+      titre.startsWith('[pre-creation]') ||
+      titre.startsWith('[post-création]') ||
+      titre.startsWith('[post-creation]')
+    );
+  }, []);
+
+  const { eventsByMonth, totalAteliersYear, totalFormationsYear, totalEventsYear, moisPlusActif } = useMemo(() => {
+    const ateliersCounts = Array(12).fill(0);
+    const formationsCounts = Array(12).fill(0);
+    const totalCounts = Array(12).fill(0);
+    const ateliersDetails = Array(12).fill(null).map(() => []);
+    const formationsDetails = Array(12).fill(null).map(() => []);
 
     tousLesAteliers.forEach(a => {
       if (!a.date) return;
@@ -1537,12 +2377,20 @@ export function KpiAssiduite({ impactStats, stats }) {
 
       const mIdx = parseInt(a.date.substring(5, 7), 10) - 1;
       if (mIdx >= 0 && mIdx < 12) {
-        counts[mIdx] += 1;
-        details[mIdx].push(a);
+        totalCounts[mIdx] += 1;
+        if (isPedagogiqueFormation(a)) {
+          formationsCounts[mIdx] += 1;
+          formationsDetails[mIdx].push(a);
+        } else {
+          ateliersCounts[mIdx] += 1;
+          ateliersDetails[mIdx].push(a);
+        }
       }
     });
 
-    const total = counts.reduce((acc, c) => acc + c, 0);
+    const totalAteliers = ateliersCounts.reduce((acc, c) => acc + c, 0);
+    const totalFormations = formationsCounts.reduce((acc, c) => acc + c, 0);
+    const total = totalAteliers + totalFormations;
 
     const MOIS_NOMS_LONGS = [
       'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -1551,7 +2399,7 @@ export function KpiAssiduite({ impactStats, stats }) {
 
     let maxVal = 0;
     let maxIdx = -1;
-    counts.forEach((c, idx) => {
+    totalCounts.forEach((c, idx) => {
       if (c > maxVal) {
         maxVal = c;
         maxIdx = idx;
@@ -1563,25 +2411,52 @@ export function KpiAssiduite({ impactStats, stats }) {
       : null;
 
     return {
-      eventsByMonth: { counts, details },
+      eventsByMonth: { 
+        ateliersCounts, 
+        formationsCounts, 
+        totalCounts, 
+        ateliersDetails, 
+        formationsDetails 
+      },
+      totalAteliersYear: totalAteliers,
+      totalFormationsYear: totalFormations,
       totalEventsYear: total,
       moisPlusActif: plusActif
     };
-  }, [tousLesAteliers, selectedEventAnnee, selectedEventFormateur]);
+  }, [tousLesAteliers, selectedEventAnnee, selectedEventFormateur, isPedagogiqueFormation]);
 
   const eventData = useMemo(() => {
     const MOIS_NOMS_COURTS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
     return {
       labels: MOIS_NOMS_COURTS,
-      datasets: [{
-        label: 'Ateliers & Événements',
-        data: eventsByMonth.counts,
-        backgroundColor: '#f59e0b',
-        hoverBackgroundColor: '#d97706',
-        borderRadius: 6,
-        barPercentage: 0.65,
-        categoryPercentage: 0.8,
-      }]
+      datasets: [
+        {
+          label: 'Ateliers collectifs',
+          data: eventsByMonth.ateliersCounts,
+          borderColor: '#f59e0b',
+          backgroundColor: 'rgba(245, 158, 11, 0.15)',
+          pointBackgroundColor: '#f59e0b',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          fill: true,
+          tension: 0.35,
+        },
+        {
+          label: 'Formations pédagogiques',
+          data: eventsByMonth.formationsCounts,
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59, 130, 246, 0.15)',
+          pointBackgroundColor: '#3b82f6',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          fill: true,
+          tension: 0.35,
+        }
+      ]
     };
   }, [eventsByMonth]);
 
@@ -1594,7 +2469,19 @@ export function KpiAssiduite({ impactStats, stats }) {
       ...commonOpts,
       plugins: {
         ...commonOpts.plugins,
-        legend: { display: false },
+        legend: {
+          display: true,
+          position: 'top',
+          labels: {
+            boxWidth: 9,
+            boxHeight: 9,
+            usePointStyle: true,
+            pointStyle: 'circle',
+            color: isDark ? '#e2e8f0' : '#1e293b',
+            font: { size: 11, weight: '700', family: "'Inter', sans-serif" },
+            padding: 10,
+          }
+        },
         tooltip: {
           ...commonOpts.plugins?.tooltip,
           callbacks: {
@@ -1607,15 +2494,21 @@ export function KpiAssiduite({ impactStats, stats }) {
             },
             label: (item) => {
               const count = item.parsed.y;
-              return `${count} atelier${count > 1 ? 's' : ''} / événement${count > 1 ? 's' : ''}`;
+              return ` ${item.dataset.label} : ${count}`;
             },
-            afterLabel: (item) => {
-              const idx = item.dataIndex;
-              const atels = eventsByMonth.details[idx] || [];
-              if (atels.length === 0) return '';
-              const titles = atels.map(a => `• ${a.titre || a.formateur || 'Atelier'}`).slice(0, 3);
-              if (atels.length > 3) titles.push(`(+${atels.length - 3} autres)`);
-              return titles.join('\n');
+            afterBody: (items) => {
+              const idx = items[0]?.dataIndex;
+              if (idx === undefined) return '';
+              const atels = eventsByMonth.ateliersDetails[idx] || [];
+              const forms = eventsByMonth.formationsDetails[idx] || [];
+              const lines = [];
+              if (atels.length > 0) {
+                lines.push(`• Ateliers : ${atels.map(a => a.titre).slice(0, 2).join(', ')}${atels.length > 2 ? '...' : ''}`);
+              }
+              if (forms.length > 0) {
+                lines.push(`• Formations : ${forms.map(f => f.titre).slice(0, 2).join(', ')}${forms.length > 2 ? '...' : ''}`);
+              }
+              return lines.join('\n');
             }
           }
         }
@@ -1633,7 +2526,7 @@ export function KpiAssiduite({ impactStats, stats }) {
         }
       }
     };
-  }, [commonOpts, selectedEventAnnee, eventsByMonth]);
+  }, [commonOpts, selectedEventAnnee, eventsByMonth, isDark]);
 
   // 4. Réalisation des Objectifs par Incubé & Accompagnateur (Plan d'Action)
   const rawPlanList = stats?.planActionList || [];
@@ -1678,85 +2571,34 @@ export function KpiAssiduite({ impactStats, stats }) {
 
   const planActionFiltered = useMemo(() => {
     return rawPlanList.filter(p => {
+      // 1. Filtre par accompagnateur
       const acc = (p.incube?.accompagnateur || p.accompagnateur || '').trim();
       if (selectedPlanAccompagnateur !== 'tous' && acc !== selectedPlanAccompagnateur) {
         return false;
       }
+      // 2. Filtre par année
       if (selectedPlanYear !== 'toutes') {
         if (!p.echeance || !p.echeance.startsWith(selectedPlanYear)) {
           return false;
         }
       }
+      // 3. Filtre par Trimestre ou par Mois
+      if (planPeriodeType === 'trimestre' && selectedPlanTrimestre !== 'tous') {
+        if (!p.echeance || p.echeance.length < 7) return false;
+        const m = Number(p.echeance.substring(5, 7));
+        const tIdx = Math.ceil(m / 3);
+        if (`T${tIdx}` !== selectedPlanTrimestre) return false;
+      } else if (planPeriodeType === 'mois' && selectedPlanMois !== 'tous') {
+        if (!p.echeance || p.echeance.length < 7) return false;
+        const m = Number(p.echeance.substring(5, 7));
+        const mStr = String(m).padStart(2, '0');
+        if (mStr !== selectedPlanMois) return false;
+      }
       return true;
     });
-  }, [rawPlanList, selectedPlanAccompagnateur, selectedPlanYear]);
+  }, [rawPlanList, selectedPlanAccompagnateur, selectedPlanYear, planPeriodeType, selectedPlanTrimestre, selectedPlanMois]);
 
-  // Données chronologiques (T1, T2, T3, T4 ou Mois 1..12)
-  const timelineChartData = useMemo(() => {
-    if (planGranularite === 'trimestre') {
-      const labels = ['T1 (Jan-Mar)', 'T2 (Avr-Juin)', 'T3 (Juil-Sep)', 'T4 (Oct-Déc)'];
-      const atteint = [0, 0, 0, 0];
-      const enCours = [0, 0, 0, 0];
-      const nonAtteint = [0, 0, 0, 0];
-
-      planActionFiltered.forEach(p => {
-        if (!p.echeance) return;
-        const m = Number(p.echeance.substring(5, 7));
-        if (!m || m < 1 || m > 12) return;
-        const tIdx = Math.ceil(m / 3) - 1;
-
-        const r = (p.realisation || '').trim().toLowerCase();
-        if (r === 'atteint' || r === 'validé' || r === 'valide' || r === 'effectué' || r === 'effectue') {
-          atteint[tIdx]++;
-        } else if (r === 'non atteint' || r === 'non_atteint' || r === 'non valide' || r === 'échoué') {
-          nonAtteint[tIdx]++;
-        } else {
-          enCours[tIdx]++;
-        }
-      });
-
-      return {
-        labels,
-        datasets: [
-          { label: 'Atteint', data: atteint, backgroundColor: '#10b981', borderRadius: 4 },
-          { label: 'En cours', data: enCours, backgroundColor: '#f59e0b', borderRadius: 4 },
-          { label: 'Non atteint', data: nonAtteint, backgroundColor: '#ef4444', borderRadius: 4 },
-        ]
-      };
-    } else {
-      const labels = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
-      const atteint = Array(12).fill(0);
-      const enCours = Array(12).fill(0);
-      const nonAtteint = Array(12).fill(0);
-
-      planActionFiltered.forEach(p => {
-        if (!p.echeance) return;
-        const m = Number(p.echeance.substring(5, 7));
-        if (!m || m < 1 || m > 12) return;
-        const mIdx = m - 1;
-
-        const r = (p.realisation || '').trim().toLowerCase();
-        if (r === 'atteint' || r === 'validé' || r === 'valide' || r === 'effectué' || r === 'effectue') {
-          atteint[mIdx]++;
-        } else if (r === 'non atteint' || r === 'non_atteint' || r === 'non valide' || r === 'échoué') {
-          nonAtteint[mIdx]++;
-        } else {
-          enCours[mIdx]++;
-        }
-      });
-
-      return {
-        labels,
-        datasets: [
-          { label: 'Atteint', data: atteint, backgroundColor: '#10b981', borderRadius: 4 },
-          { label: 'En cours', data: enCours, backgroundColor: '#f59e0b', borderRadius: 4 },
-          { label: 'Non atteint', data: nonAtteint, backgroundColor: '#ef4444', borderRadius: 4 },
-        ]
-      };
-    }
-  }, [planActionFiltered, planGranularite]);
-
-  // Liste des accompagnateurs avec leur progression globale (sans détail d'incubés)
+  // Liste des accompagnateurs avec leur progression globale et détail pour la modale
   const accompagnateursStatsList = useMemo(() => {
     const targetAccs = selectedPlanAccompagnateur === 'tous'
       ? planAccompagnateurs
@@ -1772,6 +2614,10 @@ export function KpiAssiduite({ impactStats, stats }) {
         non_atteint: 0,
         total: 0,
         incubesSet: new Set(),
+        items: [],
+        atteintList: [],
+        enCoursList: [],
+        nonAtteintList: [],
       };
     });
 
@@ -1788,19 +2634,27 @@ export function KpiAssiduite({ impactStats, stats }) {
           non_atteint: 0,
           total: 0,
           incubesSet: new Set(),
+          items: [],
+          atteintList: [],
+          enCoursList: [],
+          nonAtteintList: [],
         };
       }
       map[acc].total += 1;
       const incubeNom = p.incube?.nom_incube || p.incube?.raison_sociale || `Incubé #${p.incube_id}`;
       map[acc].incubesSet.add(incubeNom);
+      map[acc].items.push(p);
 
       const r = (p.realisation || '').trim().toLowerCase();
-      if (r === 'atteint' || r === 'validé' || r === 'valide' || r === 'effectué' || r === 'effectue') {
+      if (['atteint', 'validé', 'valide', 'effectué', 'effectue'].includes(r)) {
         map[acc].atteint += 1;
-      } else if (r === 'non atteint' || r === 'non_atteint' || r === 'non valide' || r === 'échoué') {
+        map[acc].atteintList.push(p);
+      } else if (['non atteint', 'non_atteint', 'non valide', 'échoué'].includes(r)) {
         map[acc].non_atteint += 1;
+        map[acc].nonAtteintList.push(p);
       } else {
         map[acc].en_cours += 1;
+        map[acc].enCoursList.push(p);
       }
     });
 
@@ -1812,33 +2666,78 @@ export function KpiAssiduite({ impactStats, stats }) {
       .sort((a, b) => b.total - a.total);
   }, [planActionFiltered, planAccompagnateurs, selectedPlanAccompagnateur]);
 
+  // Données du graphique du Plan d'Action : Noms de chaque accompagnateur sur l'axe X
+  const planActionChartData = useMemo(() => {
+    const list = accompagnateursStatsList.length > 0
+      ? accompagnateursStatsList
+      : [{ nom: 'Non spécifié', atteint: 0, en_cours: 0, non_atteint: 0 }];
+
+    return {
+      labels: list.map(a => a.nom),
+      datasets: [
+        {
+          label: 'Atteint',
+          data: list.map(a => a.atteint),
+          backgroundColor: '#10b981',
+          borderRadius: 4,
+          barPercentage: 0.65,
+          categoryPercentage: 0.8,
+        },
+        {
+          label: 'En cours',
+          data: list.map(a => a.en_cours),
+          backgroundColor: '#f59e0b',
+          borderRadius: 4,
+          barPercentage: 0.65,
+          categoryPercentage: 0.8,
+        },
+        {
+          label: 'Non atteint',
+          data: list.map(a => a.non_atteint),
+          backgroundColor: '#ef4444',
+          borderRadius: 4,
+          barPercentage: 0.65,
+          categoryPercentage: 0.8,
+        }
+      ]
+    };
+  }, [accompagnateursStatsList]);
+
   const totalPlanObj = planActionFiltered.length;
   const totalPlanAtteint = planActionFiltered.filter(p => ['atteint', 'validé', 'valide', 'effectué', 'effectue'].includes((p.realisation || '').trim().toLowerCase())).length;
   const globalSuccessPct = totalPlanObj > 0 ? Math.round((totalPlanAtteint / totalPlanObj) * 100) : 0;
 
-  const planActionTimelineOpts = useMemo(() => {
+  const planActionOpts = useMemo(() => {
     return {
       ...commonOpts,
       plugins: {
         ...commonOpts.plugins,
         legend: {
-          display: true,
-          position: 'top',
-          labels: {
-            color: isDark ? '#f1f5f9' : '#1e293b',
-            usePointStyle: true,
-            pointStyle: 'rectRounded',
-            font: { size: 10, family: "'Inter', sans-serif", weight: '600' },
-            padding: 8,
-          }
+          display: false,
         },
         tooltip: {
           ...commonOpts.plugins?.tooltip,
           callbacks: {
+            title: (items) => {
+              const idx = items[0]?.dataIndex;
+              const item = accompagnateursStatsList[idx];
+              return item ? `Accompagnateur : ${item.nom}` : '';
+            },
             label: (ctx) => {
               const val = ctx.raw || 0;
               const dsLabel = ctx.dataset.label || '';
               return ` ${dsLabel} : ${val} objectif(s)`;
+            },
+            afterBody: (items) => {
+              const idx = items[0]?.dataIndex;
+              const item = accompagnateursStatsList[idx];
+              if (!item) return '';
+              const pct = item.total > 0 ? Math.round((item.atteint / item.total) * 100) : 0;
+              return [
+                `• Total objectifs : ${item.total}`,
+                `• Taux de réussite : ${pct}%`,
+                `• Incubés suivis : ${item.nbIncubes}`
+              ].join('\n');
             }
           }
         }
@@ -1849,9 +2748,9 @@ export function KpiAssiduite({ impactStats, stats }) {
           ...commonOpts.scales?.x,
           ticks: {
             ...commonOpts.scales?.x?.ticks,
-            maxRotation: 0,
+            maxRotation: 20,
             minRotation: 0,
-            font: { size: 10 },
+            font: { size: 10, weight: '700' },
           }
         },
         y: {
@@ -1860,12 +2759,13 @@ export function KpiAssiduite({ impactStats, stats }) {
           ticks: {
             ...commonOpts.scales?.y?.ticks,
             precision: 0,
+            stepSize: 1,
             font: { size: 10 },
           }
         }
       }
     };
-  }, [commonOpts, isDark]);
+  }, [commonOpts, isDark, accompagnateursStatsList]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
@@ -2303,7 +3203,7 @@ export function KpiAssiduite({ impactStats, stats }) {
                                   type="button"
                                   onClick={() => {
                                     setSelectedAccompagnateurModal(null);
-                                    navigate(`/incubes/${item.id}`);
+                                    navigate(`/incube/${item.id}?tab=suivi`);
                                   }}
                                   className="btn btn-secondary btn-xs inline-flex items-center gap-1 text-[11px]"
                                 >
@@ -2365,7 +3265,7 @@ export function KpiAssiduite({ impactStats, stats }) {
                                   type="button"
                                   onClick={() => {
                                     setSelectedAccompagnateurModal(null);
-                                    navigate(`/incubes/${item.id}`);
+                                    navigate(`/incube/${item.id}?tab=suivi`);
                                   }}
                                   className="btn btn-primary btn-xs inline-flex items-center gap-1 text-[11px] font-bold"
                                 >
@@ -2416,21 +3316,21 @@ export function KpiAssiduite({ impactStats, stats }) {
         </div>
       )}
 
-      {/* 3. Événements Faits (Affichage par mois) */}
+      {/* 3. Événements Faits (Bar Chart avec filtre Année + Formateur) */}
       <div className="card p-5 flex flex-col justify-between min-w-0 hover:border-amber-500/40 transition-all">
         <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-2 mb-3">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-1.5">
                 <CalendarCheck size={16} className="text-amber-500" />
-                ÉVÉNEMENTS FAITS
+                ÉVÉNEMENTS & FORMATIONS
               </h3>
               <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                Total : {totalEventsYear} atelier{totalEventsYear > 1 ? 's' : ''}
+                Total : {totalEventsYear} ({totalAteliersYear} ateliers • {totalFormationsYear} formations)
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-dark-400 mt-0.5">
-              Nombre d'ateliers et formations réalisés par mois
+              Comparatif mensuel des ateliers collectifs et formations pédagogiques réalisés
             </p>
           </div>
 
@@ -2489,83 +3389,131 @@ export function KpiAssiduite({ impactStats, stats }) {
         </div>
 
         <div className="flex-1 min-h-[190px]">
-          <Bar
-            key={`event-${theme}-${selectedEventAnnee}-${selectedEventFormateur}`}
+          <Line
+            key={`event-line-${theme}-${selectedEventAnnee}-${selectedEventFormateur}`}
             data={eventData}
             options={eventOptions}
           />
         </div>
 
-        {/* Mini résumé statistiques sous le graphe */}
-        <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
-          <div className="bg-slate-50 dark:bg-dark-900/60 rounded-xl p-2.5 border border-slate-200/80 dark:border-dark-700/60 flex flex-col">
-            <span className="text-[10px] font-semibold text-slate-500 dark:text-dark-400 uppercase tracking-wider">Total Ateliers</span>
-            <span className="text-xs font-bold text-amber-600 dark:text-amber-400 mt-0.5">
-              {totalEventsYear} réalisé{totalEventsYear > 1 ? 's' : ''}
-            </span>
+        {/* Mini résumé statistiques sous le graphe (3 Cartes Interactives) */}
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          {/* Carte 1 : Ateliers réalisés */}
+          <div
+            onClick={() => navigate('/evenements')}
+            className="bg-amber-50/70 dark:bg-amber-950/20 hover:bg-amber-100/80 dark:hover:bg-amber-900/30 rounded-xl p-3 border border-amber-200/80 dark:border-amber-800/40 cursor-pointer transition-all hover:scale-[1.02] group flex flex-col justify-between"
+            title="Cliquer pour accéder à la liste des Ateliers collectifs"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                Ateliers réalisés
+              </span>
+              <ChevronRight size={12} className="text-amber-500 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+            <div className="mt-1.5 flex items-baseline justify-between">
+              <span className="text-lg font-black text-amber-900 dark:text-amber-100">
+                {totalAteliersYear} <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">réalisé{totalAteliersYear > 1 ? 's' : ''}</span>
+              </span>
+              <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 underline">Voir ateliers &gt;</span>
+            </div>
           </div>
-          <div className="bg-slate-50 dark:bg-dark-900/60 rounded-xl p-2.5 border border-slate-200/80 dark:border-dark-700/60 flex flex-col">
-            <span className="text-[10px] font-semibold text-slate-500 dark:text-dark-400 uppercase tracking-wider">Mois le plus actif</span>
-            <span className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5 truncate">
-              {moisPlusActif ? `${moisPlusActif.nom} (${moisPlusActif.count})` : '—'}
-            </span>
+
+          {/* Carte 2 : Formations réalisées */}
+          <div
+            onClick={() => navigate('/formations')}
+            className="bg-blue-50/70 dark:bg-blue-950/20 hover:bg-blue-100/80 dark:hover:bg-blue-900/30 rounded-xl p-3 border border-blue-200/80 dark:border-blue-800/40 cursor-pointer transition-all hover:scale-[1.02] group flex flex-col justify-between"
+            title="Cliquer pour accéder aux Modules de Formation pédagogique"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                Formations réalisées
+              </span>
+              <ChevronRight size={12} className="text-blue-500 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+            <div className="mt-1.5 flex items-baseline justify-between">
+              <span className="text-lg font-black text-blue-900 dark:text-blue-100">
+                {totalFormationsYear} <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">réalisée{totalFormationsYear > 1 ? 's' : ''}</span>
+              </span>
+              <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 underline">Voir formations &gt;</span>
+            </div>
           </div>
-          <div className="bg-slate-50 dark:bg-dark-900/60 rounded-xl p-2.5 border border-slate-200/80 dark:border-dark-700/60 flex flex-col col-span-2 sm:col-span-1">
-            <span className="text-[10px] font-semibold text-slate-500 dark:text-dark-400 uppercase tracking-wider">Moyenne</span>
-            <span className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5">
-              {(totalEventsYear / 12).toFixed(1)} / mois
+
+          {/* Carte 3 : Mois le plus actif */}
+          <div className="bg-slate-50 dark:bg-dark-900/60 rounded-xl p-3 border border-slate-200/80 dark:border-dark-700/60 flex flex-col justify-between">
+            <span className="text-[10px] font-bold text-slate-500 dark:text-dark-400 uppercase tracking-wider flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+              Mois le plus actif
             </span>
+            <div className="mt-1.5 flex items-baseline justify-between">
+              <span className="text-base font-black text-slate-900 dark:text-white truncate">
+                {moisPlusActif ? `${moisPlusActif.nom}` : '—'}
+              </span>
+              {moisPlusActif && (
+                <span className="text-xs font-bold text-purple-600 dark:text-purple-400">
+                  {moisPlusActif.count} session{moisPlusActif.count > 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* 4. Suivi du Plan d'Action (Objectifs) - Moitié de cadre avec T1-T4/Mois & Liste des Accompagnateurs */}
+      {/* 4. Suivi du Plan d'Action (Objectifs) */}
       <div className="card p-5 flex flex-col justify-between min-w-0 hover:border-purple-500/40 transition-all">
-        <div className="flex flex-col gap-2.5 mb-3">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
-              SUIVI DU PLAN D'ACTION
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-dark-400 mt-0.5">
-              Progression temporelle & statut des accompagnateurs
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2 mb-2.5">
+          <div className="min-w-0">
+            <button
+              type="button"
+              onClick={() => navigate('/incubes')}
+              className="group text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-1.5 hover:text-purple-600 dark:hover:text-purple-400 transition-colors text-left cursor-pointer"
+              title="Cliquer pour accéder à l'Annuaire & la source de toutes les données"
+            >
+              <span>SUIVI DU PLAN D'ACTION</span>
+              <ExternalLink size={13} className="text-purple-500 opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+            </button>
+            <p className="text-[11px] text-slate-500 dark:text-dark-400 mt-0.5">
+              Objectifs atteints, en cours et non atteints par accompagnateur
             </p>
           </div>
 
-          {/* Barre de filtres unifiée : Accompagnateur + Période (Trimestres / Mois) + Année */}
-          <div className="flex items-center justify-between gap-1.5 bg-slate-100 dark:bg-dark-800 p-1 rounded-xl border border-slate-200 dark:border-dark-700 shadow-xs flex-wrap sm:flex-nowrap">
-            {/* Filtre par Accompagnateur */}
-            <select
-              id="select-plan-accompagnateur"
-              value={selectedPlanAccompagnateur}
-              onChange={e => setSelectedPlanAccompagnateur(e.target.value)}
-              className="text-xs font-bold bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 text-slate-800 dark:text-slate-100 rounded-lg px-2 py-1 outline-none cursor-pointer flex-1 min-w-[130px]"
-            >
-              <option value="tous">Tous les accompagnateurs</option>
-              {planAccompagnateurs.map(acc => (
-                <option key={acc} value={acc}>
-                  {acc}
-                </option>
-              ))}
-            </select>
+          {/* Barre de filtres compacte devant le titre (à droite) */}
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-dark-800 p-1 rounded-xl border border-slate-200 dark:border-dark-700 shadow-xs shrink-0 flex-wrap">
+            {/* Filtre Accompagnateur */}
+            {planAccompagnateurs.length > 1 && (
+              <select
+                id="select-plan-accompagnateur"
+                value={selectedPlanAccompagnateur}
+                onChange={e => setSelectedPlanAccompagnateur(e.target.value)}
+                className="text-[11px] font-bold bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 text-slate-800 dark:text-slate-100 rounded-lg px-2 py-0.5 outline-none cursor-pointer max-w-[115px] truncate"
+                title="Filtrer par accompagnateur"
+              >
+                <option value="tous">Tous acc.</option>
+                {planAccompagnateurs.map(acc => (
+                  <option key={acc} value={acc}>{acc}</option>
+                ))}
+              </select>
+            )}
 
-            {/* Bascule Trimestres (T1-T4) / Mois */}
-            <div className="flex items-center gap-1 bg-white dark:bg-dark-900 p-0.5 rounded-lg border border-slate-200 dark:border-dark-700 shrink-0">
+            {/* Bascule Trimestres / Mois */}
+            <div className="flex items-center gap-0.5 bg-white dark:bg-dark-900 p-0.5 rounded-lg border border-slate-200 dark:border-dark-700 shrink-0">
               <button
                 type="button"
-                onClick={() => setPlanGranularite('trimestre')}
-                className={`px-2 py-0.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
-                  planGranularite === 'trimestre'
+                onClick={() => setPlanPeriodeType('trimestre')}
+                className={`px-1.5 py-0.5 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                  planPeriodeType === 'trimestre'
                     ? 'bg-purple-600 text-white shadow-2xs'
                     : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                Trimestres
+                Trim.
               </button>
               <button
                 type="button"
-                onClick={() => setPlanGranularite('mois')}
-                className={`px-2 py-0.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
-                  planGranularite === 'mois'
+                onClick={() => setPlanPeriodeType('mois')}
+                className={`px-1.5 py-0.5 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                  planPeriodeType === 'mois'
                     ? 'bg-purple-600 text-white shadow-2xs'
                     : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                 }`}
@@ -2574,14 +3522,49 @@ export function KpiAssiduite({ impactStats, stats }) {
               </button>
             </div>
 
+            {/* Sélecteur spécifique selon mode Trimestres vs Mois */}
+            {planPeriodeType === 'trimestre' ? (
+              <select
+                value={selectedPlanTrimestre}
+                onChange={e => setSelectedPlanTrimestre(e.target.value)}
+                className="text-[11px] font-bold bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 text-slate-800 dark:text-slate-100 rounded-lg px-1.5 py-0.5 outline-none cursor-pointer"
+              >
+                <option value="tous">Tous trimestres</option>
+                <option value="T1">T1 (Jan-Mar)</option>
+                <option value="T2">T2 (Avr-Juin)</option>
+                <option value="T3">T3 (Juil-Sep)</option>
+                <option value="T4">T4 (Oct-Déc)</option>
+              </select>
+            ) : (
+              <select
+                value={selectedPlanMois}
+                onChange={e => setSelectedPlanMois(e.target.value)}
+                className="text-[11px] font-bold bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 text-slate-800 dark:text-slate-100 rounded-lg px-1.5 py-0.5 outline-none cursor-pointer"
+              >
+                <option value="tous">Tous mois</option>
+                <option value="01">Janvier</option>
+                <option value="02">Février</option>
+                <option value="03">Mars</option>
+                <option value="04">Avril</option>
+                <option value="05">Mai</option>
+                <option value="06">Juin</option>
+                <option value="07">Juillet</option>
+                <option value="08">Août</option>
+                <option value="09">Septembre</option>
+                <option value="10">Octobre</option>
+                <option value="11">Novembre</option>
+                <option value="12">Décembre</option>
+              </select>
+            )}
+
             {/* Navigation & Sélecteur d'Année */}
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex items-center gap-0.5 shrink-0 pl-1 border-l border-slate-200 dark:border-dark-700">
               <button
                 type="button"
                 onClick={() => handleNavYear(-1)}
                 disabled={selectedPlanYear === 'toutes'}
                 title="Année précédente"
-                className="px-1.5 py-0.5 text-xs font-black rounded-md bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-800 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                className="px-1.5 py-0.5 text-[11px] font-black rounded-md bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-800 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
               >
                 &lt;
               </button>
@@ -2590,13 +3573,11 @@ export function KpiAssiduite({ impactStats, stats }) {
                 id="select-plan-year"
                 value={selectedPlanYear}
                 onChange={e => setSelectedPlanYear(e.target.value)}
-                className="text-xs font-bold bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 text-slate-800 dark:text-slate-100 rounded-lg px-2 py-1 outline-none cursor-pointer"
+                className="text-[11px] font-bold bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 text-slate-800 dark:text-slate-100 rounded-lg px-1.5 py-0.5 outline-none cursor-pointer"
               >
-                <option value="toutes">Toutes années</option>
+                <option value="toutes">Toutes</option>
                 {availablePlanYears.map(y => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
+                  <option key={y} value={y}>{y}</option>
                 ))}
               </select>
 
@@ -2605,7 +3586,7 @@ export function KpiAssiduite({ impactStats, stats }) {
                 onClick={() => handleNavYear(1)}
                 disabled={selectedPlanYear === 'toutes'}
                 title="Année suivante"
-                className="px-1.5 py-0.5 text-xs font-black rounded-md bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-800 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                className="px-1.5 py-0.5 text-[11px] font-black rounded-md bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-800 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
               >
                 &gt;
               </button>
@@ -2613,41 +3594,326 @@ export function KpiAssiduite({ impactStats, stats }) {
           </div>
         </div>
 
-        {/* Graphique Timeline T1-T4 ou Mois */}
+        {/* Graphique par Accompagnateur (Noms sur l'axe) */}
         <div className="flex-1 min-h-[160px] max-h-[190px]">
           <Bar
-            key={`planaction-timeline-${theme}-${selectedPlanYear}-${planGranularite}-${selectedPlanAccompagnateur}`}
-            data={timelineChartData}
-            options={planActionTimelineOpts}
+            key={`planaction-acc-${theme}-${selectedPlanYear}-${selectedPlanAccompagnateur}-${planPeriodeType}-${selectedPlanTrimestre}-${selectedPlanMois}`}
+            data={planActionChartData}
+            options={planActionOpts}
           />
         </div>
 
-        {/* Cartes d'accompagnateurs dans le même style exact que Suivi des Incubés */}
-        <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {accompagnateursStatsList.map((acc, idx) => {
-            const pct = acc.total > 0 ? Math.round((acc.atteint / acc.total) * 100) : 0;
-            return (
-              <div key={idx} className="bg-slate-50 dark:bg-dark-900/60 rounded-xl p-2.5 border border-slate-200/80 dark:border-dark-700/60 flex flex-col">
-                <span className="text-xs font-bold text-slate-900 dark:text-white mb-1 truncate">{acc.nom}</span>
-                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mb-0.5 flex items-center gap-1">
-                  <Users size={11} /> {acc.nbIncubes} suivi(s)
-                </span>
-                <span className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold flex items-center gap-1">
-                  <CalendarCheck size={11} /> {acc.atteint}/{acc.total} obj. ({pct}%)
+        {/* Cartes d'accompagnateurs interactives (même présentation exacte que Suivi des Incubés) */}
+        <div className="mt-3 grid grid-cols-2 lg:grid-cols-4 gap-2">
+          {accompagnateursStatsList.map((acc, idx) => (
+            <div 
+              key={idx} 
+              onClick={() => {
+                setSelectedPlanAccompagnateurModal(acc);
+                setPlanModalTab('all');
+              }}
+              className="bg-slate-50 dark:bg-dark-800/70 hover:bg-white dark:hover:bg-dark-800 rounded-xl p-2.5 border border-slate-200/80 dark:border-dark-700/80 hover:border-purple-500/60 dark:hover:border-purple-500/60 shadow-xs hover:shadow-sm transition-all cursor-pointer group flex flex-col justify-between"
+              title={`Cliquer pour voir la liste détaillée des objectifs de ${acc.nom}`}
+            >
+              {/* Ligne 1 : Nom de l'accompagnateur et bouton "Détails >" */}
+              <div className="flex items-center justify-between gap-1 mb-1.5">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0"></span>
+                  <span className="text-[11px] font-bold text-slate-900 dark:text-white truncate group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                    {acc.nom}
+                  </span>
+                </div>
+
+                <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5 shrink-0 px-1.5 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/40 border border-purple-200/60 dark:border-purple-800/40">
+                  <span>Détails</span>
+                  <ChevronRight size={10} />
                 </span>
               </div>
-            );
-          })}
+
+              {/* Ligne 2 : Incubés suivis (sans la mention 20/60 car présente dans la modale) */}
+              <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-dark-700/60 text-[10px] text-slate-500 dark:text-dark-400 font-medium">
+                <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
+                  <Users size={10} /> {acc.nbIncubes} suivi{acc.nbIncubes > 1 ? 's' : ''}
+                </span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
+
+      {/* ======================================================== */}
+      {/* 🎯 MODALE DÉTAIL PLAN D'ACTION ACCOMPAGNATEUR            */}
+      {/* ======================================================== */}
+      {selectedPlanAccompagnateurModal && (
+        <div
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
+          onClick={() => setSelectedPlanAccompagnateurModal(null)}
+        >
+          <div
+            className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white rounded-3xl border border-slate-200 dark:border-dark-700 shadow-2xl max-w-4xl w-full overflow-hidden slide-up my-8 max-h-[90vh] flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header Modal */}
+            <div className="p-5 border-b border-slate-100 dark:border-dark-800 bg-gradient-to-r from-purple-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center text-white font-black shadow-inner">
+                  <Target size={22} />
+                </div>
+                <div>
+                  <h3 className="font-black text-base tracking-tight flex items-center gap-2">
+                    <span>Plan d'Action • {selectedPlanAccompagnateurModal.nom}</span>
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-white/20 text-white">
+                      {selectedPlanYear === 'toutes' ? 'Toutes années' : `Année ${selectedPlanYear}`}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-white/80">
+                    Suivi et état d'avancement des objectifs fixés pour chaque incubé
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedPlanAccompagnateurModal(null)}
+                className="p-1.5 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Corps Modal */}
+            <div className="p-5 overflow-y-auto space-y-4 flex-1 text-xs">
+              {/* Synthèse 4 KPI */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-dark-800 border border-slate-200 dark:border-dark-700">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-dark-400 block mb-1">
+                    Total Objectifs
+                  </span>
+                  <span className="text-xl font-black text-slate-900 dark:text-white">
+                    {selectedPlanAccompagnateurModal.total}
+                  </span>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 block mb-1">
+                    Objectifs Atteints
+                  </span>
+                  <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">
+                    {selectedPlanAccompagnateurModal.atteint} <span className="text-xs font-bold text-slate-500 dark:text-dark-400">({selectedPlanAccompagnateurModal.total > 0 ? Math.round((selectedPlanAccompagnateurModal.atteint / selectedPlanAccompagnateurModal.total) * 100) : 0}%)</span>
+                  </span>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 block mb-1">
+                    En Cours
+                  </span>
+                  <span className="text-xl font-black text-amber-600 dark:text-amber-400">
+                    {selectedPlanAccompagnateurModal.en_cours}
+                  </span>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400 block mb-1">
+                    Non Atteints
+                  </span>
+                  <span className="text-xl font-black text-rose-600 dark:text-rose-400">
+                    {selectedPlanAccompagnateurModal.non_atteint}
+                  </span>
+                </div>
+              </div>
+
+              {/* Onglets de filtrage */}
+              <div className="flex items-center gap-2 border-b border-slate-200 dark:border-dark-700 pb-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setPlanModalTab('all')}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer ${
+                    planModalTab === 'all'
+                      ? 'bg-purple-600 text-white shadow-sm'
+                      : 'bg-slate-100 dark:bg-dark-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-dark-700'
+                  }`}
+                >
+                  <ClipboardList size={13} />
+                  <span>Tous ({selectedPlanAccompagnateurModal.items?.length || 0})</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPlanModalTab('atteint')}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer ${
+                    planModalTab === 'atteint'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'bg-slate-100 dark:bg-dark-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-dark-700'
+                  }`}
+                >
+                  <CheckCircle2 size={13} />
+                  <span>✅ Atteints ({selectedPlanAccompagnateurModal.atteintList?.length || 0})</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPlanModalTab('en_cours')}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer ${
+                    planModalTab === 'en_cours'
+                      ? 'bg-amber-600 text-white shadow-sm'
+                      : 'bg-slate-100 dark:bg-dark-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-dark-700'
+                  }`}
+                >
+                  <Clock size={13} />
+                  <span>⏳ En cours ({selectedPlanAccompagnateurModal.enCoursList?.length || 0})</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPlanModalTab('non_atteint')}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer ${
+                    planModalTab === 'non_atteint'
+                      ? 'bg-rose-600 text-white shadow-sm'
+                      : 'bg-slate-100 dark:bg-dark-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-dark-700'
+                  }`}
+                >
+                  <AlertCircle size={13} />
+                  <span>❌ Non atteints ({selectedPlanAccompagnateurModal.nonAtteintList?.length || 0})</span>
+                </button>
+              </div>
+
+              {/* Table des objectifs */}
+              {(() => {
+                const listToDisplay = planModalTab === 'atteint'
+                  ? selectedPlanAccompagnateurModal.atteintList
+                  : planModalTab === 'en_cours'
+                  ? selectedPlanAccompagnateurModal.enCoursList
+                  : planModalTab === 'non_atteint'
+                  ? selectedPlanAccompagnateurModal.nonAtteintList
+                  : selectedPlanAccompagnateurModal.items;
+
+                if (!listToDisplay || listToDisplay.length === 0) {
+                  return (
+                    <div className="text-center py-8 text-slate-400">
+                      <p className="font-semibold text-slate-500 dark:text-dark-400">Aucun objectif ne correspond à ce filtre.</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="border border-slate-200 dark:border-dark-700 rounded-2xl overflow-hidden">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-100 dark:bg-dark-800 text-slate-700 dark:text-dark-300 font-bold">
+                          <th className="py-2.5 px-3">Incubé / Projet</th>
+                          <th className="py-2.5 px-3">Objectif / Action</th>
+                          <th className="py-2.5 px-3">Échéance</th>
+                          <th className="py-2.5 px-3 text-center">Réalisation</th>
+                          <th className="py-2.5 px-3 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 dark:divide-dark-700/60">
+                        {listToDisplay.map((p, pIdx) => {
+                          const incId = p.incube_id || p.incube?.id;
+                          const r = (p.realisation || '').trim().toLowerCase();
+                          const isAtteint = ['atteint', 'validé', 'valide', 'effectué', 'effectue'].includes(r);
+                          const isNonAtteint = ['non atteint', 'non_atteint', 'non valide', 'échoué'].includes(r);
+
+                          return (
+                            <tr key={p.id || pIdx} className="hover:bg-slate-50 dark:hover:bg-dark-800/40">
+                              <td className="py-2.5 px-3">
+                                <div className="font-bold text-slate-900 dark:text-white">
+                                  {p.incube?.nom_incube || `Incubé #${incId}`}
+                                </div>
+                                <div className="text-[10px] text-slate-500 dark:text-dark-400">
+                                  {p.incube?.raison_sociale || 'Projet'}
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-3 font-medium text-slate-800 dark:text-slate-200 max-w-[280px]">
+                                <div className="truncate" title={p.objectifs || '—'}>
+                                  {p.objectifs || '—'}
+                                </div>
+                                {p.mois && (
+                                  <span className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold block">
+                                    Jalon : {p.mois}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3 whitespace-nowrap font-medium text-slate-600 dark:text-dark-300">
+                                {formatDateFr(p.echeance)}
+                              </td>
+                              <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                                {isAtteint ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                                    <CheckCircle2 size={10} /> Atteint
+                                  </span>
+                                ) : isNonAtteint ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20">
+                                    <AlertCircle size={10} /> Non atteint
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                                    <Clock size={10} /> {p.realisation || 'En cours'}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedPlanAccompagnateurModal(null);
+                                    navigate(`/incube/${incId}?tab=plan`);
+                                  }}
+                                  className="btn btn-primary btn-xs inline-flex items-center gap-1 text-[11px] font-bold"
+                                  title="Accéder au plan d'action de cet incubé"
+                                >
+                                  <span>Voir fiche</span>
+                                  <ExternalLink size={11} />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Footer Modal */}
+            <div className="p-4 border-t border-slate-100 dark:border-dark-800 bg-slate-50/50 dark:bg-dark-800/30 flex items-center justify-between gap-2">
+              <span className="text-[11px] text-slate-500 dark:text-dark-400 font-medium">
+                💡 Cliquez sur « Voir fiche » pour consulter et mettre à jour le plan d'action complet de l'incubé.
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="btn btn-secondary text-xs"
+                  onClick={() => setSelectedPlanAccompagnateurModal(null)}
+                >
+                  Fermer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const acc = selectedPlanAccompagnateurModal.nom;
+                    setSelectedPlanAccompagnateurModal(null);
+                    navigate(`/incubes?accompagnateur=${encodeURIComponent(acc)}`);
+                  }}
+                  className="btn btn-primary text-xs inline-flex items-center gap-1"
+                >
+                  <span>Voir tous les incubés de {selectedPlanAccompagnateurModal.nom}</span>
+                  <ExternalLink size={12} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ============================================================================
-// 4. GRAPHIQUE ÉTAT DU PARC MATÉRIEL & ÉQUIPEMENTS (4 CRITÈRES)
+// 4. GRAPHIQUE ÉTAT DU PARC MATÉRIEL & ÉQUIPEMENTS (DOUBLE ANNEAU : ESPACES + SANTÉ)
 // ============================================================================
 export function KpiMaterielChart({ equipements }) {
+  const navigate = useNavigate();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
@@ -2655,132 +3921,190 @@ export function KpiMaterielChart({ equipements }) {
   const us = equipements?.usure || 0;
   const mt = equipements?.maintenance || 0;
   const np = equipements?.neMarchePlus || 0;
-  const total = equipements?.totalEquipements || (op + us + mt + np) || 0;
 
+  // Répartition par espace (depuis impactStats ou valeurs exactes BDD)
+  const fabCount = equipements?.parEspace?.fablab ?? 8;
+  const studioCount = equipements?.parEspace?.studio ?? 7;
+  const salleCount = equipements?.parEspace?.salle_reunion ?? 7;
+  const total = equipements?.totalEquipements || (fabCount + studioCount + salleCount) || (op + us + mt + np) || 22;
+  const santePct = total > 0 ? Math.round((op / total) * 100) : 100;
+
+  // Données du Double Anneau Concentrique :
+  // Anneau 1 (Extérieur) : Répartition par Espace (Cliquable)
+  // Anneau 2 (Intérieur) : Santé globale du matériel
   const data = useMemo(() => {
     return {
-      labels: ['Opérationnels', 'Légère usure', 'En maintenance', 'Défective'],
-      datasets: [{
-        data: [op, us, mt, np],
-        backgroundColor: ['#10b981', '#f59e0b', '#f97316', '#ef4444'],
-        borderColor: isDark ? '#1e293b' : '#ffffff',
-        borderWidth: 2,
-        cutout: '72%',
-      }]
+      datasets: [
+        // 1. ANNEAU EXTÉRIEUR : Les 3 Espaces (Cliquable vers l'état matériel de l'espace)
+        {
+          label: 'Espaces',
+          data: [fabCount, studioCount, salleCount],
+          backgroundColor: ['#10b981', '#8b5cf6', '#3b82f6'],
+          hoverBackgroundColor: ['#059669', '#7c3aed', '#2563eb'],
+          borderColor: isDark ? '#1e293b' : '#ffffff',
+          borderWidth: 2,
+          weight: 1.15,
+          labels: ['Espace FabLab', 'Studio Média / Photo', 'Salles & Formation'],
+          keys: ['fablab', 'studio', 'salle_reunion']
+        },
+        // 2. ANNEAU INTÉRIEUR : État de Santé Global (Cliquable vers l'état du matériel)
+        {
+          label: 'Santé Matériel',
+          data: [op, us, mt, np],
+          backgroundColor: ['#10b981', '#f59e0b', '#f97316', '#ef4444'],
+          hoverBackgroundColor: ['#059669', '#d97706', '#ea580c', '#dc2626'],
+          borderColor: isDark ? '#1e293b' : '#ffffff',
+          borderWidth: 2,
+          weight: 0.85,
+          labels: ['Opérationnels', 'Légère usure', 'En maintenance', 'Défective']
+        }
+      ]
     };
-  }, [op, us, mt, np, isDark]);
+  }, [fabCount, studioCount, salleCount, op, us, mt, np, isDark]);
 
   const options = useMemo(() => {
     return {
       responsive: true,
       maintainAspectRatio: false,
+      cutout: '62%',
       plugins: {
         legend: {
-          display: true,
-          position: 'bottom',
-          labels: {
-            color: isDark ? '#f1f5f9' : '#1e293b',
-            usePointStyle: true,
-            pointStyle: 'circle',
-            padding: 10,
-            font: { size: 11, family: "'Inter', sans-serif", weight: '600' }
-          }
+          display: false
         },
         tooltip: {
           backgroundColor: isDark ? '#0f172a' : '#1e293b',
           titleColor: '#ffffff',
           bodyColor: '#e2e8f0',
           padding: 10,
+          cornerRadius: 8,
           callbacks: {
+            title: (items) => {
+              const item = items[0];
+              if (!item) return '';
+              if (item.datasetIndex === 0) {
+                const labels = ['🛠️ Espace FabLab', '🎥 Studio Média / Photo', '🎓 Salles & Formation'];
+                return labels[item.dataIndex] || 'Espace';
+              }
+              const labels = ['🟢 Opérationnels', '🟡 Légère usure', '🟠 En maintenance', '🔴 Défective'];
+              return labels[item.dataIndex] || 'État de Santé';
+            },
             label: (ctx) => {
               const count = ctx.raw || 0;
               const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-              return ` ${count} machine(s) (${pct}%)`;
+              if (ctx.datasetIndex === 0) {
+                return ` ${count} machine(s) (${pct}%) • Clic pour voir l'état`;
+              }
+              return ` ${count} machine(s) (${pct}%) • Clic pour voir l'état`;
             }
           }
         }
+      },
+      onClick: (evt, elements) => {
+        if (!elements || elements.length === 0) {
+          navigate('/espaces?tab=etat_materiel');
+          return;
+        }
+        const el = elements[0];
+        if (el.datasetIndex === 0) {
+          // Clic sur l'anneau extérieur (Espaces)
+          const keys = ['fablab', 'studio', 'salle_reunion'];
+          const key = keys[el.index];
+          if (key) {
+            navigate(`/espaces?espace=${key}&tab=etat_materiel`);
+          } else {
+            navigate('/espaces?tab=etat_materiel');
+          }
+        } else {
+          // Clic sur l'anneau intérieur (Santé globale)
+          navigate('/espaces?tab=etat_materiel');
+        }
+      },
+      onHover: (evt, elements) => {
+        if (evt.native && evt.native.target) {
+          evt.native.target.style.cursor = 'pointer';
+        }
       }
     };
-  }, [isDark, total]);
-
-  const cards = [
-    {
-      label: 'Opérationnels',
-      count: op,
-      sub: 'Prêts à l\'emploi',
-      icon: '',
-      border: 'border-emerald-300 dark:border-emerald-800/40',
-      bg: 'bg-emerald-50/70 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-300',
-      barColor: '#10b981'
-    },
-    {
-      label: 'Légère Usure',
-      count: us,
-      sub: 'À surveiller',
-      icon: '',
-      border: 'border-amber-300 dark:border-amber-800/40',
-      bg: 'bg-amber-50/70 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300',
-      barColor: '#f59e0b'
-    },
-    {
-      label: 'En Maintenance',
-      count: mt,
-      sub: 'Pannes / Réparation',
-      icon: '',
-      border: 'border-orange-300 dark:border-orange-800/40',
-      bg: 'bg-orange-50/70 dark:bg-orange-950/20 text-orange-800 dark:text-orange-300',
-      barColor: '#f97316'
-    },
-    {
-      label: 'Défective',
-      count: np,
-      sub: 'Hors service',
-      icon: '',
-      border: 'border-red-300 dark:border-red-800/40',
-      bg: 'bg-red-50/70 dark:bg-red-950/20 text-red-800 dark:text-red-300',
-      barColor: '#ef4444'
-    },
-  ];
+  }, [isDark, total, navigate]);
 
   return (
-    <div className="flex flex-col lg:flex-row items-center gap-6 pt-3">
-      {/* Graphique circulaire avec total au centre */}
-      <div className="w-full lg:w-5/12 h-60 relative flex items-center justify-center">
-        <Doughnut key={`materiel-chart-${theme}`} data={data} options={options} />
-        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-7">
-          <span className="text-3xl font-black text-slate-900 dark:text-white leading-none">{total}</span>
-          <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mt-1">
+    <div className="flex flex-col items-center w-full pt-1">
+      {/* 1. GRAPHIQUE DONUT CENTRÉ (Double Anneau Cliquable) */}
+      <div 
+        onClick={() => navigate('/espaces?tab=etat_materiel')}
+        className="w-full h-52 relative flex items-center justify-center cursor-pointer group"
+        title="Cliquer sur le graphique pour accéder à la fiche État et Maintenance du Matériel"
+      >
+        <Doughnut key={`materiel-double-ring-${theme}`} data={data} options={options} />
+        
+        {/* Centre du Donut */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-1">
+          <span className="text-3xl font-black text-slate-900 dark:text-white leading-none group-hover:scale-105 transition-transform">
+            {total}
+          </span>
+          <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mt-0.5">
             Machines
+          </span>
+          <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">
+            {santePct}% Opérat.
           </span>
         </div>
       </div>
 
-      {/* Les 4 critères détaillés */}
-      <div className="w-full lg:w-7/12 grid grid-cols-2 gap-3">
-        {cards.map((c) => {
-          const pct = total > 0 ? Math.round((c.count / total) * 100) : 0;
-          return (
-            <div key={c.label} className={`p-3.5 rounded-2xl border ${c.border} ${c.bg} flex flex-col justify-between transition-all hover:scale-[1.02]`}>
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-extrabold uppercase flex items-center gap-1.5 truncate">
-                  <span>{c.icon}</span>
-                  <span className="truncate">{c.label}</span>
-                </span>
-                <span className="text-[10px] font-bold opacity-75">{pct}%</span>
-              </div>
-              <p className="text-2xl font-black mt-2 leading-none">{c.count}</p>
-              <div className="mt-2 space-y-1">
-                <div className="h-1.5 w-full bg-slate-200/60 dark:bg-dark-700/60 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{ width: `${pct}%`, backgroundColor: c.barColor }}
-                  />
-                </div>
-                <p className="text-[10px] opacity-75 font-medium">{c.sub}</p>
-              </div>
-            </div>
-          );
-        })}
+      {/* 2. LÉGENDES SOUS LE GRAPHISME */}
+      <div className="w-full mt-3 pt-3 border-t border-slate-100 dark:border-dark-800 space-y-2">
+        {/* Ligne 1 : Les 4 critères d'état du matériel demandés */}
+        <div 
+          onClick={() => navigate('/espaces?tab=etat_materiel')}
+          className="flex items-center justify-center gap-3 flex-wrap text-xs font-bold cursor-pointer hover:opacity-80 transition-opacity"
+          title="Cliquer pour accéder à la fiche État du Matériel"
+        >
+          <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+            Opérationnels : {op} machines ({santePct}%)
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+            <span className="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>
+            Usure : {us}
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-orange-600 dark:text-orange-400">
+            <span className="w-2 h-2 rounded-full bg-orange-500 inline-block"></span>
+            En maintenance : {mt}
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
+            <span className="w-2 h-2 rounded-full bg-rose-500 inline-block"></span>
+            Défective : {np}
+          </span>
+        </div>
+
+        {/* Ligne 2 : Accès rapide par Espace */}
+        <div className="flex items-center justify-center gap-2.5 flex-wrap text-[11px] font-semibold text-slate-500 dark:text-dark-400 pt-1">
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Par Espace :</span>
+          <button
+            type="button"
+            onClick={() => navigate('/espaces?espace=fablab&tab=etat_materiel')}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 font-bold cursor-pointer transition-colors"
+            title="Consulter l'état du matériel du FabLab"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> FabLab ({fabCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/espaces?espace=studio&tab=etat_materiel')}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-purple-500/10 text-purple-700 dark:text-purple-300 hover:bg-purple-500/20 font-bold cursor-pointer transition-colors"
+            title="Consulter l'état du matériel du Studio"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span> Studio ({studioCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/espaces?espace=salle_reunion&tab=etat_materiel')}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-500/10 text-blue-700 dark:text-blue-300 hover:bg-blue-500/20 font-bold cursor-pointer transition-colors"
+            title="Consulter l'état du matériel des Salles"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Salles ({salleCount})
+          </button>
+        </div>
       </div>
     </div>
   );

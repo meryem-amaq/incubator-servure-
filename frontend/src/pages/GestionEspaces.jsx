@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { 
   Building2, 
   QrCode, 
@@ -75,11 +76,33 @@ export const ETATS_APRES = [
 
 export default function GestionEspaces() {
   const { user, isSuperAdmin } = useAuth();
-  const [selectedEspace, setSelectedEspace] = useState('fablab');
+  const [searchParams] = useSearchParams();
+  const paramEspace = searchParams.get('espace');
+  const paramTab = searchParams.get('tab');
+
+  const [selectedEspace, setSelectedEspace] = useState(() => {
+    if (paramEspace && ['fablab', 'studio', 'salle_reunion'].includes(paramEspace)) return paramEspace;
+    return 'fablab';
+  });
   const currentEsp = useMemo(() => ESPACES.find(e => e.id === selectedEspace) || ESPACES[0], [selectedEspace]);
   const [selectedSousSalleFilter, setSelectedSousSalleFilter] = useState('all');
   const [qrSousSalle, setQrSousSalle] = useState('all');
-  const [activeTab, setActiveTab] = useState('demandes'); // 'demandes', 'materiel', 'qr'
+  const [activeTab, setActiveTab] = useState(() => {
+    if (paramTab === 'etat' || paramTab === 'etat_materiel') return 'etat_materiel';
+    if (paramTab && ['demandes', 'materiel', 'qr'].includes(paramTab)) return paramTab;
+    return 'demandes';
+  });
+
+  useEffect(() => {
+    if (paramEspace && ['fablab', 'studio', 'salle_reunion'].includes(paramEspace)) {
+      setSelectedEspace(paramEspace);
+    }
+    if (paramTab === 'etat' || paramTab === 'etat_materiel') {
+      setActiveTab('etat_materiel');
+    } else if (paramTab && ['demandes', 'materiel', 'qr'].includes(paramTab)) {
+      setActiveTab(paramTab);
+    }
+  }, [paramEspace, paramTab]);
   
   // Demandes de réservations & états
   const [reservations, setReservations] = useState([]);

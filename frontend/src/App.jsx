@@ -84,6 +84,7 @@ function AppRoutes() {
         />
         <Route path="incubes" element={<AdminRoute><Annuaire /></AdminRoute>} />
         <Route path="incube/:id" element={<ProfilIncube />} />
+        <Route path="incubes/:id" element={<ProfilIncube />} />
         <Route path="booking" element={<BookingPage />} />
         <Route path="engagement" element={<AdminRoute><Engagement /></AdminRoute>} />
         <Route path="rapports" element={<SuperAdminRoute><RapportsActivite /></SuperAdminRoute>} />

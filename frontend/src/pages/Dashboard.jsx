@@ -589,33 +589,38 @@ export default function Dashboard() {
                 <KpiAssiduite impactStats={impactStats} stats={stats} />
               </div>
 
-              {/* Grille principale : Top Incubés & Répartition Espaces / Matériel */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Grille principale : Top Incubés & Répartition Espaces / Matériel (2 colonnes égales) */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Colonne gauche : Top 5 des Incubés les plus Assidus */}
-                <div className="card p-6 lg:col-span-1 flex flex-col h-full">
-                  <div className="flex-1 space-y-4">
-                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-dark-800 pb-3">
+                <div className="card p-5 lg:col-span-1 flex flex-col justify-between h-full space-y-4">
+                  <div className="flex-1 space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-dark-800 pb-2.5">
                       <div>
-                        <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                        <h2 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
                           Top Incubés Assidus
                         </h2>
-                        <p className="text-xs text-slate-500 dark:text-dark-400">
+                        <p className="text-[11px] text-slate-500 dark:text-dark-400">
                           Porteurs de projets les plus présents aux ateliers
                         </p>
                       </div>
                     </div>
 
                     {(!impactStats?.assiduite?.topIncubes || impactStats.assiduite.topIncubes.length === 0) ? (
-                      <div className="text-center py-10 text-slate-400 text-xs">
+                      <div className="text-center py-8 text-slate-400 text-xs">
                         Aucun émargement enregistré pour le moment.
                       </div>
                     ) : (
-                      <div className="space-y-3">
-                        {impactStats.assiduite.topIncubes.map((inc, idx) => (
-                          <div key={inc.incubeId || idx} className="p-3 rounded-xl bg-slate-50 dark:bg-dark-800/60 border border-slate-200/60 dark:border-dark-700/60 space-y-2">
+                      <div className="space-y-2.5">
+                        {impactStats.assiduite.topIncubes.slice(0, 4).map((inc, idx) => (
+                          <div
+                            key={inc.incubeId || idx}
+                            onClick={() => inc.incubeId && navigate(`/incube/${inc.incubeId}`)}
+                            title="Cliquer pour accéder à la fiche de cet incubé"
+                            className="p-2.5 rounded-xl bg-slate-50 dark:bg-dark-800/60 border border-slate-200/60 dark:border-dark-700/60 hover:border-emerald-500/40 hover:bg-slate-100/60 dark:hover:bg-dark-800 transition-all cursor-pointer space-y-1.5"
+                          >
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <span className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-xs shrink-0 ${idx === 0 ? 'bg-amber-500 text-white shadow-sm' :
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className={`w-5 h-5 rounded-full flex items-center justify-center font-black text-[10px] shrink-0 ${idx === 0 ? 'bg-amber-500 text-white shadow-xs' :
                                   idx === 1 ? 'bg-slate-300 text-slate-800' :
                                     idx === 2 ? 'bg-amber-700 text-white' :
                                       'bg-slate-200 dark:bg-dark-700 text-slate-600 dark:text-dark-300'
@@ -626,12 +631,12 @@ export default function Dashboard() {
                                   <p className="font-extrabold text-xs text-slate-900 dark:text-white truncate">
                                     {inc.nomComplet}
                                   </p>
-                                  <span className="font-mono text-[10px] text-slate-400">
+                                  <span className="font-mono text-[9px] text-slate-400">
                                     {inc.ppNumero || 'PP-IDS'}
                                   </span>
                                 </div>
                               </div>
-                              <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-black text-xs shrink-0">
+                              <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-black text-[11px] shrink-0">
                                 {inc.count} atelier{inc.count > 1 ? 's' : ''}
                               </span>
                             </div>
@@ -654,33 +659,33 @@ export default function Dashboard() {
                     )}
                   </div>
 
-                  <div className="pt-2" data-html2canvas-ignore="true">
+                  <div className="pt-1" data-html2canvas-ignore="true">
                     <button
                       type="button"
                       onClick={() => navigate('/evenements')}
-                      className="w-full btn btn-secondary py-2 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="w-full btn btn-secondary py-1.5 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <span>Gérer les Ateliers & Émargements</span>
-                      <ExternalLink size={13} />
+                      <ExternalLink size={12} />
                     </button>
                   </div>
                 </div>
 
-                {/* Colonne droite : Santé Matériel */}
-                <div className="card p-6 lg:col-span-2 flex flex-col justify-between h-full space-y-6">
-                  {/* Parc Matériel & Maintenance */}
+                {/* Colonne droite : Santé Matériel & Équipements */}
+                <div className="card p-5 lg:col-span-1 flex flex-col justify-between h-full space-y-4">
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-dark-800 pb-2">
+                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-dark-800 pb-2.5">
                       <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
                         État du Parc Matériel & Équipements
                       </h3>
                       <button
                         type="button"
                         data-html2canvas-ignore="true"
-                        onClick={() => navigate('/espaces')}
+                        onClick={() => navigate('/espaces?tab=etat_materiel')}
                         className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 cursor-pointer"
+                        title="Consulter l'état détaillé et maintenance du matériel"
                       >
-                        <span>Gérer le matériel</span>
+                        <span>État du matériel</span>
                         <ArrowRight size={13} />
                       </button>
                     </div>

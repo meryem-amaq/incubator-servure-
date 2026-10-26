@@ -79,7 +79,7 @@ router.get('/stats', auth, async (req, res) => {
 
     // Événements (pour filtrage dynamique côté client)
     const tousLesAteliers = await Atelier.findAll({
-      attributes: ['id', 'titre', 'formateur', 'date'],
+      attributes: ['id', 'titre', 'formateur', 'date', 'description'],
       raw: true
     });
 
@@ -153,6 +153,15 @@ router.get('/stats', auth, async (req, res) => {
       ? Math.round((operationnels / totalEquipements) * 100)
       : 100;
 
+    const equipementsParEspace = {
+      fablab: allEquipements.filter(e => (e.espace || '').toLowerCase() === 'fablab').length,
+      studio: allEquipements.filter(e => (e.espace || '').toLowerCase() === 'studio').length,
+      salle_reunion: allEquipements.filter(e => {
+        const esp = (e.espace || '').toLowerCase();
+        return esp === 'salle_reunion' || esp.includes('salle') || esp.includes('reunion') || esp.includes('formation');
+      }).length
+    };
+
     res.json({
       success: true,
       assiduite: {
@@ -171,6 +180,7 @@ router.get('/stats', auth, async (req, res) => {
       },
       equipements: {
         totalEquipements,
+        parEspace: equipementsParEspace,
         operationnels,
         usure,
         maintenance,

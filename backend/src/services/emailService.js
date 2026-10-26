@@ -198,9 +198,7 @@ const sendReservationStatusEmail = async (reservation, statut, motifRefus = '') 
     preheader: `${safeEspace} - ${safeDate}`,
     badgeText,
     badgeColor,
-    contentHtml,
-    ctaText: "Accéder à l'Espace Booking",
-    ctaUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/booking`
+    contentHtml
   });
 
   return await sendEmail({
@@ -264,9 +262,7 @@ const sendRdvConfirmationEmail = async (rdv, incube = {}) => {
     preheader: `RDV programmé le ${safeDate} à ${safeHeure}`,
     badgeText: 'Rendez-vous de Suivi',
     badgeColor: '#0c87eb',
-    contentHtml,
-    ctaText: "Voir mes rendez-vous",
-    ctaUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard`
+    contentHtml
   });
 
   return await sendEmail({
@@ -332,9 +328,7 @@ const sendFormationInvitationEmail = async (evenement, incube) => {
     preheader: `Atelier le ${safeDate} à ${safeHeureDebut} avec ${safeFormateur}`,
     badgeText: 'Session de Formation',
     badgeColor: '#0c87eb',
-    contentHtml,
-    ctaText: "Confirmer ma présence & Émargement",
-    ctaUrl: emargementUrl
+    contentHtml
   });
 
   return await sendEmail({
@@ -381,9 +375,7 @@ const sendAlerteAssiduiteEmail = async (incube, { tauxPresence = 0, moyenneHeure
     preheader: `Rappel d'assiduité : taux actuel à ${tauxPresence}%`,
     badgeText: 'Alerte Assiduité',
     badgeColor: '#d97706',
-    contentHtml,
-    ctaText: "Consulter mon Suivi d'Engagement",
-    ctaUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/incubes/${incube.id}?tab=engagement`
+    contentHtml
   });
 
   return await sendEmail({
@@ -434,9 +426,7 @@ const sendWelcomeEmail = async (incube, passwordInitial = null) => {
     preheader: `Vos identifiants d'accès au portail incubateur`,
     badgeText: 'Nouveau Compte Incubé',
     badgeColor: '#0c87eb',
-    contentHtml,
-    ctaText: "Se connecter à mon espace",
-    ctaUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login${recipient ? `?email=${encodeURIComponent(recipient)}` : ''}`
+    contentHtml
   });
 
   return await sendEmail({
@@ -495,9 +485,7 @@ const sendWorkshopReminderEmail = async (evenement, incube) => {
     preheader: `Votre session "${safeTitre}" commence à ${safeHeureDebut}`,
     badgeText: 'Rappel de Session',
     badgeColor: '#0c87eb',
-    contentHtml,
-    ctaText: "Voir le détail & Émarger",
-    ctaUrl: emargementUrl
+    contentHtml
   });
 
   return await sendEmail({
@@ -556,9 +544,7 @@ const sendReservationReminderEmail = async (reservation) => {
     preheader: `Votre créneau débute à ${reservation.heureDebut}`,
     badgeText: 'Rappel de Créneau',
     badgeColor: '#059669',
-    contentHtml,
-    ctaText: "Voir mes Réservations",
-    ctaUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/booking`
+    contentHtml
   });
 
   return await sendEmail({
@@ -641,9 +627,7 @@ const sendPasswordResetByAdminEmail = async (user, newPassword) => {
     preheader: `Votre mot de passe a été mis à jour`,
     badgeText: 'Administration IDS',
     badgeColor: '#10b981',
-    contentHtml,
-    ctaText: "Se connecter à la plateforme",
-    ctaUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login${recipient ? `?email=${encodeURIComponent(recipient)}` : ''}`
+    contentHtml
   });
 
   return await sendEmail({

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Layers } from 'lucide-react';
+import { Layers, Eye, Rocket } from 'lucide-react';
+import KpiCategoryDetailModal from './KpiCategoryDetailModal';
 
 /**
  * Composant RÉPARTITION PAR PHASE D'INCUBATION
@@ -43,9 +44,11 @@ export default function RepartitionPhases({
   stats = null,
   phasesData = null,
   isDark = false,
-  className = ''
+  className = '',
+  onOpenModal = null
 }) {
   const [hoveredPhase, setHoveredPhase] = useState(null);
+  const [showPhasesModal, setShowPhasesModal] = useState(false);
 
   // 1. Extraction dynamique des données réelles depuis stats.phases
   const { phasesList, total } = useMemo(() => {
@@ -111,6 +114,48 @@ export default function RepartitionPhases({
     };
   }, [stats?.phases, phasesData]);
 
+  // Modal détaillée par incubé et phase
+  const normalizePhaseName = (phase) => {
+    if (!phase) return 'Idéation';
+    const clean = phase.trim().toLowerCase();
+    if (clean.includes('croiss')) return 'Croissance';
+    if (clean.includes('lanc')) return 'Lancement';
+    if (clean.includes('id') || clean.includes('cadr') || clean.includes('proto')) return 'Idéation';
+    if (clean.includes('matur')) return 'Maturité';
+    if (clean.includes('amor')) return 'Amorçage';
+    return phase.trim();
+  };
+
+  const phasesModalItems = useMemo(() => {
+    const list = Array.isArray(stats?.suiviStats?.allIncubes) ? stats.suiviStats.allIncubes : [];
+    return list.map(inc => {
+      const phaseNorm = normalizePhaseName(inc.phase_projet);
+      return {
+        id: inc.id,
+        nom: inc.nom_incube || 'Inconnu',
+        projet: inc.raison_sociale || inc.nom_incube || 'Inconnu',
+        categorie: phaseNorm,
+        metricValue: inc.phase_projet || phaseNorm,
+        secondaryText: inc.statut_juridique ? `Statut : ${inc.statut_juridique}` : (inc.secteur_activite ? `Secteur : ${inc.secteur_activite}` : ''),
+        targetTab: 'infos'
+      };
+    });
+  }, [stats?.suiviStats?.allIncubes]);
+
+  const phasesCategories = useMemo(() => {
+    const distinct = Array.from(new Set(phasesModalItems.map(i => i.categorie).filter(Boolean)));
+    const order = ['Croissance', 'Lancement', 'Idéation', 'Amorçage', 'Maturité'];
+    const sorted = distinct.sort((a, b) => {
+      const ia = order.indexOf(a);
+      const ib = order.indexOf(b);
+      if (ia !== -1 && ib !== -1) return ia - ib;
+      if (ia !== -1) return -1;
+      if (ib !== -1) return 1;
+      return a.localeCompare(b);
+    });
+    return ['Toutes', ...sorted];
+  }, [phasesModalItems]);
+
   // 2. Géométrie du Polar Area SVG (Rayons asymétriques & plein format)
   const svgSize = 240;
   const cx = 120;
@@ -169,12 +214,23 @@ export default function RepartitionPhases({
   return (
     <div className={`card p-5 flex flex-col justify-between min-w-0 hover:border-blue-500/40 transition-all ${className}`}>
       
-      {/* 1. EN-TÊTE : Titre à gauche + Badge Total à droite */}
+      {/* 1. EN-TÊTE : Titre cliquable à gauche + Badge Total à droite */}
       <div className="flex items-center justify-between gap-2 mb-2">
-        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
-          <Layers size={16} className="text-primary-500 shrink-0" />
-          <span>RÉPARTITION PAR PHASE D'INCUBATION</span>
-        </h3>
+        <button
+          type="button"
+          onClick={() => {
+            if (onOpenModal) onOpenModal();
+            else setShowPhasesModal(true);
+          }}
+          className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2 hover:text-blue-600 dark:hover:text-blue-400 transition-colors group text-left cursor-pointer"
+          title="Cliquer pour afficher la liste des incubés par phase d'incubation"
+        >
+          <Layers size={16} className="text-primary-500 shrink-0 group-hover:scale-110 transition-transform" />
+          <span className="group-hover:underline underline-offset-2">RÉPARTITION PAR PHASE D'INCUBATION</span>
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-800 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-2xs">
+            <Eye size={11} /> Voir par incubé
+          </span>
+        </button>
 
         <div className="bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 text-xs font-black px-3 py-1 rounded-full border border-blue-200/80 dark:border-blue-800/40 shrink-0 shadow-xs">
           Total : {total} incubé(s)
@@ -331,6 +387,23 @@ export default function RepartitionPhases({
           );
         })}
       </div>
+
+      {/* Modal de secours uniquement si onOpenModal n'est pas géré au niveau parent */}
+      {!onOpenModal && (
+        <KpiCategoryDetailModal
+          isOpen={showPhasesModal}
+          onClose={() => setShowPhasesModal(false)}
+          title="Détail des Incubés par Phase d'Incubation"
+          subtitle="Consultez les 58 incubés regroupés par phase d'incubation et accédez directement à leur profil"
+          icon={Rocket}
+          themeColor="blue"
+          categoryLabel="Phase"
+          metricLabel="Phase Actuelle"
+          categories={phasesCategories}
+          items={phasesModalItems}
+          targetTab="infos"
+        />
+      )}
 
     </div>
   );

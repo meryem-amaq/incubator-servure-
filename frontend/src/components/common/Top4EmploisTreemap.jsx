@@ -1,333 +1,189 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Bar } from 'react-chartjs-2';
+import { Trophy, Eye, ExternalLink, Briefcase } from 'lucide-react';
 
 /**
- * Top4EmploisTreemap
- * Format semi-cadre (1 colonne) : Carte proportionnelle (Treemap) pure
- * Style épuré conforme à l'image de référence avec blocs colorés pleins et séparateurs blancs fins.
+ * Top4EmploisTreemap -> Graphique en Barres & Podium des Meilleurs Créateurs d'Emplois
+ * Remplace la mosaïque Treemap par un histogramme à barres propre, structuré et interactif.
+ * Clic sur une barre ou sur le nom d'un incubé redirige vers son dossier RH (/incubes/:id?tab=rh).
  */
-export default function Top4EmploisTreemap({ top4PostesList = [], isDark = false, className = '' }) {
-  const [hoveredIdx, setHoveredIdx] = useState(null);
+export default function Top4EmploisTreemap({
+  top4PostesList = [],
+  isDark = false,
+  className = '',
+  onOpenModal = null
+}) {
+  const navigate = useNavigate();
 
   // 1. Calculs des totaux
-  const totalPostes = useMemo(() => {
+  const totalTopPostes = useMemo(() => {
     return (top4PostesList || []).reduce((acc, c) => acc + (Number(c.total_postes) || 0), 0);
   }, [top4PostesList]);
 
-  // 2. Palette de couleurs plates et harmonieuses (inspirée de l'image de référence)
-  const palette = [
-    {
-      color: '#70ab94', // Vert sauge / menthe (comme "Asia")
-      medal: '🥇 1er'
-    },
-    {
-      color: '#de5254', // Rouge corail / brique (comme "Africa")
-      medal: '🥈 2ème'
-    },
-    {
-      color: '#9b88be', // Lavande / violet pastel (comme "Europe")
-      medal: '🥉 3ème'
-    },
-    {
-      color: '#edc153', // Jaune doré / ambre (comme "North America")
-      medal: '🎖️ 4ème'
-    }
+  // 2. Configuration des rangs et couleurs des médailles
+  const rankConfigs = [
+    { rank: '1er', medal: '🥇', color: '#10b981', hoverColor: '#059669', badgeBg: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30' },
+    { rank: '2ème', medal: '🥈', color: '#3b82f6', hoverColor: '#2563eb', badgeBg: 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30' },
+    { rank: '3ème', medal: '🥉', color: '#f59e0b', hoverColor: '#d97706', badgeBg: 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30' },
+    { rank: '4ème', medal: '4ème', medalIcon: '🎖️', color: '#8b5cf6', hoverColor: '#7c3aed', badgeBg: 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/30' }
   ];
 
-  // 3. Partitionnement proportionnel Treemap (adapté pour 1 colonne / semi-cadre)
-  const layout = useMemo(() => {
-    if (!top4PostesList || top4PostesList.length === 0) return null;
-
-    const count = top4PostesList.length;
-    const items = top4PostesList.map((item, idx) => {
-      const postes = Number(item.total_postes) || 0;
-      const pct = totalPostes > 0 ? Math.round((postes / totalPostes) * 100) : 0;
-      const pal = palette[idx % palette.length];
-      return {
-        ...item,
-        postes,
-        pct,
-        pal,
-        idx,
-        nomProjet: item.projet || item.nom,
-        nomIncube: item.nom && item.nom !== item.projet ? item.nom : null
-      };
+  // 3. Préparation des données pour le Chart.js Bar Chart
+  const chartData = useMemo(() => {
+    const labels = (top4PostesList || []).map((item, idx) => {
+      const cfg = rankConfigs[idx] || rankConfigs[3];
+      const name = item.projet || item.nom || 'Inconnu';
+      const shortName = name.length > 22 ? `${name.substring(0, 20)}…` : name;
+      return `${cfg.medal || cfg.medalIcon || '🎖️'} ${shortName}`;
     });
 
-    if (count === 1) {
-      return { type: 'single', item: items[0] };
-    }
-
-    if (count === 2) {
-      const w0 = items[0].postes || 1;
-      const w1 = items[1].postes || 1;
-      const sum = w0 + w1;
-      return {
-        type: 'two',
-        left: { item: items[0], widthPct: (w0 / sum) * 100 },
-        right: { item: items[1], widthPct: (w1 / sum) * 100 }
-      };
-    }
-
-    if (count === 3) {
-      const w0 = items[0].postes || 1;
-      const wRight = (items[1].postes || 1) + (items[2].postes || 1);
-      const sum = w0 + wRight;
-      const leftWidth = (w0 / sum) * 100;
-      const rightWidth = 100 - leftWidth;
-
-      const h1 = ((items[1].postes || 1) / wRight) * 100;
-      const h2 = 100 - h1;
-
-      return {
-        type: 'three',
-        left: { item: items[0], widthPct: leftWidth },
-        right: {
-          widthPct: rightWidth,
-          top: { item: items[1], heightPct: h1 },
-          bottom: { item: items[2], heightPct: h2 }
-        }
-      };
-    }
-
-    // 4 items : Disposition Treemap exacte inspirée de l'image de référence
-    // - Gauche (Item 0) : toute la hauteur
-    // - Droite Haut (Item 1) : toute la largeur droite
-    // - Droite Bas (Item 2 & Item 3) : côte à côte
-    const wLeft = items[0].postes || 1;
-    const wRight = (items[1].postes || 1) + (items[2].postes || 1) + (items[3].postes || 1);
-    const totalW = wLeft + wRight;
-
-    // Proportions équilibrées pour affichage en demi-cadre
-    const rawLeftWidth = (wLeft / totalW) * 100;
-    const leftWidth = Math.max(38, Math.min(52, rawLeftWidth));
-    const rightWidth = 100 - leftWidth;
-
-    const wTopRight = items[1].postes || 1;
-    const wBottomRight = (items[2].postes || 1) + (items[3].postes || 1);
-    const totalRight = wTopRight + wBottomRight;
-
-    const topHeight = Math.max(38, Math.min(55, (wTopRight / totalRight) * 100));
-    const bottomHeight = 100 - topHeight;
-
-    const bottomItem2Width = ((items[2].postes || 1) / wBottomRight) * 100;
-    const bottomItem3Width = 100 - bottomItem2Width;
+    const data = (top4PostesList || []).map(item => Number(item.total_postes) || 0);
+    const bgColors = (top4PostesList || []).map((_, idx) => rankConfigs[idx]?.color || '#8b5cf6');
+    const hoverBgColors = (top4PostesList || []).map((_, idx) => rankConfigs[idx]?.hoverColor || '#7c3aed');
 
     return {
-      type: 'four',
-      left: {
-        widthPct: leftWidth,
-        item: items[0]
+      labels,
+      datasets: [
+        {
+          label: 'Postes créés',
+          data,
+          backgroundColor: bgColors,
+          hoverBackgroundColor: hoverBgColors,
+          borderRadius: 8,
+          barPercentage: 0.65,
+          categoryPercentage: 0.85
+        }
+      ]
+    };
+  }, [top4PostesList]);
+
+  // 4. Options Chart.js adaptées (Histogramme Horizontal)
+  const chartOptions = useMemo(() => {
+    const textColor = isDark ? '#94a3b8' : '#64748b';
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)';
+
+    return {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: isDark ? '#0f172a' : '#1e293b',
+          titleColor: '#ffffff',
+          bodyColor: '#e2e8f0',
+          borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+          borderWidth: 1,
+          padding: 10,
+          cornerRadius: 8,
+          callbacks: {
+            title: (tooltipItems) => {
+              const idx = tooltipItems[0]?.dataIndex;
+              const item = top4PostesList[idx];
+              if (!item) return '';
+              return `${item.projet || item.nom}`;
+            },
+            label: (context) => {
+              const idx = context.dataIndex;
+              const item = top4PostesList[idx];
+              if (!item) return '';
+              const parts = [`Postes : ${item.total_postes || 0}`];
+              const contratParts = [];
+              if (Number(item.cdi_count) > 0) contratParts.push(`${item.cdi_count} CDI`);
+              if (Number(item.cdd_count) > 0) contratParts.push(`${item.cdd_count} CDD`);
+              if (Number(item.stage_count) > 0) contratParts.push(`${item.stage_count} Stage`);
+              if (Number(item.freelance_count) > 0) contratParts.push(`${item.freelance_count} Freelance`);
+              if (Number(item.autres_count) > 0) contratParts.push(`${item.autres_count} Autre`);
+              if (contratParts.length > 0) parts.push(`Contrats : ${contratParts.join(', ')}`);
+              return parts;
+            },
+            afterLabel: () => '👉 Cliquez pour voir le dossier RH'
+          }
+        }
       },
-      right: {
-        widthPct: rightWidth,
-        top: {
-          heightPct: topHeight,
-          item: items[1]
+      scales: {
+        x: {
+          beginAtZero: true,
+          grid: { color: gridColor },
+          ticks: {
+            color: textColor,
+            stepSize: 1,
+            precision: 0,
+            font: { size: 11, family: "'Inter', sans-serif" }
+          }
         },
-        bottom: {
-          heightPct: bottomHeight,
-          item2: {
-            widthPct: bottomItem2Width,
-            item: items[2]
-          },
-          item3: {
-            widthPct: bottomItem3Width,
-            item: items[3]
+        y: {
+          grid: { display: false },
+          ticks: {
+            color: isDark ? '#f1f5f9' : '#1e293b',
+            font: { size: 12, family: "'Inter', sans-serif", weight: '700' }
+          }
+        }
+      },
+      onClick: (_event, elements) => {
+        if (elements && elements.length > 0) {
+          const idx = elements[0].index;
+          const item = top4PostesList[idx];
+          const incId = item?.id || item?.incube_id;
+          if (incId) {
+            navigate(`/incubes/${incId}?tab=rh`);
           }
         }
       }
     };
-  }, [top4PostesList, totalPostes]);
+  }, [isDark, top4PostesList, navigate]);
 
-  // Rendu d'une tuile Treemap
-  const renderTile = (item, extraClasses = '') => {
-    if (!item) return null;
-    const isHovered = hoveredIdx === item.idx;
-
-    return (
-      <div
-        key={item.idx}
-        onMouseEnter={() => setHoveredIdx(item.idx)}
-        onMouseLeave={() => setHoveredIdx(null)}
-        style={{ backgroundColor: item.pal.color }}
-        className={`relative p-2.5 sm:p-3 flex flex-col justify-start text-white transition-all duration-200 cursor-pointer select-none overflow-hidden ${
-          isHovered ? 'brightness-105 z-10' : ''
-        } ${extraClasses}`}
-        title={`${item.nomProjet} : ${item.postes} poste(s) créé(s) (${item.pct}%)`}
-      >
-        {/* Titre du projet en blanc et gras */}
-        <span className="font-bold text-white text-xs sm:text-sm md:text-base tracking-tight leading-tight line-clamp-2">
-          {item.nomProjet}
-        </span>
-
-        {/* Valeur numérique & pourcentage */}
-        <span className="text-white/95 text-[11px] sm:text-xs font-semibold mt-0.5">
-          {item.postes} {item.postes > 1 ? 'postes' : 'poste'} <span className="text-white/80 font-normal">({item.pct}%)</span>
-        </span>
-
-        {/* Porteur (s'il existe et diffère du projet) */}
-        {item.nomIncube && (
-          <span className="text-white/75 text-[10px] truncate mt-0.5 hidden sm:block">
-            {item.nomIncube}
-          </span>
-        )}
-
-        {/* Médaille discrète dans le coin */}
-        <span className="absolute top-1.5 right-1.5 text-[10px] opacity-70 font-bold">
-          {item.pal.medal}
-        </span>
-      </div>
-    );
+  const handleOpenIncube = (item) => {
+    const incId = item?.id || item?.incube_id;
+    if (incId) {
+      navigate(`/incubes/${incId}?tab=rh`);
+    }
   };
 
   return (
-    <div className={`card p-5 flex flex-col justify-between h-auto min-h-[340px] min-w-0 hover:border-emerald-500/40 transition-all shadow-sm ${className}`}>
+    <div className={`card p-5 flex flex-col justify-between min-w-0 hover:border-emerald-500/40 transition-all ${className}`}>
       
-      {/* 1. EN-TÊTE : Titre & Badge Total (sans boutons de barres) */}
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <div>
-          <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-1.5">
-            <span>🏆</span>
-            <span>TOP 4 CRÉATEURS D'EMPLOIS</span>
+      {/* 1. EN-TÊTE : Titre cliquable + Bouton Voir par incubé + Total */}
+      <div className="flex justify-between items-start mb-3">
+        <button
+          type="button"
+          onClick={() => {
+            if (onOpenModal) onOpenModal();
+          }}
+          className="group cursor-pointer select-none text-left"
+          title="Cliquer pour voir la décomposition des postes créés par tous les incubés"
+        >
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2 group-hover:text-emerald-500 transition-colors">
+            <Trophy size={16} className="text-emerald-500 shrink-0 group-hover:scale-110 transition-transform" />
+            <span className="group-hover:underline underline-offset-2">TOP CRÉATEURS D'EMPLOIS</span>
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 group-hover:bg-emerald-500 group-hover:text-white transition-all shadow-2xs">
+              <Eye size={11} /> Voir par incubé
+            </span>
           </h3>
-          <p className="text-xs text-slate-500 dark:text-dark-400">
-            Carte proportionnelle des recrutements générés
+          <p className="text-xs text-slate-500 dark:text-dark-400 mt-1">
+            Classement des incubés par nombre de postes créés
           </p>
-        </div>
+        </button>
 
-        {/* Badge Total */}
-        <div className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-bold px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/40 flex items-center gap-1.5 shadow-2xs shrink-0">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span>{totalPostes} postes (Top 4)</span>
+        <div className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-semibold px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800/40 shrink-0">
+          Total Top 4 : {totalTopPostes} postes
         </div>
       </div>
 
-      {/* 2. CARTE PROPORTIONNELLE (TREEMAP 2D) */}
-      {top4PostesList && top4PostesList.length > 0 ? (
-        <div className="w-full flex-1 flex flex-col justify-between my-auto">
-          {/* Mosaïque Treemap avec séparateurs blancs nets (gap-[2px]) */}
-          <div className="w-full h-[200px] sm:h-[220px] rounded-xl overflow-hidden bg-white dark:bg-dark-900 p-[2px] shadow-2xs my-1">
-            <div className="w-full h-full flex flex-row gap-[2px]">
-              {layout?.type === 'four' && (
-                <>
-                  {/* Bloc Gauche : 1er (comme "Asia") */}
-                  <div
-                    style={{ width: `${layout.left.widthPct}%` }}
-                    className="h-full"
-                  >
-                    {renderTile(layout.left.item, 'h-full w-full')}
-                  </div>
-
-                  {/* Bloc Droit : Découpé en Haut (2ème) et Bas (3ème & 4ème) */}
-                  <div
-                    style={{ width: `${layout.right.widthPct}%` }}
-                    className="h-full flex flex-col gap-[2px]"
-                  >
-                    {/* Haut Droite : 2ème (comme "Africa") */}
-                    <div
-                      style={{ height: `${layout.right.top.heightPct}%` }}
-                      className="w-full"
-                    >
-                      {renderTile(layout.right.top.item, 'h-full w-full')}
-                    </div>
-
-                    {/* Bas Droite : 3ème & 4ème côte à côte (comme "North America" & "South America") */}
-                    <div
-                      style={{ height: `${layout.right.bottom.heightPct}%` }}
-                      className="w-full flex flex-row gap-[2px]"
-                    >
-                      <div
-                        style={{ width: `${layout.right.bottom.item2.widthPct}%` }}
-                        className="h-full"
-                      >
-                        {renderTile(layout.right.bottom.item2.item, 'h-full w-full')}
-                      </div>
-                      <div
-                        style={{ width: `${layout.right.bottom.item3.widthPct}%` }}
-                        className="h-full"
-                      >
-                        {renderTile(layout.right.bottom.item3.item, 'h-full w-full')}
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {layout?.type === 'three' && (
-                <>
-                  <div style={{ width: `${layout.left.widthPct}%` }} className="h-full">
-                    {renderTile(layout.left.item, 'h-full w-full')}
-                  </div>
-                  <div
-                    className="flex flex-col gap-[2px] h-full"
-                    style={{ width: `${layout.right.widthPct}%` }}
-                  >
-                    <div style={{ height: `${layout.right.top.heightPct}%` }} className="w-full">
-                      {renderTile(layout.right.top.item, 'h-full w-full')}
-                    </div>
-                    <div style={{ height: `${layout.right.bottom.heightPct}%` }} className="w-full">
-                      {renderTile(layout.right.bottom.item, 'h-full w-full')}
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {layout?.type === 'two' && (
-                <>
-                  <div style={{ width: `${layout.left.widthPct}%` }} className="h-full">
-                    {renderTile(layout.left.item, 'h-full w-full')}
-                  </div>
-                  <div style={{ width: `${layout.right.widthPct}%` }} className="h-full">
-                    {renderTile(layout.right.item, 'h-full w-full')}
-                  </div>
-                </>
-              )}
-
-              {layout?.type === 'single' && (
-                <div className="w-full h-full">
-                  {renderTile(layout.item, 'h-full w-full')}
-                </div>
-              )}
-            </div>
+      {/* 2. GRAPHIQUE EN BARRES (HISTOGRAMME HORIZONTAL) */}
+      <div className="flex-1 min-h-[220px] py-2 flex items-center">
+        {top4PostesList.length === 0 ? (
+          <div className="h-full w-full flex items-center justify-center text-xs text-slate-400 dark:text-dark-400">
+            Aucun poste créé enregistré
           </div>
-
-          {/* 3. LÉGENDE HORIZONTALE ÉPURÉE EN DESSOUS */}
-          <div className="mt-2 pt-2 border-t border-slate-100 dark:border-dark-700/60 flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
-            {top4PostesList.map((item, idx) => {
-              const pal = palette[idx % palette.length];
-              const count = Number(item.total_postes) || 0;
-              const pct = totalPostes > 0 ? Math.round((count / totalPostes) * 100) : 0;
-              const label = item.projet || item.nom;
-
-              return (
-                <div
-                  key={idx}
-                  onMouseEnter={() => setHoveredIdx(idx)}
-                  onMouseLeave={() => setHoveredIdx(null)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border transition-all cursor-pointer text-xs ${
-                    hoveredIdx === idx
-                      ? 'bg-slate-200/80 dark:bg-dark-700 border-slate-400 dark:border-dark-500 scale-105'
-                      : 'bg-slate-50/80 dark:bg-dark-900/50 border-slate-200/60 dark:border-dark-800 hover:bg-slate-100/80'
-                  }`}
-                >
-                  <span className="w-2.5 h-2.5 rounded-sm shrink-0 shadow-xs" style={{ backgroundColor: pal.color }} />
-                  <span className="font-bold text-slate-800 dark:text-slate-200 truncate max-w-[120px] sm:max-w-[150px]" title={label}>
-                    {label}
-                  </span>
-                  <span className="font-mono font-black" style={{ color: pal.color }}>
-                    {count} ({pct}%)
-                  </span>
-                </div>
-              );
-            })}
+        ) : (
+          <div className="w-full h-full min-h-[200px]">
+            <Bar data={chartData} options={chartOptions} />
           </div>
+        )}
+      </div>
 
-        </div>
-      ) : (
-        <div className="py-10 text-center text-xs text-slate-400 dark:text-dark-400 italic">
-          Aucune donnée de recrutement disponible actuellement
-        </div>
-      )}
     </div>
   );
 }

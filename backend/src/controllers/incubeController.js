@@ -222,7 +222,10 @@ exports.getStats = async (req, res) => {
       }),
       Incube.findAll({
         where: whereIncube,
-        attributes: ['id', 'nom_incube', 'raison_sociale', 'accompagnateur', 'telephone', 'email', 'phase_projet', 'statut_juridique'],
+        attributes: [
+          'id', 'nom_incube', 'raison_sociale', 'accompagnateur', 'telephone', 'email',
+          'phase_projet', 'statut_juridique', 'province', 'ville', 'secteur_activite', 'genre', 'niveau_etude', 'promotion'
+        ],
         raw: true
       })
     ]);
@@ -293,7 +296,7 @@ exports.getStats = async (req, res) => {
     const [
       totalPersonnel,
       emploisStats,
-      top4Emplois,
+      allEmploisRaw,
       finances,
       caParStatut,
       top3CA,
@@ -317,15 +320,23 @@ exports.getStats = async (req, res) => {
       RhDetail.findAll({
         where: whereRelations,
         attributes: [
+          [sequelize.col('incube.id'), 'id'],
+          [sequelize.col('incube.id'), 'incube_id'],
           [sequelize.col('incube.nom_incube'), 'nom'],
           [sequelize.col('incube.raison_sociale'), 'projet'],
+          [sequelize.col('incube.statut_juridique'), 'statut_juridique'],
+          [sequelize.col('incube.phase_projet'), 'phase_projet'],
           [sequelize.fn('COUNT', sequelize.col('RhDetail.id')), 'total_postes'],
-          [sequelize.fn('SUM', sequelize.literal('COALESCE(salaire_mensuel, 0)')), 'total_salaires']
+          [sequelize.fn('SUM', sequelize.literal('COALESCE(salaire_mensuel, 0)')), 'total_salaires'],
+          [sequelize.fn('SUM', sequelize.literal("CASE WHEN LOWER(nature_contrat) LIKE '%cdi%' THEN 1 ELSE 0 END")), 'cdi_count'],
+          [sequelize.fn('SUM', sequelize.literal("CASE WHEN LOWER(nature_contrat) LIKE '%cdd%' THEN 1 ELSE 0 END")), 'cdd_count'],
+          [sequelize.fn('SUM', sequelize.literal("CASE WHEN LOWER(nature_contrat) LIKE '%stage%' THEN 1 ELSE 0 END")), 'stage_count'],
+          [sequelize.fn('SUM', sequelize.literal("CASE WHEN LOWER(nature_contrat) LIKE '%freelance%' OR LOWER(nature_contrat) LIKE '%prestation%' THEN 1 ELSE 0 END")), 'freelance_count'],
+          [sequelize.fn('SUM', sequelize.literal("CASE WHEN LOWER(nature_contrat) NOT LIKE '%cdi%' AND LOWER(nature_contrat) NOT LIKE '%cdd%' AND LOWER(nature_contrat) NOT LIKE '%stage%' AND LOWER(nature_contrat) NOT LIKE '%freelance%' AND LOWER(nature_contrat) NOT LIKE '%prestation%' THEN 1 ELSE 0 END")), 'autres_count']
         ],
         include: [{ model: Incube, as: 'incube', attributes: [] }],
-        group: ['incube.id', 'incube.nom_incube', 'incube.raison_sociale'],
+        group: ['incube.id', 'incube.nom_incube', 'incube.raison_sociale', 'incube.statut_juridique', 'incube.phase_projet'],
         order: [[sequelize.literal('total_postes'), 'DESC'], [sequelize.literal('total_salaires'), 'DESC']],
-        limit: 4,
         raw: true,
       }),
       AnalyseFinanciere.findAll({
@@ -433,18 +444,86 @@ exports.getStats = async (req, res) => {
       `, { replacements, type: sequelize.QueryTypes.SELECT }),
       GestionMateriel.findAll({
         where: whereRelations,
-        raw: true
+        include: [{ model: Incube, as: 'incube', attributes: ['id', 'nom_incube', 'raison_sociale', 'phase_projet', 'statut_juridique', 'promotion'] }],
+        raw: true,
+        nest: true
       })
     ]);
 
+    const allEmplois = (allEmploisRaw || []).map(e => {
+      const cdi = Number(e.cdi_count) || 0;
+      const cdd = Number(e.cdd_count) || 0;
+      const stage = Number(e.stage_count) || 0;
+      const freelance = Number(e.freelance_count) || 0;
+      const autre = Number(e.autres_count) || 0;
+      const parts = [];
+      if (freelance > 0) parts.push(`${freelance} Freelance`);
+      if (stage > 0) parts.push(`${stage} Stage`);
+      if (cdi > 0) parts.push(`${cdi} CDI`);
+      if (cdd > 0) parts.push(`${cdd} CDD`);
+      if (autre > 0) parts.push(`${autre} Autre`);
+      return {
+        ...e,
+        total_postes: Number(e.total_postes) || 0,
+        total_salaires: Number(e.total_salaires) || 0,
+        cdi_count: cdi,
+        cdd_count: cdd,
+        stage_count: stage,
+        freelance_count: freelance,
+        autres_count: autre,
+        contrats_summary: parts.length > 0 ? parts.join(' • ') : 'Contrats en cours'
+      };
+    });
+    const top4Emplois = allEmplois.slice(0, 4);
+
     const caTotal = finances.reduce((sum, f) => sum + (Number(f.ventes) || 0) + (Number(f.autres_revenus) || 0), 0);
 
-    // Calcul des statistiques d'investissements matériel par catégorie
+    // Helper de catégorisation intelligente des équipements par secteur
+    const detectSecteurAction = (secteur, article) => {
+      const s = (secteur || '').trim();
+      if (s && s.toLowerCase() !== 'non catégorisé' && s.toLowerCase() !== 'null') {
+        const sLower = s.toLowerCase();
+        if (sLower.includes('info') || sLower.includes('ordinateur') || sLower.includes('dev')) return 'Informatique';
+        if (sLower.includes('audio') || sLower.includes('video') || sLower.includes('photo') || sLower.includes('media')) return 'Audiovisuel';
+        if (sLower.includes('electr') || sLower.includes('iot') || sLower.includes('robot')) return 'Electronique';
+        return s.charAt(0).toUpperCase() + s.slice(1);
+      }
+      const art = (article || '').toLowerCase();
+      if (art.match(/(macbook|ordinateur|pc|laptop|disque dur|ssd|ecran|écran|moniteur|tablette|ipad|onduleur|serveur|switch|routeur|hub|souris|clavier|nvidia|carte graphique|disk station)/i)) {
+        return 'Informatique';
+      }
+      if (art.match(/(caméra|camera|dji|osmo|objectif|trépied|trepied|c-stand|godox|softbox|light|projecteur|panneau|audio|micro|microphone|rode|hollyland|shure|bose|enceinte|casque|vr|quest|epson|teleprompter|téléprompteur)/i)) {
+        return 'Audiovisuel';
+      }
+      if (art.match(/(raspberry|arduino|capteur|convertisseur|batterie|chargeur|alimentation|module|relais|electrovanne|électrovanne|coffret|quadri|robot)/i)) {
+        return 'Electronique';
+      }
+      return 'Informatique';
+    };
+
+    // Helper de détection de la nature concrète du matériel
+    const detectTypeEquipement = (article, secteur) => {
+      const art = (article || '').toLowerCase();
+      const sec = (secteur || '').toLowerCase();
+      if (art.match(/(macbook|ordinateur|pc|laptop|thinkpad|latitude)/i)) return 'PC & Laptops';
+      if (art.match(/(caméra|camera|dji|osmo|sony|objectif|boitier|boîtier|stabilisateur|teleprompter|téléprompteur)/i)) return 'Caméras & Vidéo';
+      if (art.match(/(godox|softbox|light|projecteur|panneau|trépied|trepied|c-stand|box)/i)) return 'Studio & Éclairage';
+      if (art.match(/(micro|audio|casque|shure|rode|hollyland|bose|airpod|enceinte|lark)/i)) return 'Son & Audio';
+      if (art.match(/(ssd|disque|disque dur|stockage|disk station|serveur|nas)/i)) return 'Stockage & Serveurs';
+      if (art.match(/(ecran|écran|moniteur)/i)) return 'Écrans & Moniteurs';
+      if (art.match(/(raspberry|arduino|capteur|convertisseur|batterie|chargeur|alimentation|module|relais|electrovanne|électrovanne|coffret|quadri|robot)/i) || sec.includes('electr')) return 'Électronique & IoT';
+      if (art.match(/(souris|clavier|tablette|ipad|pencil|onduleur|switch|routeur|hub|carte memoire|webcam)/i)) return 'Périphériques & Réseau';
+      return 'Autres Matériels';
+    };
+
+    // Calcul des statistiques d'investissements matériel par catégorie et par type réel
     let totalInvestissementMateriel = 0;
     let totalMaterielIds = 0;
     let totalMaterielPropre = 0;
     let totalArticlesMateriel = 0;
     const catMaterielMap = {};
+    const typesEquipementsMap = {};
+    const incubeUniqueMap = {};
 
     (allMaterielsRaw || []).forEach(m => {
       let raw = String(m.valeur || '').trim().replace(/(?:dh|mad|dhs|\$|€)/gi, '').replace(/\s+/g, '');
@@ -453,7 +532,10 @@ exports.getStats = async (req, res) => {
       else raw = raw.replace(/,/g, '.').replace(/[^\d.]/g, '');
       const val = parseFloat(raw) || 0;
       const qty = parseInt(m.quantite, 10) || 1;
-      const cat = (m.secteur_action || '').trim() || 'Non catégorisé';
+      const cat = detectSecteurAction(m.secteur_action, m.article);
+      const typeMat = detectTypeEquipement(m.article, m.secteur_action);
+      m.secteur_action = cat;
+      m.type_equipement = typeMat;
       const isIds = m.type_origine === 'ids';
 
       totalInvestissementMateriel += val;
@@ -461,6 +543,7 @@ exports.getStats = async (req, res) => {
       if (isIds) totalMaterielIds += val;
       else totalMaterielPropre += val;
 
+      // Agrégation par Catégorie générale
       if (!catMaterielMap[cat]) {
         catMaterielMap[cat] = {
           nom: cat,
@@ -468,21 +551,107 @@ exports.getStats = async (req, res) => {
           quantite: 0,
           countLignes: 0,
           idsMontant: 0,
-          propreMontant: 0
+          idsQuantite: 0,
+          propreMontant: 0,
+          propreQuantite: 0
         };
       }
       catMaterielMap[cat].montantTotal += val;
       catMaterielMap[cat].quantite += qty;
       catMaterielMap[cat].countLignes += 1;
-      if (isIds) catMaterielMap[cat].idsMontant += val;
-      else catMaterielMap[cat].propreMontant += val;
+      if (isIds) {
+        catMaterielMap[cat].idsMontant += val;
+        catMaterielMap[cat].idsQuantite += qty;
+      } else {
+        catMaterielMap[cat].propreMontant += val;
+        catMaterielMap[cat].propreQuantite += qty;
+      }
+
+      // Agrégation par Type Réel d'Équipement (Nombre d'unités)
+      if (!typesEquipementsMap[typeMat]) {
+        typesEquipementsMap[typeMat] = {
+          type: typeMat,
+          quantite: 0,
+          idsQuantite: 0,
+          propreQuantite: 0,
+          valeur: 0,
+          countLignes: 0,
+          incubesSet: new Set()
+        };
+      }
+      typesEquipementsMap[typeMat].quantite += qty;
+      typesEquipementsMap[typeMat].valeur += val;
+      typesEquipementsMap[typeMat].countLignes += 1;
+      if (isIds) typesEquipementsMap[typeMat].idsQuantite += qty;
+      else typesEquipementsMap[typeMat].propreQuantite += qty;
+
+      // Agrégation par Incubé Unique pour la Modale
+      const incId = m.incube?.id || m.incube_id;
+      if (incId) {
+        typesEquipementsMap[typeMat].incubesSet.add(incId);
+        if (!incubeUniqueMap[incId]) {
+          incubeUniqueMap[incId] = {
+            id: incId,
+            incube_id: incId,
+            nom: m.incube?.nom_incube || 'Inconnu',
+            projet: m.incube?.raison_sociale || m.incube?.nom_incube || 'Inconnu',
+            phase_projet: m.incube?.phase_projet || '',
+            statut_juridique: m.incube?.statut_juridique || '',
+            promotion: m.incube?.promotion || '',
+            categorie: cat,
+            total_valeur: 0,
+            total_articles: 0,
+            unites_ids: 0,
+            unites_propre: 0,
+            types_concernes: {},
+            articles: [],
+            articles_detail: [],
+            targetTab: 'materiel'
+          };
+        }
+        incubeUniqueMap[incId].total_valeur += val;
+        incubeUniqueMap[incId].total_articles += qty;
+        if (isIds) incubeUniqueMap[incId].unites_ids += qty;
+        else incubeUniqueMap[incId].unites_propre += qty;
+
+        incubeUniqueMap[incId].types_concernes[typeMat] = (incubeUniqueMap[incId].types_concernes[typeMat] || 0) + qty;
+        if (m.article && !incubeUniqueMap[incId].articles.includes(m.article)) {
+          incubeUniqueMap[incId].articles.push(m.article);
+        }
+        incubeUniqueMap[incId].articles_detail.push({
+          article: m.article,
+          quantite: qty,
+          type_equipement: typeMat,
+          type_origine: m.type_origine || 'ids',
+          valeur: val,
+          numero_serie: m.numero_serie || ''
+        });
+      }
     });
 
     const categoriesMateriel = Object.values(catMaterielMap)
       .sort((a, b) => b.montantTotal - a.montantTotal)
       .map(c => ({
         ...c,
-        percentage: totalInvestissementMateriel > 0 ? Number(((c.montantTotal / totalInvestissementMateriel) * 100).toFixed(1)) : 0
+        percentage: totalInvestissementMateriel > 0 ? Number(((c.montantTotal / totalInvestissementMateriel) * 100).toFixed(1)) : 0,
+        percentageIds: totalMaterielIds > 0 ? Number(((c.idsMontant / totalMaterielIds) * 100).toFixed(1)) : 0
+      }));
+
+    const typesEquipements = Object.values(typesEquipementsMap)
+      .sort((a, b) => b.quantite - a.quantite)
+      .map(t => ({
+        ...t,
+        incubesCount: t.incubesSet.size,
+        incubesSet: undefined,
+        percentage: totalArticlesMateriel > 0 ? Number(((t.quantite / totalArticlesMateriel) * 100).toFixed(1)) : 0
+      }));
+
+    const incubesMaterielList = Object.values(incubeUniqueMap)
+      .sort((a, b) => b.total_articles - a.total_articles)
+      .map(inc => ({
+        ...inc,
+        typesList: Object.keys(inc.types_concernes),
+        type_origine: inc.unites_ids > 0 && inc.unites_propre > 0 ? 'mixte' : (inc.unites_ids > 0 ? 'ids' : 'propre')
       }));
 
     const materielStats = {
@@ -491,7 +660,9 @@ exports.getStats = async (req, res) => {
       totalIds: totalMaterielIds,
       totalPropre: totalMaterielPropre,
       categories: categoriesMateriel,
-      rawList: allMaterielsRaw || []
+      typesEquipements,
+      rawList: allMaterielsRaw || [],
+      incubesList: incubesMaterielList
     };
 
     // 1 ligne dans FicheSuivi = 1 RDV Réalisé prouvé par l'accompagnateur
@@ -532,6 +703,7 @@ exports.getStats = async (req, res) => {
       caParStatut,
       top3CA,
       top4Emplois,
+      allEmplois,
       emploisStats,
       planActionStats,
       planActionList,

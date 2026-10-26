@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Building2, Wrench, BarChart3, UsersRound, ClipboardList, DollarSign, Camera, FileSpreadsheet, KeyRound, Mail, UserX, Clock, CheckCircle2, FileText, GraduationCap } from 'lucide-react';
 import api, { getPhotoUrl } from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -28,9 +28,18 @@ const TABS = [
 export default function ProfilIncube() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const [incube, setIncube] = useState(null);
-  const [activeTab, setActiveTab] = useState('infos');
+  const tabParam = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState(tabParam && TABS.some(t => t.key === tabParam) ? tabParam : 'infos');
+
+  useEffect(() => {
+    const t = searchParams.get('tab');
+    if (t && TABS.some(tab => tab.key === t)) {
+      setActiveTab(t);
+    }
+  }, [searchParams]);
   const [loading, setLoading] = useState(true);
   const [showFullDossierModal, setShowFullDossierModal] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
