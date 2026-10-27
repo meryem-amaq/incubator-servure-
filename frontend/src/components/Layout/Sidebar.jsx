@@ -63,11 +63,17 @@ export default function Sidebar({
   const cleanNom = (user?.nom || '').replace(/\bcgs\b/gi, '').trim();
   const userName = (cleanPrenom || cleanNom) 
     ? `${cleanPrenom} ${cleanNom}`.trim() 
-    : (user ? (isSuperAdmin ? 'Administrateur' : 'Utilisateur') : 'Utilisateur');
+    : (user ? (isSuperAdmin ? 'Super Admin' : (user.role === 'admin' || user.role === 'administrateur' ? 'Administrateur' : 'Utilisateur')) : 'Utilisateur');
   const isIncube = user?.role === 'incube';
-  const userRole = isSuperAdmin ? 'Super Admin' : isIncube ? 'Porteur de Projet' : 'Accompagnateur';
+  const userRole = isSuperAdmin 
+    ? 'Super Admin' 
+    : (user?.role === 'admin' || user?.role === 'administrateur') 
+      ? 'Administrateur' 
+      : isIncube 
+        ? 'Porteur de Projet' 
+        : 'Accompagnateur';
   const userPhoto = user?.photo_url ? getPhotoUrl(user.photo_url) : null;
-  const userInitials = (cleanPrenom?.[0] || '') + (cleanNom?.[0] || (!cleanPrenom ? (isSuperAdmin ? 'A' : 'U') : ''));
+  const userInitials = (cleanPrenom?.[0] || '') + (cleanNom?.[0] || (!cleanPrenom ? (isSuperAdmin ? 'SA' : 'U') : ''));
 
   return (
     <>

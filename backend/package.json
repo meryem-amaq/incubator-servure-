@@ -12,6 +12,8 @@
     "create-admin": "node database/create-admin.js",
     "test": "node tests/validation.test.js",
     "sync:cloud": "node full_sync_cloud_to_local.js",
+    "sync:whitelist": "node scripts/push-whitelist-to-cloud.js",
+    "sync:pull": "node scripts/pull-reservations-from-cloud.js",
     "dump:cloud": "node dump_aiven_to_sql.js",
     "check:sync": "node check_sync.js"
   },

@@ -67,7 +67,8 @@ app.use('/api/rapports', require('./routes/rapports'));
 // Service de synchronisation hybride (Local <-> Cloud Relay - actif uniquement si CLOUD_URL est défini)
 if (process.env.CLOUD_URL) {
   const syncService = require('./services/SyncService');
-  syncService.startCron(10);
+  const syncInterval = parseInt(process.env.SYNC_INTERVAL_MINUTES || '1', 10);
+  syncService.startCron(syncInterval);
 
   // Synchronisation automatique de la liste blanche (Incubés + Staff) vers Heroku au démarrage
   if (process.env.ACTIVER_SYNC_CLOUD === 'true') {

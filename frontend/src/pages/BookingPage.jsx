@@ -113,7 +113,7 @@ export default function BookingPage() {
     return d < today;
   };
 
-  const isRealSuperAdmin = isSuperAdmin || user?.role === 'super_admin' || user?.role === 'administrateur';
+  const isRealSuperAdmin = isSuperAdmin || user?.role === 'super_admin';
 
   // Liste enrichie des accompagnateurs disponibles pour le filtrage
   const accompagnateursOptions = useMemo(() => {

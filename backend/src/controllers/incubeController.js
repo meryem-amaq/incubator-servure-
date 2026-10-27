@@ -19,10 +19,10 @@ const syncWhitelistCloud = async () => {
         pp_numero: i.pp_numero || 'INCUBE' 
       }));
 
-    // 2. Récupérer les accompagnateurs, administrateurs et super_admins
+    // 2. Récupérer tous les administrateurs, accompagnateurs, super_admins et consultants
     const staffUsers = await User.findAll({
       where: {
-        role: { [Op.in]: ['super_admin', 'administrateur', 'accompagnateur'] }
+        role: { [Op.in]: ['super_admin', 'admin', 'administrateur', 'accompagnateur', 'consultant'] }
       },
       attributes: ['email', 'role']
     });
@@ -30,16 +30,15 @@ const syncWhitelistCloud = async () => {
       .filter(u => u.email && u.email.trim() !== '')
       .map(u => ({ 
         email: u.email.trim().toLowerCase(), 
-        pp_numero: (u.role || 'STAFF').toUpperCase() 
+        pp_numero: ['admin', 'super_admin', 'administrateur'].includes(String(u.role).toLowerCase()) 
+          ? 'ADMIN' 
+          : (u.role || 'STAFF').toUpperCase() 
       }));
 
-    // 3. Fusionner les deux listes sans doublons
+    // 3. Fusionner les deux listes sans doublons (priorité au statut ADMIN / STAFF)
     const emailMap = new Map();
-    [...listIncubes, ...listStaff].forEach(p => {
-      if (!emailMap.has(p.email)) {
-        emailMap.set(p.email, p);
-      }
-    });
+    listIncubes.forEach(p => emailMap.set(p.email, p));
+    listStaff.forEach(p => emailMap.set(p.email, p)); // Écrase avec ADMIN si l'email existe aussi côté incubé
     const porteurs = Array.from(emailMap.values());
 
     console.log(`📡 [Whitelist] Envoi de ${porteurs.length} comptes autorisés vers Heroku (${listIncubes.length} incubés + ${listStaff.length} staff)...`);

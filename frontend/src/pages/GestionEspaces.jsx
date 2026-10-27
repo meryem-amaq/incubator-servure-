@@ -29,7 +29,8 @@ import {
   Upload,
   Eye,
   Image as ImageIcon,
-  Bell
+  Bell,
+  RefreshCw
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import toast from 'react-hot-toast';
@@ -316,6 +317,27 @@ export default function GestionEspaces() {
       console.error('Erreur chargement réservations:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const [syncingCloud, setSyncingCloud] = useState(false);
+
+  // Forcer la synchronisation manuelle avec le Cloud Heroku
+  const handleManualSyncCloud = async () => {
+    setSyncingCloud(true);
+    try {
+      const res = await api.post('/sync/trigger');
+      if (res.data?.success) {
+        const count = res.data.result?.pulledReservations || 0;
+        toast.success(`Synchronisation réussie ! (${count} nouvelle(s) réservation(s))`, { icon: '🔄' });
+        await fetchReservations();
+      } else {
+        toast.error(res.data?.message || 'Erreur de synchronisation');
+      }
+    } catch (err) {
+      toast.error('Impossible de contacter le relais Cloud pour le moment');
+    } finally {
+      setSyncingCloud(false);
     }
   };
 
@@ -875,6 +897,18 @@ export default function GestionEspaces() {
               title="Exporter les réservations en fichier Excel (.xlsx)"
             >
               <span>📊 Exporter (.xlsx)</span>
+            </button>
+
+            {/* 4b. BOUTON SYNCHRONISER CLOUD HEROKU (INSTANTANÉ) */}
+            <button
+              type="button"
+              onClick={handleManualSyncCloud}
+              disabled={syncingCloud}
+              className="btn py-1.5 px-3 rounded-xl text-xs font-bold border border-blue-500/30 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/30 dark:hover:bg-blue-900/40 text-blue-800 dark:text-blue-300 flex items-center gap-1.5 shadow-xs cursor-pointer transition-all shrink-0"
+              title="Aspirer immédiatement les réservations effectuées sur le lien Heroku"
+            >
+              <RefreshCw size={13} className={syncingCloud ? 'animate-spin' : ''} />
+              <span>{syncingCloud ? 'Synchronisation...' : '🔄 Sync Cloud'}</span>
             </button>
 
             {/* 5. BOUTON NOUVELLE RÉSERVATION DIRECTE ADMIN */}
