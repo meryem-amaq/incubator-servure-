@@ -86,10 +86,13 @@ export function AuthProvider({ children }) {
     localStorage.setItem('cgs_user', JSON.stringify(updatedUser));
   };
 
-  const isSuperAdmin = ['super_admin', 'admin', 'administrateur', 'superadmin'].includes(user?.role);
+  const isSuperAdmin = ['super_admin', 'administrateur', 'superadmin'].includes(user?.role);
+  const isStaff = ['super_admin', 'admin', 'administrateur', 'superadmin', 'accompagnateur', 'gestionnaire', 'consultant'].includes(user?.role);
+  const isAdmin = isStaff; // Alias pour rétro-compatibilité
+  const isIncube = user?.role === 'incube' || user?.role === 'user';
 
   return (
-    <AuthContext.Provider value={{ user, isSuperAdmin, login, logout, loading, updateUser }}>
+    <AuthContext.Provider value={{ user, isSuperAdmin, isAdmin, isStaff, isIncube, login, logout, loading, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

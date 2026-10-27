@@ -136,7 +136,7 @@ exports.getAll = async (req, res) => {
 // GET /api/incubes/stats — Statistiques consolidées pour le Dashboard (Réservé au Super Admin)
 exports.getStats = async (req, res) => {
   try {
-    const isSuper = ['super_admin', 'admin', 'administrateur', 'superadmin'].includes(req.user.role);
+    const isSuper = ['super_admin', 'administrateur', 'superadmin'].includes(req.user.role);
     if (!isSuper) {
       return res.status(403).json({ message: 'Accès interdit : Les KPIs consolidés sont réservés au Super Administrateur' });
     }
@@ -1241,7 +1241,7 @@ exports.activerCompte = async (req, res) => {
     const incube = await Incube.findByPk(req.params.id);
     if (!incube) return res.status(404).json({ message: 'Incubé introuvable' });
 
-    const isSuper = ['super_admin', 'admin', 'administrateur', 'superadmin'].includes(req.user.role);
+    const isSuper = ['super_admin', 'administrateur', 'superadmin'].includes(req.user.role);
     if (!isSuper) {
       const isOwner = incube.admin_id === req.user.id ||
         (req.user.nom && incube.accompagnateur && incube.accompagnateur.toLowerCase().includes(req.user.nom.toLowerCase()));

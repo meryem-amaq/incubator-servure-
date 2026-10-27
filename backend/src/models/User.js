@@ -8,7 +8,7 @@ const User = sequelize.define('User', {
   email: { type: DataTypes.STRING(150), allowNull: false, unique: true },
   mot_de_passe: { type: DataTypes.STRING(255), allowNull: false },
   role: {
-    type: DataTypes.ENUM('super_admin', 'admin', 'administrateur', 'gestionnaire', 'consultant', 'incube'),
+    type: DataTypes.ENUM('super_admin', 'admin', 'administrateur', 'accompagnateur', 'gestionnaire', 'consultant', 'incube', 'user'),
     defaultValue: 'admin',
   },
   photo_url: { type: DataTypes.TEXT('medium'), allowNull: true },

@@ -16,6 +16,7 @@ import {
   Eye,
   EyeOff,
   Sparkles,
+  Pencil,
 } from 'lucide-react';
 import api, { getPhotoUrl } from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -36,6 +37,18 @@ export default function Utilisateurs() {
   });
   const [photoFile, setPhotoFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // État pour la modification d'un utilisateur par le Super Admin
+  const [editModalUser, setEditModalUser] = useState(null);
+  const [editForm, setEditForm] = useState({
+    nom: '',
+    prenom: '',
+    email: '',
+    role: 'admin',
+    actif: true,
+  });
+  const [editPhotoFile, setEditPhotoFile] = useState(null);
+  const [updating, setUpdating] = useState(false);
 
   // État pour la réinitialisation de mot de passe par le Super Admin
   const [resetModalUser, setResetModalUser] = useState(null);
@@ -92,6 +105,62 @@ export default function Utilisateurs() {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  const openEditModal = (targetUser) => {
+    setEditModalUser(targetUser);
+    const normalizedRole = ['super_admin', 'administrateur', 'superadmin'].includes(targetUser.role)
+      ? 'super_admin'
+      : (targetUser.role === 'incube' || targetUser.role === 'user')
+        ? 'incube'
+        : 'admin';
+    setEditForm({
+      nom: targetUser.nom || '',
+      prenom: targetUser.prenom || '',
+      email: targetUser.email || '',
+      role: normalizedRole,
+      actif: targetUser.actif ?? true,
+    });
+    setEditPhotoFile(null);
+  };
+
+  const handleUpdateUser = async (e) => {
+    e.preventDefault();
+    if (!editModalUser) return;
+    setUpdating(true);
+    try {
+      const formData = new FormData();
+      formData.append('nom', editForm.nom);
+      formData.append('prenom', editForm.prenom);
+      formData.append('email', editForm.email);
+      formData.append('role', editForm.role);
+      formData.append('actif', editForm.actif);
+      if (editPhotoFile) {
+        formData.append('photo', editPhotoFile);
+      }
+
+      const token = localStorage.getItem('cgs_token');
+      const res = await fetch(import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/users/${editModalUser.id}` : `/api/users/${editModalUser.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Erreur lors de la mise à jour');
+      }
+
+      toast.success('Compte utilisateur mis à jour avec succès');
+      setEditModalUser(null);
+      fetchUsers();
+    } catch (err) {
+      toast.error(err.message || 'Erreur lors de la mise à jour');
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -259,16 +328,16 @@ export default function Utilisateurs() {
                       <td className="p-4 text-slate-600 dark:text-dark-300 font-mono text-[11px]">{item.email}</td>
                       <td className="p-4">
                         {isSuper ? (
-                          <span className="px-2 py-1 text-[10px] font-bold rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                            Super Admin
+                          <span className="px-2 py-1 text-[10px] font-bold rounded-md bg-amber-500/15 text-amber-500 dark:text-amber-300 border border-amber-500/30 flex items-center gap-1 w-fit">
+                            <ShieldCheck size={12} /> Super Admin
                           </span>
-                        ) : item.role === 'admin' ? (
-                          <span className="px-2 py-1 text-[10px] font-semibold rounded-md bg-navy-500/15 text-navy-600 dark:text-navy-300 border border-navy-500/30">
+                        ) : ['admin', 'accompagnateur', 'gestionnaire', 'consultant'].includes(item.role) ? (
+                          <span className="px-2 py-1 text-[10px] font-semibold rounded-md bg-navy-500/15 text-navy-600 dark:text-navy-300 border border-navy-500/30 w-fit block">
                             Accompagnateur
                           </span>
                         ) : (
-                          <span className="px-2 py-1 text-[10px] font-semibold rounded-md bg-slate-500/15 text-slate-600 dark:text-slate-300 border border-slate-500/30">
-                            Incubé
+                          <span className="px-2 py-1 text-[10px] font-semibold rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30 w-fit block">
+                            Porteur Projet (Incubé)
                           </span>
                         )}
                       </td>
@@ -289,7 +358,14 @@ export default function Utilisateurs() {
                         )}
                       </td>
                       <td className="p-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => openEditModal(item)}
+                            className="p-1.5 rounded-lg border border-slate-300 dark:border-dark-600 text-slate-600 dark:text-dark-200 hover:bg-slate-100 dark:hover:bg-dark-700 hover:text-primary-500 transition-all"
+                            title="Modifier les informations ou le rôle"
+                          >
+                            <Pencil size={15} />
+                          </button>
                           <button
                             onClick={() => {
                               setResetModalUser(item);
@@ -411,9 +487,9 @@ export default function Utilisateurs() {
                   onChange={(e) => setForm({ ...form, role: e.target.value })}
                   className="w-full bg-slate-50 dark:bg-dark-800 border border-slate-200 dark:border-dark-700 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-primary-500"
                 >
-                  <option value="admin">Accompagnateur / Formateur (Admin)</option>
-                  <option value="super_admin">Super Administrateur / Directeur (Super Admin)</option>
-                  <option value="user">Incubé</option>
+                  <option value="super_admin">Super Administrateur / Direction (Super Admin)</option>
+                  <option value="admin">Accompagnateur / Coach / Formateur (Admin)</option>
+                  <option value="incube">Porteur de Projet (Incubé)</option>
                 </select>
               </div>
 
@@ -534,6 +610,121 @@ export default function Utilisateurs() {
                   className="btn btn-primary btn-sm text-xs font-bold flex items-center gap-1.5 shadow-md shadow-primary-500/20"
                 >
                   {resettingPassword ? 'Enregistrement...' : 'Enregistrer le mot de passe'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal Modifier un utilisateur */}
+      {editModalUser && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-navy-950/60 dark:bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="card w-full max-w-md p-6 bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-dark-700 pb-4 mb-5">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                <Pencil size={18} className="text-primary-600 dark:text-primary-400" />
+                Modifier l'utilisateur
+              </h2>
+              <button
+                onClick={() => setEditModalUser(null)}
+                className="text-slate-500 dark:text-dark-400 hover:text-slate-900 dark:hover:text-white"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateUser} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="form-group">
+                  <label className="text-xs font-semibold text-slate-600 dark:text-dark-300">Prénom *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.prenom}
+                    onChange={(e) => setEditForm({ ...editForm, prenom: e.target.value })}
+                    className="w-full bg-slate-50 dark:bg-dark-800 border border-slate-200 dark:border-dark-700 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-primary-500"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="text-xs font-semibold text-slate-600 dark:text-dark-300">Nom *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.nom}
+                    onChange={(e) => setEditForm({ ...editForm, nom: e.target.value })}
+                    className="w-full bg-slate-50 dark:bg-dark-800 border border-slate-200 dark:border-dark-700 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-primary-500"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="text-xs font-semibold text-slate-600 dark:text-dark-300">Adresse e-mail *</label>
+                <div className="relative">
+                  <Mail size={14} className="absolute left-3 top-3 text-slate-400 dark:text-dark-400" />
+                  <input
+                    type="email"
+                    required
+                    value={editForm.email}
+                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    className="w-full bg-slate-50 dark:bg-dark-800 border border-slate-200 dark:border-dark-700 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-primary-500"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="text-xs font-semibold text-slate-600 dark:text-dark-300">Rôle attribué *</label>
+                <select
+                  value={editForm.role}
+                  onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                  className="w-full bg-slate-50 dark:bg-dark-800 border border-slate-200 dark:border-dark-700 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white font-medium focus:outline-none focus:border-primary-500"
+                >
+                  <option value="super_admin">👑 Super Administrateur / Direction (Super Admin)</option>
+                  <option value="admin">🧑‍🏫 Accompagnateur / Coach / Staff (Admin)</option>
+                  <option value="incube">🚀 Porteur de Projet (Incubé)</option>
+                </select>
+                <p className="text-[11px] text-slate-500 dark:text-dark-400 mt-1">
+                  Détermine précisément les accès et autorisations de cet utilisateur sur la plateforme.
+                </p>
+              </div>
+
+              <div className="form-group">
+                <label className="text-xs font-semibold text-slate-600 dark:text-dark-300">Statut du compte</label>
+                <select
+                  value={editForm.actif ? 'true' : 'false'}
+                  onChange={(e) => setEditForm({ ...editForm, actif: e.target.value === 'true' })}
+                  className="w-full bg-slate-50 dark:bg-dark-800 border border-slate-200 dark:border-dark-700 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-primary-500"
+                >
+                  <option value="true">Actif</option>
+                  <option value="false">Suspendu</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="text-xs font-semibold text-slate-600 dark:text-dark-300">Changer la photo de profil</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setEditPhotoFile(e.target.files[0])}
+                  className="w-full bg-slate-50 dark:bg-dark-800 border border-slate-200 dark:border-dark-700 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:bg-primary-500 file:text-navy-950 hover:file:bg-primary-600"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-dark-700">
+                <button
+                  type="button"
+                  onClick={() => setEditModalUser(null)}
+                  className="btn btn-secondary text-xs"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={updating}
+                  className="btn btn-primary text-xs flex items-center gap-2 font-bold"
+                >
+                  {updating ? 'Enregistrement...' : 'Enregistrer les modifications'}
                 </button>
               </div>
             </form>

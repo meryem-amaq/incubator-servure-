@@ -7,6 +7,8 @@ const userCtrl = require('../controllers/userController');
 const upload = require('../middleware/upload');
 const tourniquetService = require('../services/tourniquetService');
 
+const requireStaff = require('../middleware/requireStaff');
+
 // GET /api/users/activite?type=Formation : Historique et total d'accès pour les catégories hors-incubés
 router.get('/activite', auth, async (req, res) => {
   try {
@@ -19,12 +21,14 @@ router.get('/activite', auth, async (req, res) => {
   }
 });
 
-// Toutes les routes utilisateurs d'administration nécessitent d'être Super Admin
+// GET /api/users/admins : Liste simplifiée des accompagnateurs pour les listes déroulantes (Staff)
+router.get('/admins', auth, requireStaff, userCtrl.getAdmins);
+
+// Toutes les autres routes utilisateurs d'administration nécessitent d'être Super Admin
 router.use(auth);
 router.use(isSuperAdmin);
 
 router.get('/', userCtrl.getAll);
-router.get('/admins', userCtrl.getAdmins);
 router.post('/', upload.single('photo'), userCtrl.create);
 router.put('/:id', upload.single('photo'), userCtrl.update);
 router.post('/:id/reset-password', userCtrl.resetPasswordByAdmin);

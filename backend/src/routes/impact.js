@@ -1,14 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const isSuperAdmin = require('../middleware/isSuperAdmin');
 const { PresenceAtelier, ReservationEspace, EquipementEspace, Incube, Atelier, sequelize } = require('../models');
 const { Op } = require('sequelize');
 
 /**
  * GET /api/impact/stats
- * Statistiques d'assiduité, d'occupation des espaces et de santé du parc matériel
+ * Statistiques d'assiduité, d'occupation des espaces et de santé du parc matériel (Super Admin)
  */
-router.get('/stats', auth, async (req, res) => {
+router.get('/stats', auth, isSuperAdmin, async (req, res) => {
   try {
     const { promotion } = req.query;
     const whereIncube = {};

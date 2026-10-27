@@ -118,7 +118,14 @@ exports.create = async (req, res) => {
     }
 
     const hash = await bcrypt.hash(mot_de_passe, 12);
-    const userRole = role === 'super_admin' ? 'super_admin' : (role === 'user' || role === 'incube' ? role : 'admin');
+    let userRole = 'admin';
+    if (['super_admin', 'administrateur', 'superadmin'].includes(role)) {
+      userRole = 'super_admin';
+    } else if (['incube', 'user'].includes(role)) {
+      userRole = 'incube';
+    } else {
+      userRole = 'admin';
+    }
 
     const photo_url = req.file 
       ? `data:${req.file.mimetype || 'image/jpeg'};base64,${req.file.buffer.toString('base64')}` 
@@ -168,7 +175,15 @@ exports.update = async (req, res) => {
 
     if (nom) user.nom = nom;
     if (prenom) user.prenom = prenom;
-    if (role) user.role = role;
+    if (role) {
+      if (['super_admin', 'administrateur', 'superadmin'].includes(role)) {
+        user.role = 'super_admin';
+      } else if (['incube', 'user'].includes(role)) {
+        user.role = 'incube';
+      } else {
+        user.role = 'admin';
+      }
+    }
     if (actif !== undefined) user.actif = actif;
 
     if (mot_de_passe && mot_de_passe.trim().length >= 6) {
