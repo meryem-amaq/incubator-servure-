@@ -8,6 +8,10 @@ const SuiviEngagement = sequelize.define('SuiviEngagement', {
   annee: { type: DataTypes.INTEGER },
   moyenne_heures_presence: { type: DataTypes.FLOAT },
   taux_presence_formation: { type: DataTypes.FLOAT },
+  heures_ateliers: { type: DataTypes.FLOAT, defaultValue: 0 },
+  nb_ateliers: { type: DataTypes.INTEGER, defaultValue: 0 },
+  heures_ateliers_animes: { type: DataTypes.FLOAT, defaultValue: 0 },
+  nb_ateliers_animes: { type: DataTypes.INTEGER, defaultValue: 0 },
   initiatives: { type: DataTypes.TEXT },
   observations: { type: DataTypes.TEXT },
 }, { tableName: 'suivi_engagement' });

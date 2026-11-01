@@ -340,15 +340,18 @@ async function syncIncubeTourniquet(incubeId, annee = new Date().getFullYear()) 
 
   // 2. Trouver l'identifiant badge de l'incubé
   const badgeId = await findBadgeForIncube(incube);
-  const hasBadge = Boolean(badgeId);
+  const hasBadge = Boolean(badgeId || incube.matricule);
 
-  // 3. Récupérer les pointages en BDD
+  // 3. Récupérer les pointages en BDD (recherche par badge RFID, matricule machine ou user_id)
   const whereClause = {
     [Op.or]: []
   };
 
   if (badgeId) {
-    whereClause[Op.or].push({ raw_badge_id: badgeId });
+    whereClause[Op.or].push({ raw_badge_id: String(badgeId).trim() });
+  }
+  if (incube.matricule) {
+    whereClause[Op.or].push({ raw_badge_id: String(incube.matricule).trim() });
   }
   if (incube.user_id) {
     whereClause[Op.or].push({ user_id: incube.user_id });
@@ -580,6 +583,218 @@ async function getActivityByType(userType = 'Formation', startDate = null, endDa
   };
 }
 
+
+/**
+ * Encode un utilisateur au format 72 octets requis par les terminaux ZKTeco F18
+ */
+function encodeUser72(uid, userId, name, cardno = 0, password = '', role = 0) {
+  const buf = Buffer.alloc(72, 0);
+  buf.writeUInt16LE(Number(uid) || 1, 0);
+  buf.writeUInt8(Number(role) || 0, 2);
+  if (password) buf.write(String(password).slice(0, 8), 3, 'ascii');
+  if (name) buf.write(String(name).slice(0, 24), 11, 'ascii');
+  const cardInt = parseInt(cardno, 10);
+  if (!isNaN(cardInt) && cardInt > 0) {
+    buf.writeUInt32LE(cardInt, 35);
+  }
+  if (userId) buf.write(String(userId).slice(0, 24), 48, 'ascii');
+  return buf;
+}
+
+/**
+ * Calculer le prochain numéro de matricule libre
+ */
+async function getNextAvailableMatricule() {
+  const { sequelize } = require('../models');
+  const [incubeMax] = await sequelize.query('SELECT MAX(matricule) as m FROM incubes');
+  const [rhMax] = await sequelize.query('SELECT MAX(matricule) as m FROM rh_detail');
+  
+  const m1 = incubeMax?.[0]?.m ? parseInt(incubeMax[0].m, 10) : 0;
+  const m2 = rhMax?.[0]?.m ? parseInt(rhMax[0].m, 10) : 0;
+  
+  const currentMax = Math.max(m1, m2);
+  return currentMax >= 112 ? currentMax + 1 : 112;
+}
+
+/**
+ * Vérifier l'unicité d'un badge RFID à travers toute la base de données
+ */
+async function checkBadgeRfidUniqueness(badgeId, options = {}) {
+  if (!badgeId) return { isUnique: true };
+  const cleanBadge = String(badgeId).trim();
+  if (!cleanBadge) return { isUnique: true };
+
+  const { excludeIncubeId = null, excludeRhId = null, excludeUserId = null } = options;
+  const { Incube, RhDetail, User } = require('../models');
+
+  // 1. incubes
+  const whereIncube = { badge_id: cleanBadge };
+  if (excludeIncubeId) whereIncube.id = { [Op.ne]: excludeIncubeId };
+  const existingIncube = await Incube.findOne({ where: whereIncube });
+  if (existingIncube) {
+    return {
+      isUnique: false,
+      conflictType: 'Porteur de Projet (Startup)',
+      conflictName: existingIncube.nom_incube,
+      conflictEntity: existingIncube.raison_sociale || 'Startup'
+    };
+  }
+
+  // 2. rh_detail
+  const whereRh = { badge_id: cleanBadge };
+  if (excludeRhId) whereRh.id = { [Op.ne]: excludeRhId };
+  const existingRh = await RhDetail.findOne({ 
+    where: whereRh,
+    include: [{ model: Incube, as: 'incube', attributes: ['id', 'nom_incube', 'raison_sociale'] }]
+  });
+  if (existingRh) {
+    return {
+      isUnique: false,
+      conflictType: 'Salarié Staff Startup',
+      conflictName: existingRh.nom_complet,
+      conflictEntity: existingRh.incube?.raison_sociale || 'Startup'
+    };
+  }
+
+  // 3. users (staff interne)
+  const whereUser = { badge_id: cleanBadge };
+  if (excludeUserId) whereUser.id = { [Op.ne]: excludeUserId };
+  const existingUser = await User.findOne({ where: whereUser });
+  if (existingUser) {
+    return {
+      isUnique: false,
+      conflictType: 'Utilisateur Plateforme',
+      conflictName: `${existingUser.prenom} ${existingUser.nom}`,
+      conflictEntity: existingUser.role
+    };
+  }
+
+  return { isUnique: true };
+}
+
+/**
+ * Diffusion instantanée d'un utilisateur vers les 7 Tourniquets F18
+ */
+async function broadcastUserToTurnstiles({ matricule, name, cardno, role = 0, type = 'Incube' }) {
+  const ips = getDeviceIps();
+  const uid = parseInt(matricule, 10) || 1;
+  const userId = String(matricule);
+  const cardInt = parseInt(cardno, 10) || 0;
+  const cleanName = String(name || '').trim().slice(0, 24);
+
+  const results = {
+    matricule: uid,
+    name: cleanName,
+    cardno: cardInt,
+    totalDevices: ips.length,
+    successfulDevices: [],
+    failedDevices: []
+  };
+
+  // 1. Mettre à jour le cache MySQL TourniquetUser
+  try {
+    const { TourniquetUser } = require('../models');
+    await TourniquetUser.upsert({
+      badge_id: String(uid),
+      name: cleanName,
+      cardno: cardInt > 0 ? String(cardInt) : null,
+      type: type || 'Incube',
+      device_ip: ips[0]
+    });
+  } catch (err) {
+    console.error('Erreur upsert TourniquetUser:', err.message);
+  }
+
+  // 2. Diffusion parallèle vers les 7 bornes physiques F18
+  const userBuf = encodeUser72(uid, userId, cleanName, cardInt, '', role);
+  const CMD_USER_WRQ = 8;
+  const CMD_REFRESHDATA = 1013;
+
+  const pushPromises = ips.map(async (ip) => {
+    let zk = null;
+    try {
+      zk = await connectToDevice(ip);
+      await zk.executeCmd(CMD_USER_WRQ, userBuf);
+      await zk.executeCmd(CMD_REFRESHDATA, '');
+      await zk.disconnect().catch(() => {});
+      results.successfulDevices.push(ip);
+      return { ip, success: true };
+    } catch (err) {
+      if (zk) await zk.disconnect().catch(() => {});
+      results.failedDevices.push({ ip, error: err.message });
+      return { ip, success: false, error: err.message };
+    }
+  });
+
+  await Promise.allSettled(pushPromises);
+
+  console.log(`📡 [F18 Broadcast] Diffusion de l'usager #${uid} (${cleanName}, Badge: ${cardInt}) : ${results.successfulDevices.length}/${ips.length} bornes connectées.`);
+
+  return results;
+}
+
+/**
+ * Ré-injecter en masse tous les incubés, salariés RH et admins ayant un badge RFID
+ * vers les 7 Tourniquets F18 pour forcer l'écrasement de tous les anciens noms physiques.
+ */
+async function resyncAllBadgeHoldersToTurnstiles() {
+  const { Incube, RhDetail, User } = require('../models');
+  const [incubes, staff, users] = await Promise.all([
+    Incube.findAll({ where: { badge_id: { [Op.ne]: null } } }),
+    RhDetail.findAll({ where: { badge_id: { [Op.ne]: null } } }),
+    User.findAll({ where: { badge_id: { [Op.ne]: null } } })
+  ]);
+
+  const allToSync = [];
+
+  for (const inc of incubes) {
+    if (!inc.matricule) {
+      inc.matricule = await getNextAvailableMatricule();
+      await inc.save();
+    }
+    allToSync.push({
+      matricule: inc.matricule,
+      name: inc.nom_incube,
+      cardno: inc.badge_id,
+      type: 'Incube'
+    });
+  }
+
+  for (const s of staff) {
+    if (!s.matricule) {
+      s.matricule = await getNextAvailableMatricule();
+      await s.save();
+    }
+    allToSync.push({
+      matricule: s.matricule,
+      name: s.nom_complet,
+      cardno: s.badge_id,
+      type: 'Incube'
+    });
+  }
+
+  for (const u of users) {
+    allToSync.push({
+      matricule: u.id,
+      name: `${u.prenom || ''} ${u.nom || ''}`.trim() || 'Admin',
+      cardno: u.badge_id,
+      type: u.type || 'Administration'
+    });
+  }
+
+  let successCount = 0;
+  for (const item of allToSync) {
+    try {
+      await broadcastUserToTurnstiles(item);
+      successCount++;
+    } catch (e) {
+      console.warn(`⚠️ Échec sync usager #${item.matricule} (${item.name}):`, e.message);
+    }
+  }
+
+  return { total: allToSync.length, successCount };
+}
+
 module.exports = {
   fetchFromAllDevices,
   findBadgeForIncube,
@@ -588,5 +803,10 @@ module.exports = {
   syncIncubeTourniquet,
   getLivePresence,
   getActivityByType,
+  encodeUser72,
+  getNextAvailableMatricule,
+  checkBadgeRfidUniqueness,
+  broadcastUserToTurnstiles,
+  resyncAllBadgeHoldersToTurnstiles,
   MOIS_NOMS
 };

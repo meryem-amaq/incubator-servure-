@@ -13,8 +13,7 @@ import {
   History,
   CalendarDays,
   ExternalLink,
-  Download,
-  Trash2,
+    Trash2,
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
@@ -28,7 +27,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
-import { generateGoogleCalendarUrl, downloadIcsFile } from '../utils/calendarHelper';
+import { generateGoogleCalendarUrl } from '../utils/calendarHelper';
 
 const JOURS_SEMAINE = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 const MOIS_NOMS = [
@@ -578,7 +577,7 @@ export default function BookingPage() {
 
       {/* 1. BARRE DE NAVIGATION DU MOIS (AFFICHÉE EN HAUT POUR L'ONGLET CALENDRIER) */}
       {activeTab === 'calendrier' && (
-        <div className="flex items-center justify-between bg-slate-50 dark:bg-dark-800/60 p-3.5 rounded-2xl border border-slate-200 dark:border-dark-700">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50 dark:bg-dark-800/60 p-3 sm:p-3.5 rounded-2xl border border-slate-200 dark:border-dark-700">
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrevMonth}
@@ -586,7 +585,7 @@ export default function BookingPage() {
             >
               <ChevronLeft size={20} />
             </button>
-            <h3 className="text-lg font-black text-slate-900 dark:text-white capitalize min-w-[200px] text-center">
+            <h3 className="text-lg font-black text-slate-900 dark:text-white capitalize min-w-0 sm:min-w-[180px] text-center">
               {MOIS_NOMS[calendarMonth]} {calendarYear}
             </h3>
             <button
@@ -1245,8 +1244,7 @@ export default function BookingPage() {
           <div className="flex items-center gap-1.5">
             {/* BOUTON GOOGLE CALENDAR DIRECT */}
             {rdv.type === 'rendezvous' && gcalUrl && (
-              <>
-                <a
+              <a
                   href={gcalUrl}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -1257,16 +1255,6 @@ export default function BookingPage() {
                   <span>Google Calendar</span>
                   <ExternalLink size={10} className="opacity-70" />
                 </a>
-
-                <button
-                  type="button"
-                  onClick={() => downloadIcsFile(rdv.originalData)}
-                  className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-dark-700 text-slate-500 hover:text-slate-900"
-                  title="Télécharger fichier .ICS (Outlook, Apple Calendar)"
-                >
-                  <Download size={13} />
-                </button>
-              </>
             )}
           </div>
 

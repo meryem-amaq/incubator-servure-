@@ -237,6 +237,12 @@ router.put('/:id/valider', auth, requireStaff, async (req, res) => {
     }
     await reservation.save();
 
+    // Synchronisation immédiate du changement de statut vers le Cloud (libération ou confirmation de créneau)
+    try {
+      const syncService = require('../services/SyncService');
+      syncService.pushLocalReservationsToCloud().catch(() => {});
+    } catch (_) {}
+
     // NOUVEAU: Générer la checklist matériel si la réservation est validée
     if (statut === 'valide') {
       const { EquipementEspace, ChecklistMateriel } = require('../models');
@@ -440,6 +446,12 @@ router.post('/directe', auth, requireStaff, async (req, res) => {
     } catch (checklistErr) {
       console.warn('Checklist non générée:', checklistErr.message);
     }
+
+    // Synchronisation immédiate vers le Cloud pour bloquer le créneau sur le QR code en ligne
+    try {
+      const syncService = require('../services/SyncService');
+      syncService.pushLocalReservationsToCloud().catch(() => {});
+    } catch (_) {}
 
     res.status(201).json({
       success: true,

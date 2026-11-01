@@ -921,11 +921,37 @@ exports.create = async (req, res) => {
     delete data.photo;
     delete data.password;
 
+    // --- Validation Badge RFID & Auto-attribution Matricule (Étape 1 : Création Startup) ---
+    if (data.badge_id && String(data.badge_id).trim()) {
+      data.badge_id = String(data.badge_id).trim();
+      const rfidCheck = await tourniquetService.checkBadgeRfidUniqueness(data.badge_id);
+      if (!rfidCheck.isUnique) {
+        await t.rollback();
+        return res.status(400).json({
+          message: `Le badge RFID (${data.badge_id}) est déjà attribué à ${rfidCheck.conflictName} (${rfidCheck.conflictType} - ${rfidCheck.conflictEntity}).`
+        });
+      }
+    }
+
+    if (!data.matricule) {
+      data.matricule = await tourniquetService.getNextAvailableMatricule();
+    }
+
     // --- Création de l'Incube avec user_id lié — tout dans la même transaction ---
     const incube = await Incube.create(data, { transaction: t });
 
     // --- Commit atomique : User + Incube créés ensemble ou annulés ensemble ---
     await t.commit();
+
+    // Diffusion instantanée vers les 7 Tourniquets F18 si badge RFID renseigné
+    if (incube.badge_id) {
+      tourniquetService.broadcastUserToTurnstiles({
+        matricule: incube.matricule,
+        name: incube.nom_incube,
+        cardno: incube.badge_id,
+        type: 'Incube'
+      }).catch(err => console.error('Erreur diffusion tourniquet F18:', err.message));
+    }
 
     console.log(`✅ Incubé créé : ${incube.nom_incube} (id=${incube.id}, user_id=${incube.user_id ?? 'aucun'})`);
 
@@ -1103,11 +1129,39 @@ exports.update = async (req, res) => {
     delete data.finances;
     delete data.accompagnateurAdmin;
 
+    // Validation Badge RFID & Auto-attribution Matricule
+    if (data.badge_id && String(data.badge_id).trim()) {
+      data.badge_id = String(data.badge_id).trim();
+      if (data.badge_id !== incube.badge_id) {
+        const rfidCheck = await tourniquetService.checkBadgeRfidUniqueness(data.badge_id, { excludeIncubeId: incube.id });
+        if (!rfidCheck.isUnique) {
+          return res.status(400).json({
+            message: `Le badge RFID (${data.badge_id}) est déjà attribué à ${rfidCheck.conflictName} (${rfidCheck.conflictType} - ${rfidCheck.conflictEntity}).`
+          });
+        }
+      }
+      if (!incube.matricule && !data.matricule) {
+        data.matricule = await tourniquetService.getNextAvailableMatricule();
+      }
+    } else if (data.badge_id === '' || data.badge_id === null) {
+      data.badge_id = null;
+    }
+
     // Enregistrer l'ancienne phase et ancien statut pour comparaison
     const oldPhase = incube.phase_projet;
     const oldStatut = incube.statut_juridique;
 
     await incube.update(data);
+
+    // Diffusion vers les 7 Tourniquets F18 si badge renseigné
+    if (incube.badge_id) {
+      tourniquetService.broadcastUserToTurnstiles({
+        matricule: incube.matricule,
+        name: incube.nom_incube,
+        cardno: incube.badge_id,
+        type: 'Incube'
+      }).catch(err => console.error('Erreur diffusion tourniquet F18:', err.message));
+    }
 
     // Historiser si la phase a changé
     if (data.phase_projet && data.phase_projet !== oldPhase) {
@@ -1228,6 +1282,31 @@ exports.syncTourniquet = async (req, res) => {
   } catch (err) {
     console.error('Erreur syncTourniquet:', err);
     res.status(500).json({ message: "Erreur lors de la synchronisation des tourniquets", error: err.message });
+  }
+};
+
+// POST /api/incubes/:id/broadcast-rfid — Diffuser explicitement le badge de l'incubé vers les 7 Tourniquets F18
+exports.broadcastRfid = async (req, res) => {
+  try {
+    const incube = await Incube.findByPk(req.params.id);
+    if (!incube) return res.status(404).json({ message: 'Incubé introuvable' });
+    if (!incube.badge_id) {
+      return res.status(400).json({ message: "Aucun badge RFID n'est attribué à cet incubé" });
+    }
+    const results = await tourniquetService.broadcastUserToTurnstiles({
+      matricule: incube.matricule,
+      name: incube.nom_incube,
+      cardno: incube.badge_id,
+      type: 'Incube'
+    });
+    res.json({
+      success: true,
+      message: `Badge RFID #${incube.badge_id} (Matricule #${incube.matricule}) diffusé sur les 7 Tourniquets F18 !`,
+      results
+    });
+  } catch (err) {
+    console.error('Erreur broadcastRfid:', err);
+    res.status(500).json({ message: "Erreur lors de la diffusion vers les tourniquets", error: err.message });
   }
 };
 

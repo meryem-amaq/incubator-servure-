@@ -145,7 +145,7 @@ export default function Top4EmploisTreemap({
     <div className={`card p-5 flex flex-col justify-between min-w-0 hover:border-emerald-500/40 transition-all ${className}`}>
       
       {/* 1. EN-TÊTE : Titre cliquable + Bouton Voir par incubé + Total */}
-      <div className="flex justify-between items-start mb-3">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 mb-3">
         <button
           type="button"
           onClick={() => {

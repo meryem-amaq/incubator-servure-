@@ -137,7 +137,7 @@ export default function NiveauEtudeChart({ stats, isDark = false, className = ''
   return (
     <div className={`card p-5 flex flex-col justify-between h-auto min-h-[340px] min-w-0 hover:border-primary-500/40 transition-all shadow-sm ${className}`}>
       {/* En-tête : Titre & Badge Total */}
-      <div className="flex items-center justify-between gap-2 mb-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
         <div>
           <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-1.5">
             <span>🎓</span>

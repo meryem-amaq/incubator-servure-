@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, UserCheck, ShieldAlert, ArrowRightLeft, Camera, Upload, X, FileSpreadsheet, GraduationCap, Plus, Eye } from 'lucide-react';
+import { Save, UserCheck, Radio, ShieldCheck, ShieldAlert, ArrowRightLeft, Camera, Upload, X, FileSpreadsheet, GraduationCap, Plus, Eye } from 'lucide-react';
 import api, { getPhotoUrl } from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import ExcelImportModal from '../common/ExcelImportModal';
@@ -273,7 +273,7 @@ export default function TabInfos({ incube, onUpdate }) {
       {isSuperAdmin && (
         <div className="card p-5 border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-slate-50 dark:from-amber-500/5 dark:via-dark-800/80 dark:to-dark-900/90 shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-3 min-w-0 flex-1">
               <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-500 dark:text-amber-400 shrink-0 mt-0.5">
                 <ArrowRightLeft size={20} />
               </div>

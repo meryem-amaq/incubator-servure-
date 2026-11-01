@@ -81,6 +81,10 @@ ChecklistMateriel.belongsTo(EquipementEspace, { foreignKey: 'equipement_id', as:
 ReservationEspace.hasMany(ChecklistMateriel, { foreignKey: 'reservation_id', as: 'checklists' });
 EquipementEspace.hasMany(ChecklistMateriel, { foreignKey: 'equipement_id', as: 'checklists' });
 
+// === Associations : Atelier & Incube (Animateur) ===
+Atelier.belongsTo(Incube, { foreignKey: 'animateur_incube_id', as: 'animateurIncube' });
+Incube.hasMany(Atelier, { foreignKey: 'animateur_incube_id', as: 'ateliersAnimes' });
+
 module.exports = {
   sequelize,
   User,

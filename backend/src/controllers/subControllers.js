@@ -1,3 +1,4 @@
+const tourniquetService = require('../services/tourniquetService');
 const { Incube, GestionMateriel, SuiviEngagement, RhEmploi, RhDetail, PlanAction, AnalyseFinanciere, FicheSuivi, Formation, HistoriquePhase, HistoriqueStatut, sequelize } = require('../models');
 const { Op } = require('sequelize');
 
@@ -69,12 +70,45 @@ function createSubController(Model, modelName) {
           }
         }
 
+        // Validation Badge RFID, Auto-attribution Matricule & Dates pour le personnel RH (Staff Startup)
+        if (Model === RhDetail) {
+          if (!req.body.date_fin || String(req.body.date_fin).trim() === '') {
+            req.body.date_fin = null;
+          }
+          if (!req.body.date_embauche || String(req.body.date_embauche).trim() === '') {
+            req.body.date_embauche = null;
+          }
+          if (req.body.badge_id && String(req.body.badge_id).trim()) {
+            const trimmedBadge = String(req.body.badge_id).trim();
+            const rfidCheck = await tourniquetService.checkBadgeRfidUniqueness(trimmedBadge);
+            if (!rfidCheck.isUnique) {
+              return res.status(400).json({
+                message: `Le badge RFID (${trimmedBadge}) est déjà attribué à ${rfidCheck.conflictName} (${rfidCheck.conflictType} - ${rfidCheck.conflictEntity}).`
+              });
+            }
+            req.body.badge_id = trimmedBadge;
+          }
+          if (!req.body.matricule) {
+            req.body.matricule = await tourniquetService.getNextAvailableMatricule();
+          }
+        }
+
         const createData = { ...req.body, incube_id: req.params.incubeId };
         if (Model === SuiviEngagement && !req.body._forceTourniquetSync) {
           delete createData.moyenne_heures_presence;
         }
 
         const item = await Model.create(createData);
+
+        // Diffusion instantanée vers les 7 Tourniquets F18 si badge RFID renseigné
+        if (Model === RhDetail && item.badge_id) {
+          tourniquetService.broadcastUserToTurnstiles({
+            matricule: item.matricule,
+            name: item.nom_complet,
+            cardno: item.badge_id,
+            type: 'Incube'
+          }).catch(err => console.error('Erreur diffusion tourniquet F18 pour salarié RH:', err.message));
+        }
         if (Model === FicheSuivi && item.rendezvous_id) {
           try {
             const { RendezVous } = require('../models');
@@ -140,6 +174,31 @@ function createSubController(Model, modelName) {
         const item = await Model.findByPk(req.params.id);
         if (!item) return res.status(404).json({ message: `${modelName} non trouvé` });
 
+        // Validation Badge RFID, Matricule & Dates pour le personnel RH (Staff Startup)
+        if (Model === RhDetail) {
+          if (!req.body.date_fin || String(req.body.date_fin).trim() === '') {
+            req.body.date_fin = null;
+          }
+          if (!req.body.date_embauche || String(req.body.date_embauche).trim() === '') {
+            req.body.date_embauche = null;
+          }
+          if (req.body.badge_id && String(req.body.badge_id).trim()) {
+            const trimmedBadge = String(req.body.badge_id).trim();
+            if (trimmedBadge !== item.badge_id) {
+              const rfidCheck = await tourniquetService.checkBadgeRfidUniqueness(trimmedBadge, { excludeRhId: item.id });
+              if (!rfidCheck.isUnique) {
+                return res.status(400).json({
+                  message: `Le badge RFID (${trimmedBadge}) est déjà attribué à ${rfidCheck.conflictName} (${rfidCheck.conflictType} - ${rfidCheck.conflictEntity}).`
+                });
+              }
+            }
+            req.body.badge_id = trimmedBadge;
+          }
+          if (!item.matricule && !req.body.matricule) {
+            req.body.matricule = await tourniquetService.getNextAvailableMatricule();
+          }
+        }
+
         // Unicité du numéro de série pour le matériel (exclure le matériel en cours de modification)
         if (Model === GestionMateriel && req.body.numero_serie && String(req.body.numero_serie).trim()) {
           const trimmedSerial = String(req.body.numero_serie).trim();
@@ -163,6 +222,16 @@ function createSubController(Model, modelName) {
         }
 
         await item.update(updateData);
+
+        // Diffusion instantanée vers les 7 Tourniquets F18 si badge RFID renseigné
+        if (Model === RhDetail && item.badge_id) {
+          tourniquetService.broadcastUserToTurnstiles({
+            matricule: item.matricule,
+            name: item.nom_complet,
+            cardno: item.badge_id,
+            type: 'Incube'
+          }).catch(err => console.error('Erreur diffusion tourniquet F18 pour salarié RH:', err.message));
+        }
         if (Model === FicheSuivi && item.rendezvous_id) {
           try {
             const { RendezVous } = require('../models');

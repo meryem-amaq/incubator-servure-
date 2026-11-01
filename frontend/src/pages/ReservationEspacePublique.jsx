@@ -119,6 +119,7 @@ export default function ReservationEspacePublique() {
       nomComplet: '',
       email: '',
       telephone: '',
+      invitesExternes: '',
       dateReservation: new Date().toISOString().split('T')[0],
       heureDebut: slots[0]?.debut || '08:00',
       heureFin: slots[0]?.fin || '09:00',
@@ -332,7 +333,9 @@ export default function ReservationEspacePublique() {
           heureDebut: form.heureDebut,
           heureFin: form.heureFin,
           duree: currentDuree,
-          motif: form.motif.trim(),
+          motif: form.invitesExternes && form.invitesExternes.trim() 
+            ? `${form.motif.trim()}\n👥 Invités externes : ${form.invitesExternes.trim()}`
+            : form.motif.trim(),
           equipementsUtilises: form.equipementsUtilises.trim()
         })
       });
@@ -756,6 +759,23 @@ export default function ReservationEspacePublique() {
               value={form.motif}
               onChange={e => setForm({ ...form, motif: e.target.value })}
               className="w-full bg-slate-800/80 border border-slate-700 text-white text-xs rounded-xl p-2.5 focus:border-amber-500 outline-none placeholder:text-slate-500"
+            />
+          </div>
+
+          {/* PERSONNES EXTERNES / INVITÉS (OPTIONNEL) */}
+          <div className="space-y-1 pt-1 border-t border-slate-800/80">
+            <div className="flex items-center justify-between mb-0.5">
+              <label className="block text-xs font-bold text-slate-300">
+                👥 Invités ou personnes externes (Optionnel)
+              </label>
+              <span className="text-[10px] text-amber-400 font-medium">Clients, partenaires, prestataires...</span>
+            </div>
+            <input
+              type="text"
+              placeholder="Ex: Karim Alami (Client), Sara Berrada (Designer externe)..."
+              value={form.invitesExternes || ''}
+              onChange={e => setForm({ ...form, invitesExternes: e.target.value })}
+              className="w-full bg-slate-800/80 border border-slate-700 text-white text-xs rounded-xl px-3.5 py-2.5 focus:border-amber-500 outline-none placeholder:text-slate-500"
             />
           </div>
 

@@ -1,5 +1,6 @@
 require('dotenv').config();
-const { ReservationEspace, PresenceAtelier, Atelier, Incube } = require('../models');
+const { Op } = require('sequelize');
+const { ReservationEspace, PresenceAtelier, Atelier, Incube, EquipementEspace, ChecklistMateriel } = require('../models');
 
 /**
  * Service de synchronisation bidirectionnelle entre le serveur local (Master)
@@ -91,7 +92,18 @@ class SyncService {
       // 2. Traitement et insertion des réservations dans MariaDB
       for (const res of reservations) {
         try {
-          await ReservationEspace.create({
+          const ppNum = res.numero_pp || res.pp_numero || res.ppNumero || '';
+          const emailVal = (res.email_incube || res.emailIncube || res.email || '').trim().toLowerCase();
+          const nomVal = (res.nom_incube || res.nomIncube || res.nomComplet || res.nom || '').trim().toLowerCase();
+          
+          const isAdmin = 
+            String(ppNum).toUpperCase() === 'ADMIN' ||
+            emailVal.includes('admin') ||
+            nomVal.includes('admin');
+
+          const targetStatut = isAdmin ? 'valide' : 'en_attente';
+
+          const createdReservation = await ReservationEspace.create({
             espace: res.espace || 'fablab',
             salleSpecifique: res.salle_specifique || res.salleSpecifique || res.salle || null,
             nomIncube: res.nom_incube || res.nomIncube || res.nomComplet || res.nom || '—',
@@ -103,8 +115,33 @@ class SyncService {
             duree: res.duree || '2h',
             motifUtilisation: res.motif_utilisation || res.motifUtilisation || res.motif || null,
             equipementsUtilises: res.equipements_utilises || res.equipementsUtilises || null,
-            statut: 'en_attente'
+            statut: targetStatut
           });
+
+          // Si réservation administrateur auto-validée, générer la checklist matériel automatiquement
+          if (targetStatut === 'valide' && EquipementEspace && ChecklistMateriel) {
+            try {
+              const equipWhere = { espace: createdReservation.espace };
+              if (createdReservation.salleSpecifique) {
+                equipWhere.salle = createdReservation.salleSpecifique;
+              }
+              const equipements = await EquipementEspace.findAll({ where: equipWhere });
+              if (equipements && equipements.length > 0) {
+                await ChecklistMateriel.destroy({ where: { reservation_id: createdReservation.id } });
+                const checklists = equipements.map(e => ({
+                  reservation_id: createdReservation.id,
+                  equipement_id: e.id,
+                  etat_avant: e.etatAvant || 'Opérationnel / Parfait état',
+                  etat_apres: e.etatApres || 'Conforme & Rendu propre'
+                }));
+                await ChecklistMateriel.bulkCreate(checklists);
+              }
+              console.log(`⚡ [SyncService] Réservation admin #${createdReservation.id} auto-validée avec ${equipements?.length || 0} équipements en checklist.`);
+            } catch (chkErr) {
+              console.warn(`⚠️ [SyncService] Erreur génération checklist admin pour rés #${createdReservation.id}:`, chkErr.message);
+            }
+          }
+
           syncedReservationIds.push(res.id);
         } catch (err) {
           console.error(`❌ [SyncService] Échec insertion réservation ID cloud ${res.id}:`, err.message);
@@ -227,6 +264,49 @@ class SyncService {
     } catch (err) {
       console.warn(`⚠️ [SyncService] Impossible de pousser les ateliers au cloud (${err.message})`);
       return false;
+    }
+  }
+  /**
+   * Pousse (PUSH) les réservations locales actives et annulées vers le Cloud
+   * pour que le formulaire public QR Code bloque les créneaux déjà occupés.
+   */
+  async pushLocalReservationsToCloud() {
+    if (!process.env.CLOUD_URL) return;
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const localReservations = await ReservationEspace.findAll({
+        where: {
+          dateReservation: { [Op.gte]: today }
+        }
+      });
+
+      if (!localReservations || localReservations.length === 0) return;
+
+      const payload = localReservations.map(r => ({
+        espace: r.espace,
+        salleSpecifique: r.salleSpecifique,
+        nomIncube: r.nomIncube,
+        emailIncube: r.emailIncube,
+        telephoneIncube: r.telephoneIncube,
+        dateReservation: r.dateReservation,
+        heureDebut: r.heureDebut,
+        heureFin: r.heureFin,
+        statut: r.statut,
+        motifUtilisation: r.motifUtilisation,
+        equipementsUtilises: r.equipementsUtilises
+      }));
+
+      const res = await fetch(`${this.cloudUrl}/api/sync/reservations-locales`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ reservations: payload })
+      });
+
+      if (res.ok) {
+        console.log(`📤 [SyncService] ${localReservations.length} réservation(s) locale(s) synchronisée(s) vers le Cloud.`);
+      }
+    } catch (err) {
+      console.warn(`⚠️ [SyncService] Erreur pushLocalReservationsToCloud :`, err.message);
     }
   }
 }

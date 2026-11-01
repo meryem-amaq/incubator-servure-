@@ -1099,7 +1099,7 @@ export function KpiEconomique({ stats, section = 'all' }) {
         </div>
 
       {/* Chiffre d'Affaires par Statut */}
-      <div className="card p-5 flex flex-col h-80 min-w-0 hover:border-blue-500/40 transition-all shadow-sm">
+      <div className="card p-5 flex flex-col min-h-[350px] min-w-0 hover:border-blue-500/40 transition-all shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1">
           <button
             type="button"
@@ -1799,11 +1799,11 @@ export function KpiDemographie({ stats }) {
       <RepartitionGenre
         stats={stats}
         isDark={isDark}
-        className="h-80 min-w-0"
+        className="min-h-[350px] min-w-0 flex flex-col"
       />
 
       {/* Répartition par Province */}
-      <div className="card p-5 flex flex-col h-80 min-w-0 hover:border-blue-500/40 transition-all">
+      <div className="card p-5 flex flex-col min-h-[350px] min-w-0 hover:border-blue-500/40 transition-all">
         <button
           type="button"
           onClick={() => setShowProvinceModal(true)}
@@ -1824,7 +1824,7 @@ export function KpiDemographie({ stats }) {
       </div>
 
       {/* Domaines d'Activité */}
-      <div className="card p-5 flex flex-col h-80 min-w-0 hover:border-primary-500/40 transition-all">
+      <div className="card p-5 flex flex-col min-h-[350px] min-w-0 hover:border-primary-500/40 transition-all">
         <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase mb-1">
           Domaines d'Activité
         </h3>
@@ -1835,7 +1835,7 @@ export function KpiDemographie({ stats }) {
       </div>
 
       {/* Statut Juridique */}
-      <div className="card p-5 flex flex-col h-80 min-w-0 hover:border-purple-500/40 transition-all">
+      <div className="card p-5 flex flex-col min-h-[350px] min-w-0 hover:border-purple-500/40 transition-all">
         <button
           type="button"
           onClick={() => setShowStatutModal(true)}
@@ -3012,7 +3012,7 @@ export function KpiAssiduite({ impactStats, stats }) {
         </div>
 
         {/* Cartes interactives des accompagnateurs */}
-        <div className="mt-3 grid grid-cols-2 lg:grid-cols-4 gap-2">
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
           {suiviStatsDetail.map((detail, idx) => (
             <div 
               key={idx} 

@@ -13,15 +13,17 @@ import {
   Printer, 
   Check, 
   ExternalLink,
+  ChevronLeft,
   ChevronRight,
   FileSpreadsheet,
   ArrowRight,
   QrCode,
   Mail,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Users
 } from 'lucide-react';
-import api from '../../api/axios';
+import api, { getPhotoUrl } from '../../api/axios';
 import toast from 'react-hot-toast';
 
 const MOIS = [
@@ -36,6 +38,11 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
   const [savingAll, setSavingAll] = useState(false);
   const [savingRowIdx, setSavingRowIdx] = useState(null);
   const [syncingTourniquet, setSyncingTourniquet] = useState(false);
+  const [activeEngagementTab, setActiveEngagementTab] = useState("tourniquets"); // "tourniquets", "formations", "ateliers" // "agenda" | "table"
+  const [selectedAgendaMonth, setSelectedAgendaMonth] = useState(() => {
+    const curMonthIdx = new Date().getMonth();
+    return MOIS[curMonthIdx] || MOIS[0];
+  }); // "tourniquets", "formations", "ateliers"
 
   // Synchroniser automatiquement les pointages réels des tourniquets physiques ZKTeco
   const handleSyncTourniquet = async (isSilent = false) => {
@@ -90,6 +97,78 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
     if (lastSyncedKeyRef.current === syncKey) return;
     lastSyncedKeyRef.current = syncKey;
     handleSyncTourniquet(true);
+  }, [incubeId, incube?.id, annee]);
+
+  // État et synchronisation des ateliers (Bénéficiaire et Animateur)
+  const [ateliersStats, setAteliersStats] = useState(null);
+  const [syncingAteliers, setSyncingAteliers] = useState(false);
+  const lastSyncedAteliersKeyRef = useRef('');
+
+  const handleSyncAteliers = async (isSilent = false) => {
+    const targetId = incubeId || incube?.id;
+    if (!targetId) {
+      if (!isSilent) toast.error("Veuillez sélectionner un incubé.");
+      return;
+    }
+    if (!isSilent) setSyncingAteliers(true);
+    try {
+      const res = await api.get(`/ateliers/incube-stats/${targetId}?annee=${annee}`);
+      const statsData = res.data;
+      setAteliersStats(statsData);
+
+      if (statsData?.monthly) {
+        setMonths(prev => {
+          const next = { ...prev };
+          Object.entries(statsData.monthly).forEach(([m, s]) => {
+            if (next[m]) {
+              const currentInit = next[m].initiatives || '';
+              let updatedInit = currentInit;
+
+              // Si l'incubé a animé des ateliers ce mois-ci et que ce n'est pas encore mentionné dans initiatives :
+              if (s.ateliers_animes && s.ateliers_animes.length > 0) {
+                s.ateliers_animes.forEach(a => {
+                  const mention = `🎤 Animation de l'atelier : "${a.titre}" (${a.duree || a.heures + 'h'})`;
+                  if (!updatedInit.includes(a.titre)) {
+                    updatedInit = updatedInit ? `${updatedInit}\n• ${mention}` : `• ${mention}`;
+                  }
+                });
+              }
+
+              next[m] = {
+                ...next[m],
+                heures_ateliers: s.heures_ateliers,
+                nb_ateliers: s.nb_ateliers,
+                heures_ateliers_animes: s.heures_ateliers_animes,
+                nb_ateliers_animes: s.nb_ateliers_animes,
+                initiatives: updatedInit
+              };
+            }
+          });
+          return next;
+        });
+
+        if (!isSilent) {
+          const tSuivies = statsData.totals?.heures_ateliers_suivies || 0;
+          const tAnimees = statsData.totals?.heures_ateliers_animes || 0;
+          const msgAnime = tAnimees > 0 ? ` + ${tAnimees}h animées (🎤)` : '';
+          toast.success(`Ateliers synchronisés : ${tSuivies}h suivies (${statsData.totals?.nb_ateliers_suivis} ateliers)${msgAnime}`);
+        }
+      }
+    } catch (err) {
+      console.warn("Erreur sync ateliers:", err);
+      if (!isSilent) toast.error("Erreur lors de la synchronisation des ateliers");
+    } finally {
+      if (!isSilent) setSyncingAteliers(false);
+    }
+  };
+
+  useEffect(() => {
+    const targetId = incubeId || incube?.id;
+    if (!targetId) return;
+    const syncKey = `ateliers-${targetId}-${annee}`;
+    if (lastSyncedAteliersKeyRef.current === syncKey) return;
+    lastSyncedAteliersKeyRef.current = syncKey;
+    handleSyncAteliers(true);
   }, [incubeId, incube?.id, annee]);
 
   // Liste dynamique des années : garantit 2024 minimum + tout l'historique enregistré + prévisions (currentYear + 2)
@@ -698,25 +777,30 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
       assistesSurRequis,
       tauxFormationsReel,
 
-      totalInitiatives: countInitiatives
+      totalInitiatives: countInitiatives,
+
+      // Statistiques Ateliers & Événements
+      totalHeuresAteliersSuivies: ateliersStats?.totals?.heures_ateliers || 0,
+      totalNbAteliersSuivis: ateliersStats?.totals?.nb_ateliers || 0,
+      totalHeuresAteliersAnimes: ateliersStats?.totals?.heures_ateliers_animes || 0,
+      totalNbAteliersAnimes: ateliersStats?.totals?.nb_ateliers_animes || 0
     };
-  }, [months, workshops, allPresences, incubeId, incube, annee]);
+  }, [months, workshops, allPresences, incubeId, incube, annee, ateliersStats]);
 
   return (
     <div className="space-y-6 slide-up w-full">
-      
       {/* 1. Cartes de statistiques (KPI) EN HAUT DE PAGE */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 relative z-10">
+      <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-4 relative z-10">
         
         {/* CARTE 1 : Présence & Assiduité aux Horaires (Semaine, Mois, Année) */}
-        <div className="card p-4 border border-slate-200 dark:border-dark-700/60 flex flex-col justify-between gap-3">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
+        <div className="card p-4 border border-slate-200 dark:border-dark-700/60 flex flex-col justify-between gap-3 overflow-hidden">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
               <div className="w-11 h-11 rounded-2xl bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
                 <Clock size={22} />
               </div>
-              <div>
-                <p className="text-[11px] text-slate-500 dark:text-dark-400 font-bold uppercase tracking-wider">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] text-slate-500 dark:text-dark-400 font-bold uppercase tracking-wider truncate">
                   Présence Heures (Obj: 15h/sem)
                 </p>
                 <div className="flex items-baseline gap-1.5 mt-0.5">
@@ -726,7 +810,7 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
               </div>
             </div>
             {stats.tauxHebdo !== '—' && (
-              <span className={`px-2.5 py-1 rounded-lg text-xs font-black border ${
+              <span className={`px-2.5 py-1 rounded-lg text-xs font-black border shrink-0 ${
                 stats.tauxHebdo >= 100 
                   ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30 dark:text-emerald-400'
                   : 'bg-amber-500/10 text-amber-600 border-amber-500/30 dark:text-amber-400'
@@ -761,84 +845,119 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
         </div>
 
         {/* CARTE 2 : Formations Obligatoires (Modules officiels IDS) */}
-        <div className="card p-4 border border-slate-200 dark:border-dark-700/60 flex flex-col justify-between gap-3">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
+        <div className="card p-4 border border-slate-200 dark:border-dark-700/60 flex flex-col justify-between gap-3 overflow-hidden">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
               <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
                 <GraduationCap size={22} />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="text-[11px] text-slate-500 dark:text-dark-400 font-bold uppercase tracking-wider">
-                    Assiduité Formations Obligatoires
-                  </p>
-                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
-                    Parcours {trackName}
-                  </span>
-                </div>
-                <div className="flex items-baseline gap-1.5 mt-0.5">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] text-slate-500 dark:text-dark-400 font-bold uppercase tracking-wider truncate">
+                  Formations Obligatoires
+                </p>
+                <div className="flex items-baseline gap-1.5 mt-0.5 flex-wrap">
                   <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
                     {stats.tauxFormationsReel}%
                   </span>
-                  <span className="text-[10px] font-semibold text-slate-400">
+                  <span className="text-[10px] font-semibold text-slate-400 whitespace-nowrap">
                     ({stats.assistesSurRequis} sur {stats.baseRequisCount} requis)
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className={`px-2.5 py-1 rounded-lg text-xs font-black border ${
-                stats.tauxFormationsReel >= 80
-                  ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30 dark:text-emerald-400'
-                  : 'bg-amber-500/10 text-amber-600 border-amber-500/30 dark:text-amber-400'
-              }`}>
-                {stats.tauxFormationsReel}%
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 whitespace-nowrap">
+                {trackName}
               </span>
               <button
                 onClick={handleSyncAllFormationsFromEvents}
-                className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold flex items-center gap-1 transition-all"
+                className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold flex items-center gap-1 transition-all shrink-0"
                 title="Calculer et synchroniser automatiquement depuis les feuilles de présence des formations obligatoires"
               >
-                <Sparkles size={12} /> Sync Formations
+                <Sparkles size={12} /> Sync
               </button>
             </div>
           </div>
 
-          <div className="pt-2 border-t border-slate-100 dark:border-dark-700/60 flex items-center justify-between text-xs">
-            <span className="text-slate-500 dark:text-dark-400 text-[11px]">Formations obligatoires {annee} ({trackName}) :</span>
-            <span className="font-bold text-slate-800 dark:text-dark-200 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 rounded-md text-[11px]">
+          <div className="pt-2 border-t border-slate-100 dark:border-dark-700/60 flex items-center justify-between text-xs gap-1">
+            <span className="text-slate-500 dark:text-dark-400 text-[11px] truncate">Obligatoires {annee} ({trackName}) :</span>
+            <span className="font-bold text-slate-800 dark:text-dark-200 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 rounded-md text-[11px] shrink-0">
               {stats.totalAssistesAnnee} sur {stats.totalAteliersAnnee} séances ({stats.tauxFormationsReel}%)
             </span>
           </div>
         </div>
 
-        {/* CARTE 3 : Mois de Présence & Initiatives */}
-        <div className="card p-4 border border-slate-200 dark:border-dark-700/60 flex flex-col justify-between gap-3">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
-                <Sparkles size={22} />
+        {/* CARTE 3 : Ateliers Pratiques (Bénéficiaire & Animateur) */}
+        <div className="card p-4 border border-slate-200 dark:border-dark-700/60 flex flex-col justify-between gap-3 overflow-hidden">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-11 h-11 rounded-2xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center shrink-0">
+                <Users size={22} />
               </div>
-              <div>
-                <p className="text-[11px] text-slate-500 dark:text-dark-400 font-bold uppercase tracking-wider">
-                  Mois de Présence
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] text-slate-500 dark:text-dark-400 font-bold uppercase tracking-wider truncate">
+                  Ateliers Collectifs
                 </p>
-                <div className="flex items-baseline gap-1.5 mt-0.5">
-                  <span className="text-2xl font-black text-slate-900 dark:text-dark-100">{stats.countMoisRemplis}</span>
-                  <span className="text-xs font-semibold text-slate-400"> / 12 mois</span>
+                <div className="flex items-baseline gap-1.5 mt-0.5 flex-wrap">
+                  <span className="text-2xl font-black text-slate-900 dark:text-dark-100">
+                    {Number(stats.totalHeuresAteliersSuivies || 0).toFixed(0)}h
+                  </span>
+                  <span className="text-xs font-semibold text-slate-400 whitespace-nowrap">
+                    ({stats.totalNbAteliersSuivis || 0} suivi{stats.totalNbAteliersSuivis > 1 ? 's' : ''})
+                  </span>
                 </div>
               </div>
             </div>
-            <span className="px-2.5 py-1 rounded-lg text-xs font-black border bg-amber-500/10 text-amber-600 border-amber-500/30 dark:text-amber-400">
+
+            <button
+              onClick={() => handleSyncAteliers(false)}
+              disabled={syncingAteliers}
+              className="p-1.5 rounded-lg bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-400 hover:bg-cyan-100 border border-cyan-200 dark:border-cyan-800 text-[10px] font-bold flex items-center gap-1 transition-all shrink-0"
+              title="Synchroniser les présences d'ateliers et animations"
+            >
+              <RefreshCw size={12} className={syncingAteliers ? "animate-spin" : ""} /> Sync Ateliers
+            </button>
+          </div>
+
+          <div className="pt-2 border-t border-slate-100 dark:border-dark-700/60 flex items-center justify-between text-xs gap-1">
+            <span className="text-slate-500 dark:text-dark-400 text-[11px] truncate">Rôle Animateur (Pair-à-pair) :</span>
+            {Number(stats.totalNbAteliersAnimes) > 0 ? (
+              <span className="font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-md text-[11px] flex items-center gap-1 shrink-0">
+                🎤 {stats.totalNbAteliersAnimes} atelier{stats.totalNbAteliersAnimes > 1 ? 's' : ''} ({stats.totalHeuresAteliersAnimes}h)
+              </span>
+            ) : (
+              <span className="text-[11px] text-slate-400 shrink-0">0 atelier animé</span>
+            )}
+          </div>
+        </div>
+
+        {/* CARTE 4 : Mois de Présence & Initiatives */}
+        <div className="card p-4 border border-slate-200 dark:border-dark-700/60 flex flex-col justify-between gap-3 overflow-hidden">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-11 h-11 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
+                <Sparkles size={22} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] text-slate-500 dark:text-dark-400 font-bold uppercase tracking-wider truncate">
+                  Mois de Présence
+                </p>
+                <div className="flex items-baseline gap-1.5 mt-0.5 flex-wrap">
+                  <span className="text-2xl font-black text-slate-900 dark:text-dark-100">{stats.countMoisRemplis}</span>
+                  <span className="text-xs font-semibold text-slate-400 whitespace-nowrap"> / 12 mois</span>
+                </div>
+              </div>
+            </div>
+            <span className="px-2.5 py-1 rounded-lg text-xs font-black border bg-amber-500/10 text-amber-600 border-amber-500/30 dark:text-amber-400 shrink-0">
               {Math.round((stats.countMoisRemplis / 12) * 100)}%
             </span>
           </div>
           <div className="pt-2 border-t border-slate-100 dark:border-dark-700/60 flex flex-col gap-1.5 text-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-500 dark:text-dark-400 text-[11px]">Mois actifs :</span>
+            <div className="flex items-center justify-between gap-1.5">
+              <span className="text-slate-500 dark:text-dark-400 text-[11px] shrink-0">Mois actifs :</span>
               <span 
-                className="font-bold text-slate-800 dark:text-dark-200 bg-amber-50 dark:bg-amber-900/30 px-2 py-0.5 rounded-md text-[11px] truncate max-w-[190px]"
+                className="font-bold text-slate-800 dark:text-dark-200 bg-amber-50 dark:bg-amber-900/30 px-2 py-0.5 rounded-md text-[11px] truncate text-right flex-1 min-w-0"
                 title={stats.moisPresents.length > 0 ? stats.moisPresents.join(', ') : 'Aucun mois avec heures enregistrées'}
               >
                 {stats.moisPresents.length > 0 ? stats.moisPresents.join(', ') : 'Aucune présence enregistrée'}
@@ -855,11 +974,11 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
       </div>
 
       {/* 2. Barre de contrôle épurée sans cadre EN DESSOUS DES CARTES DE STATISTIQUES */}
-      <div className="flex flex-wrap items-center justify-between gap-3 relative z-30 py-1">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 relative z-30 py-1">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 min-w-0">
           {incubeSelector}
 
-          <div className="flex items-center gap-2 bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-dark-700 rounded-xl px-3 py-2 text-xs shadow-sm">
+          <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-dark-700 rounded-xl px-2.5 py-1.5 text-xs shadow-sm shrink-0">
             <span className="text-slate-500 dark:text-dark-400 font-medium">Année :</span>
             <select 
               className="bg-transparent font-bold text-slate-800 dark:text-dark-100 focus:outline-none cursor-pointer pr-1"
@@ -873,38 +992,38 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap sm:flex-nowrap shrink-0">
           {/* BOUTON ACTUALISER TOURNIQUETS PHYSIQUES */}
           <button
             type="button"
-            className="btn btn-secondary btn-sm flex items-center gap-1.5 border-blue-500/40 text-blue-700 dark:text-blue-400 hover:bg-blue-500/10 font-bold shadow-sm"
+            className="btn btn-secondary btn-sm !py-1.5 !px-2.5 text-xs flex items-center gap-1.5 border-blue-500/40 text-blue-700 dark:text-blue-400 hover:bg-blue-500/10 font-bold shadow-sm whitespace-nowrap"
             onClick={() => handleSyncTourniquet(false)}
             disabled={syncingTourniquet}
             title="Actualiser les pointages réels depuis les 7 tourniquets physiques ZKTeco"
           >
-            <RefreshCw size={15} className={`text-blue-500 ${syncingTourniquet ? 'animate-spin' : ''}`} />
-            {syncingTourniquet ? 'Actualisation...' : 'Actualiser Tourniquets'}
+            <RefreshCw size={14} className={`text-blue-500 ${syncingTourniquet ? 'animate-spin' : ''}`} />
+            <span>{syncingTourniquet ? 'Actualisation...' : 'Actualiser Tourniquets'}</span>
           </button>
 
           <button
             type="button"
-            className="btn btn-secondary btn-sm flex items-center gap-1.5 border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 font-bold shadow-sm"
+            className="btn btn-secondary btn-sm !py-1.5 !px-2.5 text-xs flex items-center gap-1.5 border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 font-bold shadow-sm whitespace-nowrap"
             onClick={handleSendAlerteAssiduite}
             disabled={sendingAlerte}
             title="Envoyer un email officiel de relance d'assiduité à l'incubé"
           >
-            <Mail size={15} className="text-amber-500" />
-            {sendingAlerte ? 'Envoi...' : 'Relancer par email (Assiduité)'}
+            <Mail size={14} className="text-amber-500" />
+            <span>{sendingAlerte ? 'Envoi...' : 'Relancer par email'}</span>
           </button>
 
           <button 
-            className="btn btn-primary btn-sm shadow-md shadow-primary-500/20 flex items-center gap-1.5"
+            className="btn btn-primary btn-sm !py-1.5 !px-3 text-xs shadow-md shadow-primary-500/20 flex items-center gap-1.5 font-bold whitespace-nowrap"
             onClick={saveAllMonths}
             disabled={savingAll}
             title="Enregistrer les remarques et observations"
           >
-            <Save size={15} />
-            {savingAll ? 'Enregistrement...' : 'Enregistrer remarques'}
+            <Save size={14} />
+            <span>{savingAll ? 'Enregistrement...' : 'Enregistrer remarques'}</span>
           </button>
         </div>
       </div>
@@ -922,100 +1041,217 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
         </div>
       )}
 
-      {/* 3. TABLEAU PRINCIPAL : Engagement, Implication et Initiatives (12 Mois) */}
-      <div className="card p-0 overflow-hidden border border-slate-200 dark:border-dark-700/60 shadow-md">
-        <div className="table-container">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-100 dark:bg-dark-800 text-slate-700 dark:text-dark-300 border-b border-slate-200 dark:border-dark-700/60">
-                <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 w-28 min-w-[110px] sticky left-0 bg-slate-100 dark:bg-dark-800 z-10 border-r border-slate-200 dark:border-dark-700/60 whitespace-nowrap">
-                  Mois
-                </th>
-                <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 text-center min-w-[220px] whitespace-nowrap">
-                  <div className="flex items-center justify-center gap-1.5">
-                    <span>Heures Certifiées Tourniquet (Total Mois)</span>
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                      🔒 ZKTeco Direct
-                    </span>
-                  </div>
-                  <div className="text-[10px] font-semibold text-blue-600 dark:text-blue-400">
-                    Objectif : 60 h/mois (soit 15 h/semaine)
-                  </div>
-                </th>
-                <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 text-center min-w-[210px] whitespace-nowrap">
-                  <div>Taux Formations Obligatoires (%)</div>
-                  <div className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">Obj: ≥ 80% (Modules obligatoires)</div>
-                </th>
-                <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 min-w-[220px]">
-                  Initiatives et propositions
-                </th>
-                <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 min-w-[220px]">
-                  Observation et commentaire
-                </th>
-                <th className="py-3 px-3 font-bold text-slate-800 dark:text-dark-200 text-center w-20 whitespace-nowrap">
-                  Action
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-dark-700/50">
-              {MOIS.map((m, idx) => {
-                const item = months[m];
-                const isSaving = savingRowIdx === idx;
-                const rowBg = idx % 2 === 0 ? 'bg-white dark:bg-dark-900/60' : 'bg-slate-50/60 dark:bg-dark-800/40';
+      {/* ========================================================================= */}
+      {/* STRUCTURE EN 3 PARTIES SÉPARÉES D'ENGAGEMENT (NAVIGATION PAR ONGLETS)     */}
+      {/* ========================================================================= */}
+      <div className="space-y-4">
+        {/* BARRE D'ONGLETS NAVIGATION 3 PARTIES */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-200 dark:border-dark-700/60 pb-3">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 min-w-0">
+            <button
+              type="button"
+              onClick={() => setActiveEngagementTab('tourniquets')}
+              className={`px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border shadow-xs ${
+                activeEngagementTab === 'tourniquets'
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/20'
+                  : 'bg-white dark:bg-dark-900 border-slate-200 dark:border-dark-700 text-slate-700 dark:text-dark-200 hover:bg-slate-50 dark:hover:bg-dark-800'
+              }`}
+            >
+              <Clock size={15} className={activeEngagementTab === 'tourniquets' ? 'text-white' : 'text-blue-500'} />
+              <span>Partie 1 : Présence Centre (Tourniquets)</span>
+            </button>
 
-                // Calculs exacts heures
-                const valPresence = item.moyenne_heures_presence !== '' && !isNaN(item.moyenne_heures_presence) ? parseFloat(item.moyenne_heures_presence) : null;
-                const hebdoHeures = valPresence !== null ? (valPresence / 4).toFixed(1) : null;
-                // Taux calculé sur base de 15h/semaine (ou 60h/mois)
-                const hebdoTaux = valPresence !== null ? Math.round(((valPresence / 4) / OBJECTIF_HEBDO) * 100) : null;
-                const moisTaux = valPresence !== null ? Math.round((valPresence / OBJECTIF_MOIS) * 100) : null;
-                const isFutureMonth = annee === currentYear && idx > new Date().getMonth();
-                const hasBadge = Boolean(incube?.badge_id);
+            <button
+              type="button"
+              onClick={() => setActiveEngagementTab('formations')}
+              className={`px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border shadow-xs ${
+                activeEngagementTab === 'formations'
+                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-500/20'
+                  : 'bg-white dark:bg-dark-900 border-slate-200 dark:border-dark-700 text-slate-700 dark:text-dark-200 hover:bg-slate-50 dark:hover:bg-dark-800'
+              }`}
+            >
+              <GraduationCap size={15} className={activeEngagementTab === 'formations' ? 'text-white' : 'text-emerald-500'} />
+              <span>Partie 2 : Formations Obligatoires</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded font-black ${
+                activeEngagementTab === 'formations' ? 'bg-white/20 text-white' : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+              }`}>
+                {stats.tauxFormationsReel}%
+              </span>
+            </button>
 
-                // Calculs événements réels pour ce mois
-                const eventStats = getMonthFormationStats(idx);
-                const displayRate = (item.taux_presence_formation !== '' && item.taux_presence_formation !== null && item.taux_presence_formation !== undefined)
-                  ? item.taux_presence_formation
-                  : (eventStats.rate !== null ? eventStats.rate : '');
+            <button
+              type="button"
+              onClick={() => setActiveEngagementTab('ateliers')}
+              className={`px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border shadow-xs ${
+                activeEngagementTab === 'ateliers'
+                  ? 'bg-amber-600 text-white border-amber-600 shadow-md shadow-amber-500/20'
+                  : 'bg-white dark:bg-dark-900 border-slate-200 dark:border-dark-700 text-slate-700 dark:text-dark-200 hover:bg-slate-50 dark:hover:bg-dark-800'
+              }`}
+            >
+              <Users size={15} className={activeEngagementTab === 'ateliers' ? 'text-white' : 'text-amber-500'} />
+              <span>Partie 3 : Ateliers & Événements</span>
+              {(Number(stats.totalNbAteliersSuivis) > 0 || Number(stats.totalNbAteliersAnimes) > 0) && (
+                <span className={`text-[10px] px-1.5 py-0.2 rounded font-black ${
+                  activeEngagementTab === 'ateliers' ? 'bg-white/20 text-white' : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                }`}>
+                  {Number(stats.totalNbAteliersSuivis) + Number(stats.totalNbAteliersAnimes)}
+                </span>
+              )}
+            </button>
+          </div>
 
-                return (
-                  <tr key={m} className={`${rowBg} hover:bg-slate-100/60 dark:hover:bg-dark-700/30 transition-colors`}>
-                    {/* Colonne Date */}
-                    <td className={`py-3 px-4 font-bold text-slate-800 dark:text-dark-200 sticky left-0 z-10 border-r border-slate-200 dark:border-dark-700/60 shadow-sm transition-colors ${
-                      idx % 2 === 0 ? 'bg-white dark:bg-dark-900' : 'bg-slate-50 dark:bg-dark-800'
-                    }`}>
-                      {m}
-                    </td>
+          {/* Actions contextuelles selon l'onglet actif */}
+          <div className="flex items-center gap-2 shrink-0">
+            {activeEngagementTab === 'tourniquets' && (
+              <button
+                type="button"
+                onClick={() => handleSyncTourniquet(false)}
+                disabled={syncingTourniquet}
+                className="btn btn-secondary btn-xs font-bold text-blue-600 inline-flex items-center gap-1.5 border-blue-200 dark:border-blue-900"
+                title="Actualiser les pointages réels des tourniquets physiques"
+              >
+                <RefreshCw size={13} className={syncingTourniquet ? "animate-spin" : ""} /> Sync Tourniquets
+              </button>
+            )}
+            {activeEngagementTab === 'formations' && (
+              <button
+                type="button"
+                onClick={handleSyncAllFormationsFromEvents}
+                className="btn btn-secondary btn-xs font-bold text-emerald-600 inline-flex items-center gap-1.5 border-emerald-200 dark:border-emerald-900"
+                title="Recalculer l'assiduité depuis les feuilles d'émargement"
+              >
+                <Sparkles size={13} /> Sync Formations
+              </button>
+            )}
+            {activeEngagementTab === 'ateliers' && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleSyncAteliers(false)}
+                  disabled={syncingAteliers}
+                  className="btn btn-secondary btn-xs font-bold text-amber-600 inline-flex items-center gap-1.5 border-amber-200 dark:border-amber-900"
+                  title="Synchroniser les présences d'ateliers et rôles d'animateur"
+                >
+                  <RefreshCw size={13} className={syncingAteliers ? "animate-spin" : ""} /> Sync Ateliers
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/evenements')}
+                  className="btn btn-secondary btn-xs text-slate-600 dark:text-dark-300 inline-flex items-center gap-1"
+                  title="Ouvrir la page des Événements et Ateliers"
+                >
+                  <ExternalLink size={12} /> Gérer Événements
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
 
-                    {/* Heures présence mensuelle issues des tourniquets (Lecture seule certifiée) */}
-                    <td className="p-2 text-center">
-                      <div className="flex flex-col items-center justify-center gap-1.5">
-                        <div className="inline-flex items-center justify-center gap-1.5 px-3 py-1 bg-slate-100/90 dark:bg-dark-800/90 border border-slate-200/80 dark:border-dark-700/80 rounded-md shadow-xs">
-                          <span className="text-xs font-extrabold text-slate-800 dark:text-dark-100 font-mono">
-                            {valPresence !== null && valPresence !== undefined ? Number(valPresence).toFixed(1) : (isFutureMonth ? '—' : '0.0')}
+        {/* ========================================================= */}
+        {/* VUE 1 : PRÉSENCE PHYSIQUE & TOURNIQUETS (12 MOIS)        */}
+        {/* ========================================================= */}
+        {activeEngagementTab === 'tourniquets' && (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between text-xs text-slate-500 dark:text-dark-400 px-1 gap-2">
+              <p>
+                🏛️ <strong>Présence physique aux locaux de l'incubateur</strong> • Base contractuelle : 15 h/semaine (soit 60 h/mois, 720 h/an).
+              </p>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-[11px] bg-slate-100 dark:bg-dark-800 px-2 py-0.5 rounded border border-slate-200 dark:border-dark-700">
+                  Badge : {incube?.badge_id ? `#${incube.badge_id}` : 'Non affecté'}
+                </span>
+                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                  Total {annee} : {stats.totalHeures} h
+                </span>
+              </div>
+            </div>
+
+            <div className="card overflow-hidden border border-slate-200 dark:border-dark-700/60 shadow-sm p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-100 dark:bg-dark-800 text-slate-700 dark:text-dark-300 border-b border-slate-200 dark:border-dark-700/60">
+                      <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 w-32 sticky left-0 bg-slate-100 dark:bg-dark-800 z-10 border-r border-slate-200 dark:border-dark-700/60">
+                        Mois
+                      </th>
+                      <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 text-center min-w-[200px]">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span>Heures Totales / Mois</span>
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                            🔒 ZKTeco Direct
                           </span>
-                          <span className="text-[11px] text-slate-500 dark:text-dark-400 font-semibold">h / mois</span>
                         </div>
+                        <div className="text-[10px] font-semibold text-blue-600 dark:text-blue-400">Objectif : 60 h/mois (15 h/sem)</div>
+                      </th>
+                      <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 text-center min-w-[160px]">
+                        Moyenne Hebdomadaire
+                        <div className="text-[10px] font-semibold text-slate-500">Objectif : 15 h/sem</div>
+                      </th>
+                      <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 text-center min-w-[180px]">
+                        Progression mensuelle
+                        <div className="text-[10px] font-semibold text-slate-500">Taux réalisation</div>
+                      </th>
+                      <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 text-center min-w-[140px]">
+                        Statut & Conformité
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-dark-700/50">
+                    {MOIS.map((m, idx) => {
+                      const item = months[m] || {};
+                      const rowBg = idx % 2 === 0 ? 'bg-white dark:bg-dark-900/60' : 'bg-slate-50/60 dark:bg-dark-800/40';
 
-                        {/* Badges de calculs exacts semaine et mois + Statut Conforme/Attention/Non Conforme */}
-                        {valPresence !== null && valPresence > 0 ? (
-                          <div className="flex flex-col gap-1 items-center w-full">
-                            <div className={`inline-flex items-center justify-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-md border w-full max-w-[200px] ${
-                              valPresence >= OBJECTIF_MOIS 
-                                ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                                : valPresence >= 45
-                                ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                                : 'bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
-                            }`} title={`Moyenne : ${hebdoHeures}h / 15h par semaine (${hebdoTaux}%) | Total Mois : ${valPresence}h / 60h (${moisTaux}%)`}>
-                              <span>Sem : {hebdoHeures}h / 15h</span>
-                              <span>•</span>
-                              <span>{hebdoTaux}%</span>
-                            </div>
-                            <div className="flex items-center justify-between w-full max-w-[200px] text-[9px] px-0.5">
-                              <span className="text-slate-400">
-                                Total : {valPresence}h / 60h ({moisTaux}%)
+                      const valPresence = item.moyenne_heures_presence !== '' && !isNaN(item.moyenne_heures_presence) ? parseFloat(item.moyenne_heures_presence) : null;
+                      const hebdoHeures = valPresence !== null ? (valPresence / 4).toFixed(1) : null;
+                      const moisTaux = valPresence !== null ? Math.round((valPresence / OBJECTIF_MOIS) * 100) : null;
+                      const isFutureMonth = annee === currentYear && idx > new Date().getMonth();
+                      const hasBadge = Boolean(incube?.badge_id);
+
+                      return (
+                        <tr key={m} className={`${rowBg} hover:bg-slate-100/60 dark:hover:bg-dark-700/30 transition-colors`}>
+                          <td className={`py-3 px-4 font-bold text-slate-800 dark:text-dark-200 sticky left-0 z-10 border-r border-slate-200 dark:border-dark-700/60 shadow-sm ${
+                            idx % 2 === 0 ? 'bg-white dark:bg-dark-900' : 'bg-slate-50 dark:bg-dark-800'
+                          }`}>
+                            {m}
+                          </td>
+
+                          <td className="p-3 text-center">
+                            <div className="inline-flex items-center justify-center gap-1.5 px-3 py-1 bg-slate-100/90 dark:bg-dark-800/90 border border-slate-200/80 dark:border-dark-700/80 rounded-md font-mono">
+                              <span className="text-xs font-black text-slate-900 dark:text-white">
+                                {valPresence !== null ? Number(valPresence).toFixed(1) : (isFutureMonth ? '—' : '0.0')}
                               </span>
-                              <span className={`px-1.5 py-0.5 rounded font-black text-[8px] uppercase tracking-wider border ${
+                              <span className="text-[11px] text-slate-500 font-semibold">h / mois</span>
+                            </div>
+                          </td>
+
+                          <td className="p-3 text-center font-medium text-slate-700 dark:text-dark-300">
+                            {hebdoHeures !== null ? `${hebdoHeures} h / sem` : '—'}
+                          </td>
+
+                          <td className="p-3 text-center">
+                            {valPresence !== null && valPresence > 0 ? (
+                              <div className="w-36 mx-auto space-y-1">
+                                <div className="flex justify-between text-[10px] font-bold text-slate-500">
+                                  <span>{valPresence}h</span>
+                                  <span>{moisTaux}%</span>
+                                </div>
+                                <div className="h-1.5 w-full bg-slate-200 dark:bg-dark-700 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full transition-all duration-500 ${
+                                      moisTaux >= 100 ? 'bg-emerald-500' : moisTaux >= 75 ? 'bg-amber-500' : 'bg-rose-500'
+                                    }`}
+                                    style={{ width: `${Math.min(moisTaux, 100)}%` }}
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 text-xs italic">—</span>
+                            )}
+                          </td>
+
+                          <td className="p-3 text-center">
+                            {valPresence !== null && valPresence > 0 ? (
+                              <span className={`px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-wider border ${
                                 moisTaux >= 100 
                                   ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
                                   : moisTaux >= 75
@@ -1024,131 +1260,345 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                               }`}>
                                 {moisTaux >= 100 ? 'CONFORME' : moisTaux >= 75 ? 'ATTENTION' : 'NON CONFORME'}
                               </span>
-                            </div>
-                          </div>
-                        ) : !hasBadge ? (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 dark:bg-dark-800 dark:text-dark-400 border border-slate-200 dark:border-dark-700">
-                            Sans badge
-                          </span>
-                        ) : isFutureMonth ? (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 dark:bg-dark-800 dark:text-dark-400 border border-slate-200 dark:border-dark-700">
-                            À venir
-                          </span>
-                        ) : (Number(stats.totalHeures) === 0 || stats.countHeuresMois === 0) ? (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 dark:bg-dark-800 dark:text-dark-300 border border-slate-200 dark:border-dark-700" title="Badge actif - En attente des premiers pointages aux tourniquets pour cette année">
-                            En attente de pointages
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
-                            0.0h (Non conforme)
-                          </span>
-                        )}
-                      </div>
-                    </td>
-
-                    {/* Taux formation synchronisé avec événements */}
-                    <td className="p-2 text-center">
-                      <div className="flex flex-col items-center justify-center gap-1">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <input
-                            type="number"
-                            step="1"
-                            min="0"
-                            max="100"
-                            placeholder={eventStats.rate !== null ? `${eventStats.rate}` : "Ex: 100"}
-                            className="input !py-1.5 !px-2 !text-xs !w-20 text-center font-bold bg-slate-50 dark:bg-dark-900 border-slate-300 dark:border-dark-700/80 text-emerald-600 dark:text-emerald-400"
-                            value={displayRate}
-                            onChange={(e) => updateField(m, 'taux_presence_formation', e.target.value)}
-                          />
-                          <span className="text-[11px] text-slate-500 dark:text-dark-400 font-semibold">%</span>
-                        </div>
-
-                        {/* Indicateur clair et interactif de la présence aux formations obligatoires */}
-                        {eventStats.total > 0 ? (
-                          <div className="flex flex-col items-center justify-center gap-1 text-[10px]">
-                            {eventStats.workshops.map((w, wIdx) => {
-                              const isPres = isIncubePresentAtWorkshop(w);
-                              return (
-                                <button
-                                  key={w.id || wIdx}
-                                  type="button"
-                                  onClick={() => handleTogglePresence(w, m)}
-                                  className={`px-2 py-0.5 rounded-md font-bold inline-flex items-center gap-1 shadow-2xs transition-all cursor-pointer border ${
-                                    isPres
-                                      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25'
-                                      : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
-                                  }`}
-                                  title="Cliquer pour basculer Présent / Absent"
-                                >
-                                  {isPres ? (
-                                    <>
-                                      <CheckCircle2 size={11} className="text-emerald-600 dark:text-emerald-400" />
-                                      <span>Présent (100%)</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                                      <span>Absent (0%)</span>
-                                    </>
-                                  )}
-                                </button>
-                              );
-                            })}
-                            
-                            {/* Titre de la formation obligatoire du mois */}
-                            {eventStats.workshops.length > 0 && (
-                              <span className="text-[9px] text-slate-500 dark:text-dark-400 font-medium truncate max-w-[190px]" title={eventStats.workshops.map(w => w.titre).join(' • ')}>
-                                {eventStats.workshops[0].titre}
-                              </span>
+                            ) : !hasBadge ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 dark:bg-dark-800 dark:text-dark-400">Sans badge</span>
+                            ) : (
+                              <span className="text-slate-400 italic text-[11px]">En attente</span>
                             )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* VUE 2 : FORMATIONS OBLIGATOIRES (MODULES OFFICIELS)      */}
+        {/* ========================================================= */}
+        {activeEngagementTab === 'formations' && (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-900 dark:text-emerald-200 text-xs">
+              <div className="flex items-center gap-2">
+                <GraduationCap size={20} className="text-emerald-600 shrink-0" />
+                <div>
+                  <span className="font-bold text-sm">Parcours Officiel IDS : {trackName}</span>
+                  <p className="text-xs text-slate-600 dark:text-dark-300 mt-0.5">
+                    Sessions du tronc commun obligatoire • Assiduité globale : <strong>{stats.tauxFormationsReel}%</strong> ({stats.totalAssistesAnnee} sur {stats.totalAteliersAnnee} séances validées).
+                  </p>
+                </div>
+              </div>
+              <span className={`px-3 py-1.5 rounded-lg text-xs font-black ${
+                stats.tauxFormationsReel >= 80 
+                  ? 'bg-emerald-600 text-white shadow-xs' 
+                  : 'bg-amber-500 text-white shadow-xs'
+              }`}>
+                Objectif ≥ 80% : {stats.tauxFormationsReel >= 80 ? '✅ Validé' : '⚠️ En cours'}
+              </span>
+            </div>
+
+            <div className="card overflow-hidden border border-slate-200 dark:border-dark-700/60 shadow-sm p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-100 dark:bg-dark-800 text-slate-700 dark:text-dark-300 border-b border-slate-200 dark:border-dark-700/60">
+                      <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 w-12">#</th>
+                      <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200">Module Obligatoire / Thème</th>
+                      <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200">Date Planifiée</th>
+                      <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200">Formateur / Intervenant</th>
+                      <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 text-center">Durée</th>
+                      <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 text-center">Émargement</th>
+                      <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 text-center">Statut Attestation</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-dark-700/50">
+                    {workshops.length > 0 ? (
+                      workshops.map((w, idx) => {
+                        const isPres = isIncubePresentAtWorkshop(w);
+                        const monthName = w.date ? MOIS[new Date(w.date).getMonth()] : MOIS[0];
+                        return (
+                          <tr key={w.id || idx} className="hover:bg-slate-50 dark:hover:bg-dark-800/40 transition-colors">
+                            <td className="py-3 px-4 font-bold text-slate-400">{idx + 1}</td>
+                            <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
+                              <div className="flex items-center gap-2">
+                                <span className={`w-2 h-2 rounded-full ${isPres ? 'bg-emerald-500' : 'bg-amber-400'}`}></span>
+                                <span>{w.titre}</span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 text-slate-600 dark:text-dark-300 font-medium">
+                              {w.date ? new Date(w.date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'}
+                            </td>
+                            <td className="py-3 px-4 text-slate-600 dark:text-dark-300">
+                              {w.formateur || w.intervenant || 'Intervenant IDS'}
+                            </td>
+                            <td className="py-3 px-4 text-center font-bold text-slate-700 dark:text-dark-300">
+                              {w.duree || '3h00'}
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleTogglePresence(w, monthName)}
+                                className={`px-3 py-1 rounded-lg font-bold text-xs inline-flex items-center gap-1.5 transition-all shadow-2xs border ${
+                                  isPres
+                                    ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25'
+                                    : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
+                                }`}
+                                title="Cliquer pour basculer Présent / Absent"
+                              >
+                                {isPres ? (
+                                  <>
+                                    <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400" />
+                                    <span>Présent (Validé)</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                    <span>Non validé (Absent)</span>
+                                  </>
+                                )}
+                              </button>
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <span className={`text-xs font-bold ${isPres ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                {isPres ? 'Attestation éligible' : 'À rattraper'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="py-10 text-center text-slate-400 italic">
+                          Aucun module de formation obligatoire enregistré pour ce parcours.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* VUE 3 : ATELIERS & ÉVÉNEMENTS (FORMAT AGENDA & PLANNING MENSUEL) */}
+        {/* ========================================================================= */}
+        {activeEngagementTab === 'ateliers' && (
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 dark:text-dark-400 px-1">
+              <p>
+                🛠️ <strong>Workshops pratiques et initiatives d'animation</strong> • Synchronisés avec la page <em>Événements</em>.
+              </p>
+              <div className="flex items-center gap-2">
+                <span className="bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 px-2 py-0.5 rounded font-bold">
+                  📥 Suivis : {stats.totalHeuresAteliersSuivies}h ({stats.totalNbAteliersSuivis} atelier{stats.totalNbAteliersSuivis > 1 ? 's' : ''})
+                </span>
+                <span className="bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded font-bold">
+                  🎤 Animés : {stats.totalHeuresAteliersAnimes}h ({stats.totalNbAteliersAnimes} atelier{stats.totalNbAteliersAnimes > 1 ? 's' : ''})
+                </span>
+              </div>
+            </div>
+
+            {/* 1. ATELIERS SUIVIS PAR L'INCUBÉ (RÔLE : BÉNÉFICIAIRE) */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-cyan-700 dark:text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <span>📥</span> 1. Ateliers Suivis par l'Incubé (Rôle : Bénéficiaire)
+                </h3>
+                <span className="text-xs font-bold text-slate-500">
+                  Total : {stats.totalHeuresAteliersSuivies} h • {stats.totalNbAteliersSuivis} atelier(s)
+                </span>
+              </div>
+
+              <div className="card overflow-hidden border border-slate-200 dark:border-dark-700/60 shadow-sm p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100 dark:bg-dark-800 text-slate-700 dark:text-dark-300 border-b border-slate-200 dark:border-dark-700/60">
+                        <th className="py-2.5 px-3 font-semibold">Atelier Pratique</th>
+                        <th className="py-2.5 px-3 font-semibold">Date</th>
+                        <th className="py-2.5 px-3 font-semibold">Animateur / Formateur</th>
+                        <th className="py-2.5 px-3 font-semibold text-center">Durée</th>
+                        <th className="py-2.5 px-3 font-semibold text-center">Émargement QR</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-dark-700/50">
+                      {ateliersStats?.totals?.nb_ateliers_suivis > 0 ? (
+                        Object.values(ateliersStats.monthly || {}).flatMap(m => m.ateliers_suivis || []).map((a, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-dark-800/40">
+                            <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white">{a.titre}</td>
+                            <td className="py-2.5 px-3 text-slate-600 dark:text-dark-300">
+                              {a.date ? new Date(a.date).toLocaleDateString('fr-FR') : '—'}
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-600 dark:text-dark-300">{a.formateur || 'Intervenant IDS'}</td>
+                            <td className="py-2.5 px-3 text-center font-bold text-slate-700 dark:text-dark-300">{a.duree || `${a.heures}h`}</td>
+                            <td className="py-2.5 px-3 text-center">
+                              <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30">
+                                ✅ QR Validé
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="py-8 text-center text-slate-400 italic">
+                            Aucun atelier pratique émargé pour le moment pour cette année.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. ATELIERS ANIMÉS PAR L'INCUBÉ (RÔLE : ANIMATEUR / PAIR-À-PAIR & INITIATIVES) */}
+            <div className="space-y-3 pt-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-500/20 pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-lg bg-amber-500/20 text-amber-600">🎤</span>
+                  <h3 className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
+                    2. Ateliers Animés par l'Incubé & Initiatives ({annee})
+                  </h3>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-bold text-amber-600 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-0.5 rounded-lg border border-amber-200 dark:border-amber-800">
+                    Total heures dispensées : {stats.totalHeuresAteliersAnimes} h ({stats.totalNbAteliersAnimes} atelier{stats.totalNbAteliersAnimes > 1 ? 's' : ''})
+                  </span>
+                </div>
+              </div>
+
+              {/* TABLEAU : AU NIVEAU DE MOIS UNE AGENDA POUR SÉLECTIONNER LE MOIS */}
+              <div className="card overflow-hidden border border-slate-200 dark:border-dark-700/60 shadow-sm p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100 dark:bg-dark-800 text-slate-700 dark:text-dark-300 border-b border-slate-200 dark:border-dark-700/60">
+                        <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 w-52 sticky left-0 bg-slate-100 dark:bg-dark-800 z-10 border-r border-slate-200 dark:border-dark-700/60">
+                          <div className="flex items-center justify-between gap-1.5">
+                            <span className="flex items-center gap-1.5">
+                              <Calendar size={14} className="text-amber-500" />
+                              <span>Mois (Agenda)</span>
+                            </span>
                           </div>
-                        ) : (
-                          <span className="text-[10px] text-slate-400 italic">Aucune formation ce mois</span>
-                        )}
-                      </div>
-                    </td>
+                        </th>
+                        <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 text-center min-w-[150px]">
+                          Ateliers Animés
+                          <div className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">Heures données</div>
+                        </th>
+                        <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 min-w-[240px]">
+                          Initiatives & Projets
+                        </th>
+                        <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 min-w-[240px]">
+                          Observation & Remarques
+                        </th>
+                        <th className="py-3 px-3 font-bold text-slate-800 dark:text-dark-200 text-center w-20">
+                          Action
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-dark-700/50">
+                      {(() => {
+                        const isAll = selectedAgendaMonth === 'all';
+                        const monthsToRender = isAll ? MOIS : [selectedAgendaMonth];
 
-                    {/* Initiatives et propositions */}
-                    <td className="p-2">
-                      <textarea
-                        rows={1}
-                        placeholder="Initiatives prises ce mois..."
-                        className="input !py-2 !px-3 !text-xs w-full resize-none rounded-xl bg-slate-50 dark:bg-dark-900 border-slate-300 dark:border-dark-700/80 text-slate-800 dark:text-dark-200 placeholder-slate-400 dark:placeholder-dark-500 focus:border-amber-500/80"
-                        value={item.initiatives || ''}
-                        onChange={(e) => updateField(m, 'initiatives', e.target.value)}
-                      />
-                    </td>
+                        return monthsToRender.map((m) => {
+                          const idx = MOIS.indexOf(m);
+                          const item = months[m] || {};
+                          const isSaving = savingRowIdx === idx;
+                          const mStats = ateliersStats?.monthly?.[m] || {};
+                          const hAnimees = mStats.heures_ateliers_animes !== undefined ? mStats.heures_ateliers_animes : (item.heures_ateliers_animes || 0);
+                          const nbAnimes = mStats.nb_ateliers_animes !== undefined ? mStats.nb_ateliers_animes : (item.nb_ateliers_animes || 0);
 
-                    {/* Observation et commentaire */}
-                    <td className="p-2">
-                      <textarea
-                        rows={1}
-                        placeholder="Remarques de l'accompagnateur..."
-                        className="input !py-2 !px-3 !text-xs w-full resize-none rounded-xl bg-slate-50 dark:bg-dark-900 border-slate-300 dark:border-dark-700/80 text-slate-800 dark:text-dark-200 placeholder-slate-400 dark:placeholder-dark-500 focus:border-amber-500/80"
-                        value={item.observations || ''}
-                        onChange={(e) => updateField(m, 'observations', e.target.value)}
-                      />
-                    </td>
+                          return (
+                            <tr key={m} className="bg-white dark:bg-dark-900/60 hover:bg-slate-100/60 dark:hover:bg-dark-700/30 transition-colors">
+                              {/* COLONNE MOIS : SÉLECTEUR AGENDA POUR CHOISIR LE MOIS */}
+                              <td className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 sticky left-0 z-10 border-r border-slate-200 dark:border-dark-700/60 shadow-sm bg-white dark:bg-dark-900">
+                                <div className="flex items-center gap-1.5">
+                                  <div className="p-1 rounded-md bg-amber-500/10 text-amber-600 shrink-0">
+                                    <Calendar size={14} />
+                                  </div>
+                                  <select
+                                    value={selectedAgendaMonth}
+                                    onChange={(e) => setSelectedAgendaMonth(e.target.value)}
+                                    className="select select-xs !py-1 !px-2 font-bold text-xs bg-slate-50 dark:bg-dark-800 border border-slate-300 dark:border-dark-700 rounded-lg text-slate-800 dark:text-dark-200 focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
+                                    title="Sélectionner le mois dans l'agenda"
+                                  >
+                                    {MOIS.map((optM) => (
+                                      <option key={optM} value={optM}>
+                                        {optM} {annee}
+                                      </option>
+                                    ))}
+                                    <option value="all">📋 Tous les 12 mois</option>
+                                  </select>
+                                </div>
+                              </td>
 
-                    {/* Action sauvegarder ligne */}
-                    <td className="p-2 text-center">
-                      <button
-                        onClick={() => saveMonth(m, idx)}
-                        disabled={isSaving}
-                        className="p-2 rounded-xl bg-slate-100 hover:bg-emerald-500 hover:text-white dark:bg-dark-700/70 dark:hover:bg-emerald-600 text-slate-600 dark:text-dark-300 transition-all shadow-sm"
-                        title={`Enregistrer les données de ${m}`}
-                      >
-                        <Save size={14} className={isSaving ? 'animate-spin' : ''} />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                              {/* COLONNE ATELIERS ANIMÉS : HEURES AFFICHÉES DIRECTEMENT DEPUIS ATELIERS */}
+                              <td className="p-2 text-center">
+                                {nbAnimes > 0 ? (
+                                  <div className="inline-flex flex-col items-center">
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                                      🎤 {hAnimees} h ({nbAnimes} atelier{nbAnimes > 1 ? 's' : ''})
+                                    </span>
+                                    {mStats.ateliers_animes && mStats.ateliers_animes.length > 0 && (
+                                      <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium truncate max-w-[150px] block mt-0.5" title={mStats.ateliers_animes.map(a => a.titre).join(', ')}>
+                                        {mStats.ateliers_animes[0].titre}
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-400 text-xs">0 h</span>
+                                )}
+                              </td>
+
+                              {/* COLONNE INITIATIVES & PROJETS */}
+                              <td className="p-2">
+                                <textarea
+                                  rows={1}
+                                  placeholder="Initiatives prises ce mois..."
+                                  className="input !py-2 !px-3 !text-xs w-full resize-none rounded-xl bg-slate-50 dark:bg-dark-900 border-slate-300 dark:border-dark-700/80 text-slate-800 dark:text-dark-200"
+                                  value={item.initiatives || ''}
+                                  onChange={(e) => updateField(m, 'initiatives', e.target.value)}
+                                />
+                              </td>
+
+                              {/* COLONNE OBSERVATION & REMARQUES */}
+                              <td className="p-2">
+                                <textarea
+                                  rows={1}
+                                  placeholder="Remarques de l'accompagnateur..."
+                                  className="input !py-2 !px-3 !text-xs w-full resize-none rounded-xl bg-slate-50 dark:bg-dark-900 border-slate-300 dark:border-dark-700/80 text-slate-800 dark:text-dark-200"
+                                  value={item.observations || ''}
+                                  onChange={(e) => updateField(m, 'observations', e.target.value)}
+                                />
+                              </td>
+
+                              {/* COLONNE ACTION [💾] */}
+                              <td className="p-2 text-center">
+                                <button
+                                  onClick={() => saveMonth(m, idx)}
+                                  disabled={isSaving}
+                                  className="p-2 rounded-xl bg-slate-100 hover:bg-emerald-500 hover:text-white dark:bg-dark-700/70 dark:hover:bg-emerald-600 text-slate-600 dark:text-dark-300 transition-all shadow-sm"
+                                  title={`Enregistrer ${m}`}
+                                >
+                                  <Save size={14} className={isSaving ? 'animate-spin' : ''} />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-
     </div>
   );
 }

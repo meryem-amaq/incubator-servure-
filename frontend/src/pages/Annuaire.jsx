@@ -705,7 +705,7 @@ export default function Annuaire() {
   return (
     <div className="slide-up space-y-6">
       {/* KPI Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="card flex items-center gap-3 sm:gap-4 p-3.5 sm:p-5">
           <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-primary-500/10 text-primary-500 flex items-center justify-center shrink-0">
             <Users size={22} />
@@ -941,7 +941,7 @@ export default function Annuaire() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
           <button
             type="button"
             className="btn btn-secondary flex items-center gap-2 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 font-semibold"
@@ -1005,7 +1005,7 @@ export default function Annuaire() {
           ) : null}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))] gap-4">
           {filtered.map((inc, idx) => {
             const followUp = getFollowUpStatus(inc);
             const planStatut = getPlanStatus(inc);
@@ -1057,37 +1057,38 @@ export default function Annuaire() {
                     </div>
                   </div>
 
-                  <div className="mt-3.5 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
-                    <div className="min-w-0 truncate"><span className="text-slate-500 dark:text-dark-500">Statut :</span> <span className="text-slate-700 dark:text-dark-300 font-medium">{inc.statut_juridique}</span></div>
-                    <div className="min-w-0 truncate"><span className="text-slate-500 dark:text-dark-500">N° PP :</span> <span className="text-slate-700 dark:text-dark-300 font-medium">{inc.pp_numero || '—'}</span></div>
-                    <div className="min-w-0 truncate">
-                      <span className="text-slate-500 dark:text-dark-500">Accomp. :</span>{' '}
-                      <span className="text-slate-700 dark:text-dark-300 font-medium truncate inline-block max-w-full" title={inc.accompagnateurAdmin ? `${inc.accompagnateurAdmin.prenom} ${inc.accompagnateurAdmin.nom}` : (inc.accompagnateur || 'Non assigné')}>
+                  <div className="mt-3.5 space-y-1.5 text-xs">
+                    <div className="grid grid-cols-2 gap-x-2">
+                      <div className="min-w-0"><span className="text-slate-500 dark:text-dark-500">Statut :</span> <span className="text-slate-700 dark:text-dark-300 font-medium">{inc.statut_juridique || '—'}</span></div>
+                      <div className="min-w-0"><span className="text-slate-500 dark:text-dark-500">N° PP :</span> <span className="text-slate-700 dark:text-dark-300 font-medium">{inc.pp_numero || '—'}</span></div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-2">
+                      <div className="min-w-0"><span className="text-slate-500 dark:text-dark-500">Début :</span> <span className="text-slate-700 dark:text-dark-300 font-medium">{inc.date_demarrage ? new Date(inc.date_demarrage).toLocaleDateString('fr-FR') : '—'}</span></div>
+                      <div className="min-w-0 flex items-center gap-1">
+                        <span className="text-slate-500 dark:text-dark-500 shrink-0">Promo :</span>{' '}
+                        <span className="font-bold text-primary-600 dark:text-primary-400 whitespace-nowrap">
+                          {inc.promotion || '—'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="min-w-0 flex items-center gap-1.5">
+                      <span className="text-slate-500 dark:text-dark-500 shrink-0">Accomp. :</span>{' '}
+                      <span className="text-slate-700 dark:text-dark-300 font-medium truncate" title={inc.accompagnateurAdmin ? `${inc.accompagnateurAdmin.prenom} ${inc.accompagnateurAdmin.nom}` : (inc.accompagnateur || 'Non assigné')}>
                         {inc.accompagnateurAdmin
                           ? `${inc.accompagnateurAdmin.prenom} ${inc.accompagnateurAdmin.nom}`
                           : (inc.accompagnateur || 'Non assigné')}
                       </span>
                     </div>
-                    <div className="min-w-0 truncate"><span className="text-slate-500 dark:text-dark-500">Début :</span> <span className="text-slate-700 dark:text-dark-300 font-medium">{inc.date_demarrage ? new Date(inc.date_demarrage).toLocaleDateString('fr-FR') : '—'}</span></div>
-                    {inc.promotion && (
-                      <div className="col-span-1 min-w-0 truncate">
-                        <span className="text-slate-500 dark:text-dark-500">Promo :</span>{' '}
-                        <span className="inline-flex items-center gap-1 font-bold text-primary-600 dark:text-primary-400">
-                          <GraduationCap size={12} />
-                          {inc.promotion}
-                        </span>
-                      </div>
-                    )}
                     {inc.secteur_activite && (
-                      <div className={`${inc.promotion ? "col-span-1" : "col-span-2"} min-w-0 truncate`}>
-                        <span className="text-slate-500 dark:text-dark-500">Secteur :</span>{' '}
-                        <span className="text-slate-700 dark:text-dark-300 font-medium truncate inline-block max-w-[130px]" title={inc.secteur_activite}>
+                      <div className="min-w-0 flex items-center gap-1.5">
+                        <span className="text-slate-500 dark:text-dark-500 shrink-0">Secteur :</span>{' '}
+                        <span className="text-slate-700 dark:text-dark-300 font-medium truncate" title={inc.secteur_activite}>
                           {inc.secteur_activite}
                         </span>
                       </div>
                     )}
                     {inc.email && (
-                      <div className="col-span-2 pt-1 border-t border-slate-100 dark:border-dark-800/60 text-[11px] text-slate-500 dark:text-dark-400 flex items-center gap-1.5 min-w-0 truncate">
+                      <div className="pt-1.5 border-t border-slate-100 dark:border-dark-800/60 text-[11px] text-slate-500 dark:text-dark-400 flex items-center gap-1.5 min-w-0">
                         <span>📧</span> <span className="font-mono text-slate-700 dark:text-dark-200 truncate">{inc.email}</span>
                       </div>
                     )}

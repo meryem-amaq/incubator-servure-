@@ -715,3 +715,500 @@ export const getSeancePVBlobUrl = (incube, row) => {
   return URL.createObjectURL(blob);
 };
 
+// ==========================================
+// 3️⃣ PROCÈS-VERBAL TRIMESTRIEL CONSOLIDÉ (3 MOIS)
+// ==========================================
+
+const MOIS_NOMS_FR = [
+  '', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+];
+
+export const generateQuarterlyPVDocument = (incube, options = {}, signatureImage = null) => {
+  const doc = new jsPDF('landscape');
+  const pageWidth = doc.internal.pageSize.width; // 297mm
+  const pageHeight = doc.internal.pageSize.height; // 210mm
+  const marginX = 14;
+  const contentWidth = pageWidth - (marginX * 2); // 269mm
+
+  const today = new Date().toLocaleDateString('fr-FR');
+  const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  const accompagnateurName = getAccompagnateurName(incube);
+  const incubeName = incube?.nom_incube || 'Incubé';
+
+  // Paramètres du trimestre
+  const selectedYear = parseInt(options.year || new Date().getFullYear(), 10);
+  const quarterNum = parseInt(options.quarter || Math.ceil((new Date().getMonth() + 1) / 3), 10);
+
+  // Mois correspondants au trimestre
+  const QUARTER_MONTHS = {
+    1: [1, 2, 3],
+    2: [4, 5, 6],
+    3: [7, 8, 9],
+    4: [10, 11, 12]
+  };
+  const targetMonths = QUARTER_MONTHS[quarterNum] || [1, 2, 3];
+  const quarterLabel = `Trimestre T${quarterNum} (${MOIS_NOMS_FR[targetMonths[0]]} - ${MOIS_NOMS_FR[targetMonths[2]]})`;
+
+  // Formatage monétaire
+  const fmtMAD = (v) => {
+    const num = Number(v) || 0;
+    return `${num.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MAD`;
+  };
+
+  // Helper pour dessiner le titre officiel d'une section
+  const drawSectionHeader = (title, yPos) => {
+    doc.setFillColor(37, 99, 235); // Bleu primaire
+    doc.roundedRect(marginX, yPos - 3.8, 3, 5, 0.8, 0.8, 'F');
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(15, 23, 42);
+    doc.text(title, marginX + 6, yPos);
+  };
+
+  // ==========================================
+  // EN-TÊTE DU DOCUMENT
+  // ==========================================
+  doc.setFontSize(8.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(37, 99, 235);
+  doc.text("CENTRE DE GESTION SOLIDAIRE (CGS) • IDS INCUBATEUR", marginX, 12);
+
+  doc.setFontSize(14);
+  doc.setTextColor(15, 23, 42);
+  doc.text("PROCÈS-VERBAL D'ÉVALUATION TRIMESTRIELLE (PV 3 MOIS)", marginX, 19);
+
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Réf : PV-TRI-T${quarterNum}-${selectedYear}-${incube?.pp_numero || 'INC'} • Dossier : ${incubeName} • Période : ${quarterLabel} ${selectedYear}`, marginX, 25);
+
+  doc.setFontSize(8.5);
+  doc.text(`Édité le ${today} à ${time}`, pageWidth - marginX, 25, { align: 'right' });
+
+  // Ligne de séparation
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.6);
+  doc.line(marginX, 28, pageWidth - marginX, 28);
+
+  // ==========================================
+  // CARTOUCHE D'IDENTIFICATION
+  // ==========================================
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(marginX, 32, contentWidth, 18, 2, 2, 'FD');
+
+  doc.setFontSize(8);
+  // Col 1
+  doc.setFont("helvetica", "bold"); doc.setTextColor(71, 85, 105);
+  doc.text("• Porteur de projet :", marginX + 4, 38);
+  doc.setFont("helvetica", "bold"); doc.setTextColor(15, 23, 42);
+  doc.text(incubeName, marginX + 38, 38);
+
+  doc.setFont("helvetica", "bold"); doc.setTextColor(71, 85, 105);
+  doc.text("• Raison sociale :", marginX + 4, 45);
+  doc.setFont("helvetica", "normal"); doc.setTextColor(15, 23, 42);
+  doc.text(incube?.raison_sociale || '—', marginX + 38, 45);
+
+  // Col 2
+  doc.setFont("helvetica", "bold"); doc.setTextColor(71, 85, 105);
+  doc.text("• N° Dossier :", marginX + 96, 38);
+  doc.setFont("helvetica", "normal"); doc.setTextColor(15, 23, 42);
+  doc.text(incube?.pp_numero || '—', marginX + 125, 38);
+
+  doc.setFont("helvetica", "bold"); doc.setTextColor(71, 85, 105);
+  doc.text("• Phase actuelle :", marginX + 96, 45);
+  doc.setFont("helvetica", "normal"); doc.setTextColor(15, 23, 42);
+  doc.text(incube?.phase_projet || '—', marginX + 125, 45);
+
+  // Col 3
+  doc.setFont("helvetica", "bold"); doc.setTextColor(71, 85, 105);
+  doc.text("• Accompagnateur :", marginX + 185, 38);
+  doc.setFont("helvetica", "normal"); doc.setTextColor(15, 23, 42);
+  doc.text(accompagnateurName, marginX + 220, 38);
+
+  doc.setFont("helvetica", "bold"); doc.setTextColor(71, 85, 105);
+  doc.text("• Trimestre visé :", marginX + 185, 45);
+  doc.setFont("helvetica", "bold"); doc.setTextColor(37, 99, 235);
+  doc.text(`T${quarterNum} ${selectedYear} (${MOIS_NOMS_FR[targetMonths[0]].slice(0,3)} - ${MOIS_NOMS_FR[targetMonths[2]].slice(0,3)})`, marginX + 220, 45);
+
+  let currentY = 56;
+
+  // ==========================================
+  // 1. SÉANCES DE SUIVI DU TRIMESTRE
+  // ==========================================
+  drawSectionHeader(`1. SÉANCES DE SUIVI DU TRIMESTRE (${quarterLabel})`, currentY);
+
+  const rawSuivis = Array.isArray(incube?.fiches_suivi) ? incube.fiches_suivi : (options.fiches || []);
+  const suivisTrimestre = rawSuivis.filter(s => {
+    if (!s.date_suivi) return false;
+    const d = new Date(s.date_suivi);
+    if (isNaN(d.getTime())) return false;
+    const y = d.getFullYear();
+    const m = d.getMonth() + 1;
+    return y === selectedYear && targetMonths.includes(m);
+  });
+
+  const suiviColumns = [
+    { header: 'N°', dataKey: 'num' },
+    { header: 'Date', dataKey: 'date' },
+    { header: 'Objet de la réunion', dataKey: 'objet' },
+    { header: 'Statut Juridique', dataKey: 'juridique' },
+    { header: 'Phase', dataKey: 'phase' },
+    { header: 'Observations & Décisions arrêtées', dataKey: 'obs' }
+  ];
+
+  const suiviData = suivisTrimestre.length === 0
+    ? [['—', '—', 'Aucune séance de suivi enregistrée pour ce trimestre.', '—', '—', '—']]
+    : suivisTrimestre.map((s, idx) => [
+        s.numero_ordre ? `N° ${s.numero_ordre}` : `S${idx + 1}`,
+        formatDateFr(s.date_suivi),
+        s.objet_reunion || 'Séance de suivi périodique',
+        s.statut_juridique || '—',
+        s.statut_avancement || '—',
+        s.observations?.trim() || 'Conforme aux objectifs fixés.'
+      ]);
+
+  autoTable(doc, {
+    startY: currentY + 3.5,
+    head: [suiviColumns.map(c => c.header)],
+    body: suiviData,
+    styles: { fontSize: 7.5, cellPadding: 2.5, textColor: [51, 65, 85], valign: 'middle' },
+    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.8, cellPadding: 3 },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    columnStyles: {
+      0: { cellWidth: 14, halign: 'center' },
+      1: { cellWidth: 22, halign: 'center' },
+      2: { cellWidth: 48 },
+      3: { cellWidth: 32 },
+      4: { cellWidth: 26 },
+      5: { cellWidth: 'auto' }
+    },
+    margin: { left: marginX, right: marginX }
+  });
+
+  currentY = doc.lastAutoTable.finalY + 7;
+
+  // ==========================================
+  // 2. AVANCEMENT DU PLAN D'ACTION DU TRIMESTRE
+  // ==========================================
+  if (currentY + 38 > pageHeight) {
+    doc.addPage();
+    currentY = 16;
+  }
+
+  drawSectionHeader("2. AVANCEMENT DU PLAN D'ACTION (OBJECTIFS DU TRIMESTRE)", currentY);
+
+  const rawPlans = Array.isArray(incube?.plans) ? incube.plans : (options.plans || []);
+  // Filtrer les plans correspondants au trimestre ou affichés
+  const plansTrimestre = rawPlans.filter(p => {
+    if (p.echeance) {
+      const d = new Date(p.echeance);
+      if (!isNaN(d.getTime())) {
+        return d.getFullYear() === selectedYear && targetMonths.includes(d.getMonth() + 1);
+      }
+    }
+    // Si pas de date échéance stricte, inclure si mois texte correspond
+    if (p.mois) {
+      const pMoisLower = String(p.mois).toLowerCase();
+      return targetMonths.some(m => pMoisLower.includes(MOIS_NOMS_FR[m].toLowerCase()));
+    }
+    return true; // Par défaut garder les plans actifs s'ils ne sont pas datés
+  });
+
+  const planColumns = [
+    { header: 'N°', dataKey: 'num' },
+    { header: 'Objectif / Action stratégique', dataKey: 'obj' },
+    { header: 'Échéance', dataKey: 'ech' },
+    { header: 'Statut / Réalisation', dataKey: 'statut' },
+    { header: 'Difficultés / Commentaires', dataKey: 'com' }
+  ];
+
+  const planData = plansTrimestre.length === 0
+    ? [['—', 'Aucune action formalisée pour cette période.', '—', '—', '—']]
+    : plansTrimestre.map((p, idx) => [
+        `A${idx + 1}`,
+        p.objectifs || 'Action sans intitulé',
+        formatDateFr(p.echeance || p.date_debut),
+        p.realisation || 'En cours',
+        [p.problemes_rencontres, p.commentaires].filter(Boolean).join(' • ') || 'RAS'
+      ]);
+
+  autoTable(doc, {
+    startY: currentY + 3.5,
+    head: [planColumns.map(c => c.header)],
+    body: planData,
+    styles: { fontSize: 7.5, cellPadding: 2.5, textColor: [51, 65, 85], valign: 'middle' },
+    headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.8, cellPadding: 3 },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    columnStyles: {
+      0: { cellWidth: 14, halign: 'center' },
+      1: { cellWidth: 70 },
+      2: { cellWidth: 26, halign: 'center' },
+      3: { cellWidth: 32, halign: 'center', fontStyle: 'bold' },
+      4: { cellWidth: 'auto' }
+    },
+    margin: { left: marginX, right: marginX }
+  });
+
+  currentY = doc.lastAutoTable.finalY + 7;
+
+  // ==========================================
+  // 3. SYNTHÈSE DE L'ANALYSE FINANCIÈRE
+  // ==========================================
+  if (currentY + 45 > pageHeight) {
+    doc.addPage();
+    currentY = 16;
+  }
+
+  drawSectionHeader(`3. SYNTHÈSE DE L'ANALYSE FINANCIÈRE (${quarterLabel} ${selectedYear})`, currentY);
+
+  const rawFinances = Array.isArray(incube?.finances) ? incube.finances : (options.finances || []);
+  const financesTrimestre = rawFinances.filter(f => {
+    return parseInt(f.annee, 10) === selectedYear && targetMonths.includes(parseInt(f.mois, 10));
+  });
+
+  // Calculs mensuels
+  let sumVentes = 0;
+  let sumCharges = 0;
+  let sumResultat = 0;
+
+  const financeRows = targetMonths.map(m => {
+    const record = financesTrimestre.find(f => parseInt(f.mois, 10) === m) || {};
+    const v = Number(record.ventes) || 0;
+    
+    // Somme des charges
+    const fixedCharges = [
+      'achats', 'charges_personnel', 'charges_cnss', 'salaire_porteur',
+      'loyer_coworking', 'eau_electricite', 'transport', 'telephone',
+      'taxes', 'tva', 'remboursement_credit', 'autres_charges'
+    ];
+    let ch = 0;
+    fixedCharges.forEach(k => { ch += Number(record[k]) || 0; });
+
+    // Charges personnalisées stockées dans details_autres_charges
+    if (record.details_autres_charges) {
+      try {
+        const details = typeof record.details_autres_charges === 'string'
+          ? JSON.parse(record.details_autres_charges)
+          : record.details_autres_charges;
+        if (Array.isArray(details)) {
+          details.forEach(it => { ch += Number(it.montant) || 0; });
+        }
+      } catch (_) {}
+    }
+
+    const res = v - ch;
+    sumVentes += v;
+    sumCharges += ch;
+    sumResultat += res;
+
+    return [
+      MOIS_NOMS_FR[m],
+      fmtMAD(v),
+      fmtMAD(ch),
+      fmtMAD(res),
+      res >= 0 ? 'Excédentaire' : 'Déficitaire'
+    ];
+  });
+
+  // Ligne de totalisation du trimestre
+  financeRows.push([
+    `TOTAL ${quarterLabel}`,
+    fmtMAD(sumVentes),
+    fmtMAD(sumCharges),
+    fmtMAD(sumResultat),
+    sumResultat >= 0 ? 'Bilan Positif' : 'Bilan Négatif'
+  ]);
+
+  const financeCols = [
+    { header: 'Mois', dataKey: 'mois' },
+    { header: 'Chiffre d\'Affaires / Ventes', dataKey: 'ventes' },
+    { header: 'Total Charges d\'Exploitation', dataKey: 'charges' },
+    { header: 'Résultat Net / Marge', dataKey: 'resultat' },
+    { header: 'Situation', dataKey: 'statut' }
+  ];
+
+  autoTable(doc, {
+    startY: currentY + 3.5,
+    head: [financeCols.map(c => c.header)],
+    body: financeRows,
+    styles: { fontSize: 7.5, cellPadding: 2.5, textColor: [51, 65, 85], valign: 'middle' },
+    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.8, cellPadding: 3 },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    columnStyles: {
+      0: { cellWidth: 50, fontStyle: 'bold' },
+      1: { cellWidth: 55, halign: 'right' },
+      2: { cellWidth: 55, halign: 'right' },
+      3: { cellWidth: 55, halign: 'right', fontStyle: 'bold' },
+      4: { cellWidth: 'auto', halign: 'center', fontStyle: 'bold' }
+    },
+    didParseCell: (data) => {
+      // Mettre en gras et colorer la ligne TOTAL
+      if (data.row.index === financeRows.length - 1) {
+        data.cell.styles.fontStyle = 'bold';
+        data.cell.styles.fillColor = [224, 231, 255]; // Indigo léger
+        data.cell.styles.textColor = [30, 27, 75];
+      }
+    },
+    margin: { left: marginX, right: marginX }
+  });
+
+  currentY = doc.lastAutoTable.finalY + 7;
+
+  // ==========================================
+  // 4. MATÉRIEL & ÉQUIPEMENTS AFFECTÉS
+  // ==========================================
+  if (currentY + 40 > pageHeight) {
+    doc.addPage();
+    currentY = 16;
+  }
+
+  drawSectionHeader("4. PARC MATÉRIEL & ÉQUIPEMENTS AFFECTÉS", currentY);
+
+  const rawMateriels = Array.isArray(incube?.materiels) ? incube.materiels : (options.materiels || []);
+  const materielCols = [
+    { header: 'N°', dataKey: 'num' },
+    { header: 'Désignation de l\'article', dataKey: 'art' },
+    { header: 'N° Série / Réf', dataKey: 'serie' },
+    { header: 'Date affectation', dataKey: 'date' },
+    { header: 'Quantité', dataKey: 'qte' },
+    { header: 'Origine', dataKey: 'org' },
+    { header: 'État / Conformité', dataKey: 'etat' }
+  ];
+
+  const materielData = rawMateriels.length === 0
+    ? [['—', 'Aucun matériel inventorié sous gestion directe.', '—', '—', '—', '—', '—']]
+    : rawMateriels.map((m, idx) => [
+        `M${idx + 1}`,
+        m.article || 'Matériel',
+        m.numero_serie || '—',
+        formatDateFr(m.date_acquisition_reception),
+        String(m.quantite || 1),
+        m.type_origine === 'ids' ? 'Dotation IDS' : 'Propre',
+        m.etat || 'Opérationnel'
+      ]);
+
+  autoTable(doc, {
+    startY: currentY + 3.5,
+    head: [materielCols.map(c => c.header)],
+    body: materielData,
+    styles: { fontSize: 7.5, cellPadding: 2.5, textColor: [51, 65, 85], valign: 'middle' },
+    headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.8, cellPadding: 3 },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    columnStyles: {
+      0: { cellWidth: 12, halign: 'center' },
+      1: { cellWidth: 70 },
+      2: { cellWidth: 38 },
+      3: { cellWidth: 26, halign: 'center' },
+      4: { cellWidth: 16, halign: 'center' },
+      5: { cellWidth: 26, halign: 'center' },
+      6: { cellWidth: 'auto', halign: 'center', fontStyle: 'bold' }
+    },
+    margin: { left: marginX, right: marginX }
+  });
+
+  currentY = doc.lastAutoTable.finalY + 7;
+
+  // ==========================================
+  // 5. SYNTHÈSE, RECOMMANDATIONS & DÉCISION
+  // ==========================================
+  if (currentY + 45 > pageHeight) {
+    doc.addPage();
+    currentY = 16;
+  }
+
+  drawSectionHeader("5. AVIS DE L'ACCOMPAGNATEUR & RECOMMANDATIONS POUR LE TRIMESTRE SUIVANT", currentY);
+
+  const cardY = currentY + 3.5;
+  const cardWidth = (contentWidth - 14) / 3;
+  const cardHeight = 22;
+
+  // 5.1 Progression
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(marginX, cardY, cardWidth, cardHeight, 2, 2, 'FD');
+  doc.setFontSize(8); doc.setFont("helvetica", "bold"); doc.setTextColor(30, 41, 59);
+  doc.text("• Progression & Jalons", marginX + 3.5, cardY + 5.5);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(71, 85, 105);
+  const progText = options.progression || `Progression régulière au cours du T${quarterNum}. ${suivisTrimestre.length} séance(s) de cadrage réalisée(s).`;
+  const progLines = doc.splitTextToSize(progText, cardWidth - 7);
+  doc.text(progLines.slice(0, 3), marginX + 3.5, cardY + 11);
+
+  // 5.2 Points de vigilance
+  const card2X = marginX + cardWidth + 7;
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(card2X, cardY, cardWidth, cardHeight, 2, 2, 'FD');
+  doc.setFontSize(8); doc.setFont("helvetica", "bold"); doc.setTextColor(180, 83, 9);
+  doc.text("• Points de vigilance & Actions", card2X + 3.5, cardY + 5.5);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(71, 85, 105);
+  const vigText = options.vigilance || (sumResultat < 0 ? "Surveillance de la trésorerie et optimisation des charges requises." : "Poursuite de la prospection commerciale et consolidation du plan d'action.");
+  const vigLines = doc.splitTextToSize(vigText, cardWidth - 7);
+  doc.text(vigLines.slice(0, 3), card2X + 3.5, cardY + 11);
+
+  // 5.3 Décision / Validation
+  const card3X = card2X + cardWidth + 7;
+  doc.setFillColor(240, 253, 244);
+  doc.roundedRect(card3X, cardY, cardWidth, cardHeight, 2, 2, 'FD');
+  doc.setFontSize(8); doc.setFont("helvetica", "bold"); doc.setTextColor(22, 101, 52);
+  doc.text("• Décision du Comité", card3X + 3.5, cardY + 5.5);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(71, 85, 105);
+  const decText = options.decision || `Avis Favorable : Validation de l'étape T${quarterNum}. Maintien du parcours d'incubation IDS.`;
+  const decLines = doc.splitTextToSize(decText, cardWidth - 7);
+  doc.text(decLines.slice(0, 3), card3X + 3.5, cardY + 11);
+
+  currentY = cardY + cardHeight + 7;
+
+  // ==========================================
+  // 6. VALIDATION ET ÉMARGEMENT (SIGNATURES)
+  // ==========================================
+  if (currentY + 45 > pageHeight) {
+    doc.addPage();
+    currentY = 16;
+  }
+
+  drawSectionHeader("6. ÉMARGEMENT & DOUBLE SIGNATURE OFFICIELLE", currentY);
+
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "italic");
+  doc.setTextColor(100, 116, 139);
+  doc.text(
+    `Le présent procès-verbal trimestriel arrête l'état d'avancement du projet à l'issue du trimestre T${quarterNum} (${selectedYear}). Les soussignés en certifient la conformité.`,
+    marginX + 6,
+    currentY + 4.5
+  );
+
+  drawPVSignatures(doc, signatureImage, currentY + 9, incubeName, accompagnateurName, pageWidth);
+
+  // Numérotation finale de toutes les pages
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(148, 163, 184);
+    doc.text(
+      `Page ${i} sur ${totalPages} • Document officiel CGS - IDS Incubateur • Procès-Verbal Trimestriel T${quarterNum} ${selectedYear}`,
+      pageWidth / 2,
+      pageHeight - 5,
+      { align: 'center' }
+    );
+  }
+
+  return doc;
+};
+
+export const exportQuarterlyPVToPDF = (incube, options, signatureImage, filename) => {
+  const doc = generateQuarterlyPVDocument(incube, options, signatureImage);
+  const q = options?.quarter || 1;
+  const y = options?.year || new Date().getFullYear();
+  doc.save(filename || `PV_Trimestriel_T${q}_${y}_${incube?.nom_incube || 'Incube'}.pdf`);
+};
+
+export const getQuarterlyPVBlobUrl = (incube, options) => {
+  const doc = generateQuarterlyPVDocument(incube, options, null);
+  const blob = doc.output('blob');
+  return URL.createObjectURL(blob);
+};
+
+

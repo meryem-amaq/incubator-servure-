@@ -89,15 +89,17 @@ export default function Sidebar({
       <nav 
         id="mobile-navigation-drawer"
         aria-label="Navigation principale"
-        className={`fixed top-0 bottom-0 left-0 z-40 bg-[#02162B] border-r border-[#0A2744] flex flex-col transition-all duration-300 ease-in-out print:hidden ${
-          isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        } ${isExpanded ? 'w-72' : 'w-20'}`}
+        className={`bg-[#02162B] border-r border-[#0A2744] flex flex-col transition-all duration-300 ease-in-out print:hidden fixed inset-y-0 left-0 z-50 ${
+          isMobileOpen ? 'translate-x-0 w-72 max-w-[85vw]' : '-translate-x-full'
+        } lg:static lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:translate-x-0 ${
+          isExpanded ? 'lg:w-72' : 'lg:w-20'
+        }`}
       >
         {/* 1. BRAND / LOGO HEADER */}
-        <div className={`h-16 flex items-center ${isExpanded ? 'justify-between px-4' : 'justify-center'} border-b border-[#0A2744] shrink-0`}>
+        <div className={`h-16 flex items-center ${(isExpanded || isMobileOpen) ? 'justify-between px-4' : 'justify-center'} border-b border-[#0A2744] shrink-0`}>
           
           {/* Logo (Visible uniquement si étendu) */}
-          {isExpanded && (
+          {(isExpanded || isMobileOpen) && (
             <div className="flex items-center gap-3 overflow-hidden cursor-pointer" onClick={() => navigate('/')}>
               <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center shadow-md shrink-0">
                 <img src="/logo-ids.png" alt="IDS Logo" className="w-full h-full object-cover rounded-xl" />
@@ -380,19 +382,19 @@ export default function Sidebar({
           {/* CARTE UTILISATEUR EN BAS */}
           <div 
             className={`flex items-center justify-between p-2 rounded-xl bg-[#08223F] ${
-              !isExpanded ? 'justify-center bg-transparent p-1' : ''
+              (!isExpanded && !isMobileOpen) ? 'justify-center bg-transparent p-1' : ''
             }`}
           >
             <div 
               className="flex items-center overflow-hidden cursor-pointer"
               onClick={() => {
-                if (!isExpanded) {
+                if (!isExpanded && !isMobileOpen) {
                   setIsSettingsOpen(!isSettingsOpen);
                 } else {
                   handleProfileClick();
                 }
               }}
-              title={!isExpanded ? `${userName} - ${userRole}` : 'Voir mon profil'}
+              title={(!isExpanded && !isMobileOpen) ? `${userName} - ${userRole}` : 'Voir mon profil'}
             >
               {userPhoto ? (
                 <img 
@@ -406,7 +408,7 @@ export default function Sidebar({
                 </div>
               )}
               
-              {isExpanded && (
+              {(isExpanded || isMobileOpen) && (
                 <div className="ml-3 truncate">
                   <p className="text-sm font-semibold text-white truncate">{userName}</p>
                   <p className="text-xs text-blue-300 truncate">{userRole}</p>
@@ -415,7 +417,7 @@ export default function Sidebar({
             </div>
 
             {/* Bouton Paramètres (Visible uniquement si la sidebar est ouverte) */}
-            {isExpanded && (
+            {(isExpanded || isMobileOpen) && (
               <button 
                 onClick={() => setIsSettingsOpen(!isSettingsOpen)}
                 className={`p-1.5 rounded-lg text-blue-300 hover:text-white hover:bg-[#14395E] transition-colors ml-1 ${

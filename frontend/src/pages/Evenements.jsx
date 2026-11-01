@@ -487,7 +487,7 @@ export default function Evenements() {
         const timeStr = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
         const res = await fetch('/api/presence/enregistrer', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             atelierId: selectedAtelier.id,
             incubeId: String(incube.id),
@@ -514,7 +514,7 @@ export default function Evenements() {
       } else {
         await fetch('/api/presence/enregistrer', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             atelierId: selectedAtelier.id,
             incubeId: String(incube.id),
@@ -1729,7 +1729,13 @@ export default function Evenements() {
                       <Clock size={13} className="text-slate-400" /> {f.duree || '3h00'}
                     </span>
                     <span className="flex items-center gap-1.5 truncate font-medium text-slate-700 dark:text-dark-200">
-                      <GraduationCap size={13} className="text-slate-400" /> {f.formateur}{f.intervenant ? ` / ${f.intervenant}` : ''}
+                      {(f.animateurType === 'incube' || f.animateurIncubeId) ? (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                        🎤 Incubé IDS
+                      </span>
+                    ) : (
+                      <GraduationCap size={13} className="text-slate-400" />
+                    )} {f.formateur}{f.intervenant ? ` / ${f.intervenant}` : ''}
                     </span>
                   </div>
 
@@ -1822,27 +1828,91 @@ export default function Evenements() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="label">Formateur</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: M. Benjelloun"
-                      className="input"
-                      value={newFormation.formateur}
-                      onChange={(e) => setNewFormation({ ...newFormation, formateur: e.target.value })}
-                    />
+                {/* Sélecteur de type d'animateur (Externe vs Incubé IDS) */}
+                <div className="space-y-2">
+                  <label className="label font-bold text-slate-700 dark:text-dark-200">
+                    Type d'Animation de l'Atelier
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNewFormation({ ...newFormation, animateurType: 'externe', animateurIncubeId: '' })}
+                      className={`px-3 py-2 text-xs font-bold rounded-xl border transition-all ${
+                        newFormation.animateurType !== 'incube'
+                          ? 'bg-primary-500/10 border-primary-500 text-primary-600 dark:text-primary-400'
+                          : 'border-slate-200 dark:border-dark-700 text-slate-600 dark:text-dark-300 hover:bg-slate-50 dark:hover:bg-dark-800'
+                      }`}
+                    >
+                      🏢 Formateur / Externe
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewFormation({ ...newFormation, animateurType: 'incube' })}
+                      className={`px-3 py-2 text-xs font-bold rounded-xl border transition-all ${
+                        newFormation.animateurType === 'incube'
+                          ? 'bg-amber-500/15 border-amber-500 text-amber-600 dark:text-amber-400'
+                          : 'border-slate-200 dark:border-dark-700 text-slate-600 dark:text-dark-300 hover:bg-slate-50 dark:hover:bg-dark-800'
+                      }`}
+                    >
+                      🎤 Animé par un Incubé (Pair-à-pair)
+                    </button>
                   </div>
-                  <div>
-                    <label className="label">Intervenant</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: Consultant Fablab"
-                      className="input"
-                      value={newFormation.intervenant}
-                      onChange={(e) => setNewFormation({ ...newFormation, intervenant: e.target.value })}
-                    />
-                  </div>
+
+                  {newFormation.animateurType === 'incube' ? (
+                    <div className="pt-1">
+                      <label className="label text-amber-700 dark:text-amber-400 font-semibold">
+                        Sélectionner l'incubé animateur *
+                      </label>
+                      <select
+                        className="input border-amber-400/80 focus:ring-amber-400 font-medium"
+                        value={newFormation.animateurIncubeId || ''}
+                        onChange={(e) => {
+                          const idVal = e.target.value;
+                          const inc = allIncubes.find(i => String(i.id) === String(idVal));
+                          setNewFormation({
+                            ...newFormation,
+                            animateurIncubeId: idVal,
+                            formateur: inc ? `${inc.nom_incube} (Incubé IDS)` : '',
+                            intervenant: inc ? `Incubé : ${inc.nom_incube}` : ''
+                          });
+                        }}
+                        required
+                      >
+                        <option value="">-- Choisir l'incubé intervenant --</option>
+                        {allIncubes.map(i => (
+                          <option key={i.id} value={i.id}>
+                            {i.nom_incube} {i.raison_sociale ? `(${i.raison_sociale})` : ''} - {i.promotion || 'Sans promo'}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1 italic">
+                        💡 Cet atelier sera automatiquement valorisé dans le suivi d'engagement de cet incubé comme initiative d'animation !
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <div>
+                        <label className="label">Formateur</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: M. Benjelloun"
+                          className="input"
+                          value={newFormation.formateur}
+                          onChange={(e) => setNewFormation({ ...newFormation, formateur: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="label">Intervenant</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Consultant Fablab"
+                          className="input"
+                          value={newFormation.intervenant}
+                          onChange={(e) => setNewFormation({ ...newFormation, intervenant: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

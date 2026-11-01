@@ -132,12 +132,18 @@ export default function Engagement() {
 
   const adminFilteredList = isSuperAdmin ? getMatchingIncubes(incubes, selectedAdminFilter) : incubes;
 
-  const filteredIncubes = adminFilteredList.filter(i => 
-    !searchTerm || 
-    i.nom_incube?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    i.raison_sociale?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    i.pp_numero?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredIncubes = adminFilteredList.filter(i => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase().trim();
+    return (
+      (i.nom_incube && i.nom_incube.toLowerCase().includes(term)) ||
+      (i.raison_sociale && i.raison_sociale.toLowerCase().includes(term)) ||
+      (i.pp_numero && i.pp_numero.toLowerCase().includes(term)) ||
+      (i.promo && i.promo.toLowerCase().includes(term)) ||
+      (i.promotion?.nom && i.promotion.nom.toLowerCase().includes(term)) ||
+      (i.accompagnateur && i.accompagnateur.toLowerCase().includes(term))
+    );
+  });
 
   // Sélecteur d'incubé compact et élégant avec filtre Super Admin
   const renderIncubeSelector = () => (
@@ -191,7 +197,7 @@ export default function Engagement() {
               <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
               <input
                 type="text"
-                placeholder="Rechercher un incubé..."
+                placeholder="Rechercher par nom d'incubé, projet, PP, promo..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full bg-slate-50 dark:bg-dark-900 text-xs pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 dark:border-dark-700 focus:outline-none focus:border-amber-500 text-slate-900 dark:text-dark-100"

@@ -25,7 +25,9 @@ import {
   exportGlobalPVToPDF,
   getGlobalPVBlobUrl,
   exportSeancePVToPDF,
-  getSeancePVBlobUrl
+  getSeancePVBlobUrl,
+  exportQuarterlyPVToPDF,
+  getQuarterlyPVBlobUrl
 } from '../../utils/pdfExport';
 
 const BASE_STATUT_OPTS = ['Auto-entrepreneur', 'SARL', 'SARL AU', 'Autre'];
@@ -87,6 +89,16 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
 
   // Modal de lecture agrandie des observations
   const [textModal, setTextModal] = useState({ open: false, title: '', text: '' });
+
+  // Modal PV Trimestriel (3 Mois)
+  const [showQuarterlyModal, setShowQuarterlyModal] = useState(false);
+  const [quarterlyConfig, setQuarterlyConfig] = useState({
+    year: new Date().getFullYear(),
+    quarter: Math.ceil((new Date().getMonth() + 1) / 3),
+    progression: '',
+    vigilance: '',
+    decision: ''
+  });
 
   // Modal de signature PDF
   const [showSigModal, setShowSigModal] = useState(false);
@@ -302,6 +314,20 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
     setShowSigModal(true);
   };
 
+  // Générer & Prévisualiser le PV Trimestriel
+  const handleOpenQuarterlyPV = () => {
+    setExportType('quarterly');
+    setSelectedRow(null);
+    setSigModalTitle(`Signature du PV Trimestriel (T${quarterlyConfig.quarter} ${quarterlyConfig.year}) • ${incube?.nom_incube || 'Incubé'}`);
+    const url = getQuarterlyPVBlobUrl(incube, {
+      ...quarterlyConfig,
+      fiches: rows
+    });
+    setPdfPreviewUrl(url);
+    setShowQuarterlyModal(false);
+    setShowSigModal(true);
+  };
+
   // Validation signature
   const handleValidateSignature = (signatureImage) => {
     const safeName = (incube?.nom_incube || 'Incube').replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -324,6 +350,14 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
         `PV_Seance_Suivi_${dateStr}_${safeName}.pdf`
       );
       toast.success(`Procès-Verbal de la séance signé et téléchargé avec succès !`);
+    } else if (exportType === 'quarterly') {
+      exportQuarterlyPVToPDF(
+        incube,
+        { ...quarterlyConfig, fiches: rows },
+        signatureImage,
+        `PV_Trimestriel_T${quarterlyConfig.quarter}_${quarterlyConfig.year}_${safeName}_${dateStamp}.pdf`
+      );
+      toast.success(`Procès-Verbal Trimestriel T${quarterlyConfig.quarter} signé et téléchargé avec succès !`);
     }
   };
 
@@ -342,6 +376,16 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm flex items-center gap-1.5 border-indigo-500/40 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-500/10 font-bold shadow-sm"
+            onClick={() => setShowQuarterlyModal(true)}
+            title="Générer le Procès-Verbal Trimestriel consolidé (Matériel, Finances, Plan d'Action et Séances des 3 mois)"
+          >
+            <CalendarCheck size={14} className="text-indigo-500" />
+            <span>PV Trimestriel (3 Mois)</span>
+          </button>
+
           <button
             type="button"
             className="btn btn-secondary btn-sm flex items-center gap-1.5 border-rose-500/40 text-rose-700 dark:text-rose-400 hover:bg-rose-500/10 font-bold shadow-sm"
@@ -906,6 +950,177 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
                 onClick={() => setTextModal({ open: false, title: '', text: '' })}
               >
                 Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modale de Configuration du PV Trimestriel (3 Mois) */}
+      {showQuarterlyModal && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[90] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-dark-900 rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-200 dark:border-dark-700 animate-scale-up">
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 dark:border-dark-800 bg-gradient-to-r from-indigo-900 via-primary-900 to-navy-950 text-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-xs flex items-center justify-center text-indigo-300 border border-white/10">
+                  <CalendarCheck size={20} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base sm:text-lg flex items-center gap-2">
+                    Procès-Verbal Trimestriel d'Étape (PV 3 Mois)
+                  </h3>
+                  <p className="text-xs text-indigo-200">
+                    Génération consolidée : Séances de suivi, Analyse financière, Plan d'action & Matériel
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowQuarterlyModal(false)}
+                className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Fermer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-5 sm:p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+              {/* 1. Sélection Année & Trimestre */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 dark:text-dark-200 block mb-1.5 uppercase tracking-wider">
+                    Année d'exercice <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={quarterlyConfig.year}
+                    onChange={e => setQuarterlyConfig(prev => ({ ...prev, year: parseInt(e.target.value, 10) }))}
+                    className="input !py-2.5 !text-xs w-full font-bold bg-slate-50 dark:bg-dark-800 border-slate-300 dark:border-dark-700 rounded-xl cursor-pointer"
+                  >
+                    {[2027, 2026, 2025, 2024, 2023].map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-700 dark:text-dark-200 block mb-1.5 uppercase tracking-wider">
+                    Trimestre visé <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={quarterlyConfig.quarter}
+                    onChange={e => setQuarterlyConfig(prev => ({ ...prev, quarter: parseInt(e.target.value, 10) }))}
+                    className="input !py-2.5 !text-xs w-full font-bold bg-slate-50 dark:bg-dark-800 border-slate-300 dark:border-dark-700 rounded-xl cursor-pointer"
+                  >
+                    <option value={1}>T1 : Janvier — Février — Mars</option>
+                    <option value={2}>T2 : Avril — Mai — Juin</option>
+                    <option value={3}>T3 : Juillet — Août — Septembre</option>
+                    <option value={4}>T4 : Octobre — Novembre — Décembre</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* 2. Synthèse automatique des données prêtes à être intégrées */}
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-dark-800/60 border border-slate-200 dark:border-dark-700 space-y-2">
+                <div className="text-xs font-bold text-slate-700 dark:text-dark-200 flex items-center gap-1.5">
+                  <Sparkles size={14} className="text-indigo-500" />
+                  <span>Données consolidées prêtes pour ce trimestre :</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+                  <div className="p-2 rounded-lg bg-white dark:bg-dark-700 border border-slate-200/80 dark:border-dark-600">
+                    <div className="font-bold text-indigo-600 dark:text-indigo-400 text-sm">
+                      {rows.filter(s => {
+                        if (!s.date_suivi) return false;
+                        const d = new Date(s.date_suivi);
+                        const m = d.getMonth() + 1;
+                        const y = d.getFullYear();
+                        const qMonths = { 1: [1,2,3], 2: [4,5,6], 3: [7,8,9], 4: [10,11,12] }[quarterlyConfig.quarter];
+                        return y === quarterlyConfig.year && qMonths && qMonths.includes(m);
+                      }).length}
+                    </div>
+                    <div className="text-[10px] text-slate-500">Séance(s) Suivi</div>
+                  </div>
+                  <div className="p-2 rounded-lg bg-white dark:bg-dark-700 border border-slate-200/80 dark:border-dark-600">
+                    <div className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">
+                      {(incube?.finances || []).filter(f => {
+                        const qMonths = { 1: [1,2,3], 2: [4,5,6], 3: [7,8,9], 4: [10,11,12] }[quarterlyConfig.quarter];
+                        return parseInt(f.annee, 10) === quarterlyConfig.year && qMonths && qMonths.includes(parseInt(f.mois, 10));
+                      }).length} / 3
+                    </div>
+                    <div className="text-[10px] text-slate-500">Mois Financiers</div>
+                  </div>
+                  <div className="p-2 rounded-lg bg-white dark:bg-dark-700 border border-slate-200/80 dark:border-dark-600">
+                    <div className="font-bold text-blue-600 dark:text-blue-400 text-sm">
+                      {(incube?.plans || []).length}
+                    </div>
+                    <div className="text-[10px] text-slate-500">Actions Plan</div>
+                  </div>
+                  <div className="p-2 rounded-lg bg-white dark:bg-dark-700 border border-slate-200/80 dark:border-dark-600">
+                    <div className="font-bold text-amber-600 dark:text-amber-400 text-sm">
+                      {(incube?.materiels || []).length}
+                    </div>
+                    <div className="text-[10px] text-slate-500">Équipements</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Notes optionnelles de l'Accompagnateur pour le PV */}
+              <div className="space-y-3 pt-1">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 dark:text-dark-200 block mb-1">
+                    Progression & Points forts du trimestre (Optionnel)
+                  </label>
+                  <input
+                    type="text"
+                    value={quarterlyConfig.progression}
+                    onChange={e => setQuarterlyConfig(prev => ({ ...prev, progression: e.target.value }))}
+                    placeholder="Ex: Cadrage commercial achevé, première vente réalisée..."
+                    className="input !py-2 !text-xs w-full bg-slate-50 dark:bg-dark-800 border-slate-300 dark:border-dark-700 rounded-xl"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-700 dark:text-dark-200 block mb-1">
+                    Points de vigilance & Actions correctives (Optionnel)
+                  </label>
+                  <input
+                    type="text"
+                    value={quarterlyConfig.vigilance}
+                    onChange={e => setQuarterlyConfig(prev => ({ ...prev, vigilance: e.target.value }))}
+                    placeholder="Ex: Surveillance des délais de paiement, optimisation de trésorerie..."
+                    className="input !py-2 !text-xs w-full bg-slate-50 dark:bg-dark-800 border-slate-300 dark:border-dark-700 rounded-xl"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-700 dark:text-dark-200 block mb-1">
+                    Avis & Décision d'étape du Comité d'Accompagnement (Optionnel)
+                  </label>
+                  <input
+                    type="text"
+                    value={quarterlyConfig.decision}
+                    onChange={e => setQuarterlyConfig(prev => ({ ...prev, decision: e.target.value }))}
+                    placeholder="Ex: Avis Favorable : Poursuite du programme vers la phase suivante..."
+                    className="input !py-2 !text-xs w-full bg-slate-50 dark:bg-dark-800 border-slate-300 dark:border-dark-700 rounded-xl"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 sm:p-5 border-t border-slate-100 dark:border-dark-800 bg-slate-50/50 dark:bg-dark-800/30 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowQuarterlyModal(false)}
+                className="btn btn-secondary text-xs py-2 px-4 rounded-xl cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenQuarterlyPV}
+                className="btn btn-primary text-xs py-2 px-5 rounded-xl font-bold cursor-pointer shadow-md flex items-center gap-1.5"
+              >
+                <Eye size={14} />
+                <span>Prévisualiser & Signer le PV Trimestriel</span>
               </button>
             </div>
           </div>

@@ -215,7 +215,7 @@ export default function RepartitionPhases({
     <div className={`card p-5 flex flex-col justify-between min-w-0 hover:border-blue-500/40 transition-all ${className}`}>
       
       {/* 1. EN-TÊTE : Titre cliquable à gauche + Badge Total à droite */}
-      <div className="flex items-center justify-between gap-2 mb-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
         <button
           type="button"
           onClick={() => {

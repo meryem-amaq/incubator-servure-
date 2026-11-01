@@ -19,6 +19,16 @@ const Atelier = sequelize.define('Atelier', {
     type: DataTypes.STRING(150),
     allowNull: true
   },
+  animateurType: {
+    type: DataTypes.ENUM('externe', 'incube'),
+    defaultValue: 'externe',
+    field: 'animateur_type'
+  },
+  animateurIncubeId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    field: 'animateur_incube_id'
+  },
   date: {
     type: DataTypes.DATEONLY,
     allowNull: false

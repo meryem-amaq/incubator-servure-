@@ -1,9 +1,10 @@
 const express = require('express');
+const { Op } = require('sequelize');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const requireStaff = require('../middleware/requireStaff');
 const isSuperAdmin = require('../middleware/isSuperAdmin');
-const { PresenceAtelier, Incube, Atelier, User, Attendance, TourniquetUser, sequelize } = require('../models');
+const { PresenceAtelier, Incube, Atelier, User, Attendance, TourniquetUser, RhDetail, sequelize } = require('../models');
 const tourniquetService = require('../services/tourniquetService');
 
 function normalizeDateString(dateInput) {
@@ -316,6 +317,20 @@ router.post('/superadmin/tourniquet-sync', auth, isSuperAdmin, async (req, res) 
 });
 
 // POST /api/presence/superadmin/sync-clocks : Synchroniser les horloges des 7 bornes sur l'heure locale exacte GMT+0
+// POST /api/presence/superadmin/resync-all-names : Forcer l'écrasement de tous les anciens noms physiques sur les 7 Tourniquets F18
+router.post('/superadmin/resync-all-names', auth, isSuperAdmin, async (req, res) => {
+  try {
+    const result = await tourniquetService.resyncAllBadgeHoldersToTurnstiles();
+    res.json({
+      success: true,
+      message: `Tous les profils enregistrés (${result.total}) ont été ré-injectés sur les 7 Tourniquets F18 ! Les anciens noms ont été écrasés avec succès.`,
+      result
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Erreur lors de la ré-injection des noms F18', error: err.message });
+  }
+});
+
 router.post('/superadmin/sync-clocks', auth, isSuperAdmin, async (req, res) => {
   try {
     const { syncAllDeviceClocks } = require('../services/tourniquetCollector');
@@ -398,16 +413,26 @@ router.post('/enregistrer', async (req, res) => {
       if (!authenticatedUser) {
         return res.status(401).json({ message: 'Authentification requise pour retirer une présence' });
       }
-      const staffRoles = ['super_admin', 'admin', 'administrateur', 'gestionnaire', 'consultant'];
+      const staffRoles = ['super_admin', 'superadmin', 'admin', 'administrateur', 'gestionnaire', 'consultant', 'coach', 'accompagnateur'];
       if (!staffRoles.includes(authenticatedUser.role)) {
         return res.status(403).json({ message: 'Action réservée à l\'équipe administrative' });
       }
 
-      await PresenceAtelier.destroy({
-        where: { atelierId: aId, incubeId: String(incubeId) }
+      const destroyWhere = { atelierId: aId };
+      const orClauses = [];
+      if (incubeId) orClauses.push({ incubeId: String(incubeId) });
+      if (email && String(email).trim()) orClauses.push({ email: String(email).trim().toLowerCase() });
+      if (nom && String(nom).trim()) orClauses.push({ nom: String(nom).trim() });
+
+      if (orClauses.length > 0) {
+        destroyWhere[Op.or] = orClauses;
+      }
+
+      const deletedCount = await PresenceAtelier.destroy({
+        where: destroyWhere
       });
-      console.log(`❌ Présence retirée en BDD [Atelier ${aId}] : Incubé ${incubeId}`);
-      return res.json({ success: true, message: 'Présence retirée', present: false });
+      console.log(`❌ Présence retirée en BDD [Atelier ${aId}] : Incubé ${incubeId || nom} (${deletedCount} supprimé(s))`);
+      return res.json({ success: true, message: 'Présence retirée avec succès', present: false, deletedCount });
     }
 
     // Validation du champ Email obligatoire pour l'émargement autonome
@@ -743,6 +768,49 @@ router.put('/atelier/:id/horaire', auth, requireStaff, async (req, res) => {
   } catch (err) {
     console.error('Erreur mise à jour horaire atelier:', err.message);
     res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// DELETE /api/presence/:id — Supprimer une présence par son identifiant unique en BDD
+router.delete('/:id', auth, requireStaff, async (req, res) => {
+  try {
+    const item = await PresenceAtelier.findByPk(req.params.id);
+    if (!item) {
+      return res.status(404).json({ message: 'Présence introuvable' });
+    }
+    await item.destroy();
+    res.json({ success: true, message: 'Présence supprimée avec succès' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// DELETE /api/presence/atelier/:atelierId/incube/:incubeId — Supprimer la présence d'un incubé à un atelier
+router.delete('/atelier/:atelierId/incube/:incubeId', auth, requireStaff, async (req, res) => {
+  try {
+    const { atelierId, incubeId } = req.params;
+    const deleted = await PresenceAtelier.destroy({
+      where: {
+        atelierId: String(atelierId),
+        incubeId: String(incubeId)
+      }
+    });
+    res.json({ success: true, message: `${deleted} présence(s) supprimée(s) avec succès` });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// DELETE /api/presence/atelier/:atelierId — Réinitialiser / supprimer toutes les présences d'un atelier
+router.delete('/atelier/:atelierId', auth, requireStaff, async (req, res) => {
+  try {
+    const { atelierId } = req.params;
+    const deleted = await PresenceAtelier.destroy({
+      where: { atelierId: String(atelierId) }
+    });
+    res.json({ success: true, message: `Toutes les présences (${deleted}) ont été supprimées` });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 });
 

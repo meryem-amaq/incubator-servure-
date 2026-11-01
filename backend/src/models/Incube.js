@@ -3,6 +3,7 @@ const sequelize = require('../config/database');
 
 const Incube = sequelize.define('Incube', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  matricule: { type: DataTypes.INTEGER, allowNull: true, unique: true },
   user_id: { type: DataTypes.INTEGER, allowNull: true, unique: true },
   admin_id: { type: DataTypes.INTEGER, allowNull: true },
   photo_path: { type: DataTypes.TEXT('medium') },

@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Building2, Wrench, BarChart3, UsersRound, ClipboardList, DollarSign, Camera, FileSpreadsheet, KeyRound, Mail, UserX, Clock, CheckCircle2, FileText, GraduationCap } from 'lucide-react';
+import { ArrowLeft, Building2, Radio, Wrench, BarChart3, UsersRound, ClipboardList, DollarSign, Camera, FileSpreadsheet, KeyRound, Mail, UserX, Clock, CheckCircle2, FileText } from 'lucide-react';
 import api, { getPhotoUrl } from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import TabInfos from '../components/tabs/TabInfos';
 import TabMateriel from '../components/tabs/TabMateriel';
 import TabEngagement from '../components/tabs/TabEngagement';
-import TabFormations from '../components/tabs/TabFormations';
 import TabRH from '../components/tabs/TabRH';
+import TabBadgeAcces from '../components/tabs/TabBadgeAcces';
 import TabPlanAction from '../components/tabs/TabPlanAction';
 import TabFinancier from '../components/tabs/TabFinancier';
 import TabFicheSuivi from '../components/tabs/TabFicheSuivi';
@@ -16,10 +16,12 @@ import ExcelFullDossierModal from '../components/common/ExcelFullDossierModal';
 
 const TABS = [
   { key: 'infos', label: 'Infos Générales', icon: Building2 },
+  { key: 'badge', label: 'Badge RFID & Accès', icon: Radio },
   { key: 'materiel', label: 'Matériel', icon: Wrench },
   { key: 'engagement', label: 'Engagement & Présence', icon: BarChart3 },
-  { key: 'formations', label: 'Formations Suivies', icon: GraduationCap },
+
   { key: 'rh', label: 'Ressources Humaines', icon: UsersRound },
+  
   { key: 'plan', label: "Plan d'Action", icon: ClipboardList },
   { key: 'financier', label: 'Analyse Financière', icon: DollarSign },
   { key: 'suivi', label: 'Fiche de Suivi', icon: FileText },
@@ -113,8 +115,9 @@ export default function ProfilIncube() {
       case 'infos': return <TabInfos incube={incube} onUpdate={load} />;
       case 'materiel': return <TabMateriel incubeId={incube.id} incube={incube} data={incube.materiels || []} onUpdate={load} />;
       case 'engagement': return <TabEngagement incubeId={incube.id} incube={incube} data={incube.engagements || []} onUpdate={load} />;
-      case 'formations': return <TabFormations incubeId={incube.id} formations={incube.formations || []} onUpdate={load} />;
+
       case 'rh': return <TabRH incubeId={incube.id} incube={incube} emplois={incube.emplois || []} personnel={incube.personnel || []} onUpdate={load} />;
+      case 'badge': return <TabBadgeAcces incube={incube} onUpdate={load} onNavigateToRH={() => setActiveTab('rh')} />;
       case 'plan': return <TabPlanAction incubeId={incube.id} incube={incube} data={incube.plans || []} onUpdate={load} />;
       case 'financier': return <TabFinancier incubeId={incube.id} incube={incube} data={incube.finances || []} onUpdate={load} />;
       case 'suivi': return <TabFicheSuivi incubeId={incube.id} incube={incube} fiches={incube.fiches_suivi || []} onUpdate={load} />;
@@ -124,56 +127,56 @@ export default function ProfilIncube() {
 
   return (
     <div className="slide-up space-y-6">
-      {/* Header — profil */}
-      <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-6">
-        <button className="btn btn-secondary btn-icon mt-1" onClick={() => navigate('/incubes')}>
-          <ArrowLeft size={18} />
-        </button>
-        <div className="flex items-center gap-4 sm:gap-5 flex-1 w-full">
-          <div className="relative w-16 h-16 shrink-0">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-navy-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-primary-500/20 absolute inset-0">
+      {/* Header — profil responsive */}
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+        <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
+          <button className="btn btn-secondary btn-icon shrink-0 mt-0.5" onClick={() => navigate('/incubes')}>
+            <ArrowLeft size={18} />
+          </button>
+          <div className="relative w-14 h-14 sm:w-16 sm:h-16 shrink-0">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-navy-600 flex items-center justify-center text-white font-bold text-lg sm:text-xl shadow-lg shadow-primary-500/20 absolute inset-0">
               {incube.nom_incube?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
             </div>
             {incube.photo_path && (
               <img 
                 src={getPhotoUrl(incube.photo_path)} 
                 alt={incube.nom_incube} 
-                className="w-16 h-16 rounded-2xl object-cover shadow-lg border-2 border-primary-500/40 relative z-10" 
+                className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover shadow-lg border-2 border-primary-500/40 relative z-10" 
                 onError={(e) => { e.currentTarget.style.display = 'none'; }}
               />
             )}
           </div>
-          <div>
-            <h1 className="text-xl font-extrabold text-slate-900 dark:text-white">{incube.nom_incube}</h1>
-            <p className="text-slate-500 dark:text-dark-400 text-sm">{incube.raison_sociale || '—'} · {incube.pp_numero}</p>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white break-words">{incube.nom_incube}</h1>
+            <p className="text-slate-500 dark:text-dark-400 text-xs sm:text-sm truncate">{incube.raison_sociale || '—'} · {incube.pp_numero}</p>
           </div>
-          <div className="flex items-center gap-2.5 ml-auto flex-wrap justify-end">
-            <span className={`badge ${PHASE_COLORS[incube.phase_projet] || 'badge-gray'}`}>
-              {incube.phase_projet}
+        </div>
+        <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap self-start md:self-auto shrink-0">
+          <span className={`badge ${PHASE_COLORS[incube.phase_projet] || 'badge-gray'}`}>
+            {incube.phase_projet}
+          </span>
+          {incube.plans?.some(p => p.realisation === 'En attente') && (
+            <span className="inline-flex items-center gap-1 text-xs font-black px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 ring-1 ring-amber-400/40 animate-pulse" title="Objectif non atteint : En attente d'une 2ème séance">
+              🟠 En attente (2ème séance)
             </span>
-            {incube.plans?.some(p => p.realisation === 'En attente') && (
-              <span className="inline-flex items-center gap-1 text-xs font-black px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 ring-1 ring-amber-400/40 animate-pulse" title="Objectif non atteint : En attente d'une 2ème séance">
-                🟠 En attente (2ème séance)
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => setShowFullDossierModal(true)}
-              className="btn btn-secondary btn-sm flex items-center gap-1.5 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 font-bold shadow-sm"
-              title="Remplir tout le dossier de l'incubé avec un fichier Excel"
-            >
-              <FileSpreadsheet size={15} className="text-emerald-500" />
-              <span className="hidden sm:inline">Importer tout le dossier (Excel)</span>
-              <span className="sm:hidden">Excel global</span>
-            </button>
-          </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowFullDossierModal(true)}
+            className="btn btn-secondary btn-sm flex items-center gap-1.5 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 font-bold shadow-sm"
+            title="Remplir tout le dossier de l'incubé avec un fichier Excel"
+          >
+            <FileSpreadsheet size={15} className="text-emerald-500 shrink-0" />
+            <span className="hidden sm:inline">Importer tout le dossier (Excel)</span>
+            <span className="sm:hidden">Excel global</span>
+          </button>
         </div>
       </div>
 
       {/* Barre de statut du compte portail incubé & actions (Visible pour Coach / Super Admin) */}
       {isStaff && (
         <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-700/80 shadow-sm">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
               incube.compteUtilisateur?.actif 
                 ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
@@ -181,7 +184,7 @@ export default function ProfilIncube() {
             }`}>
               <KeyRound size={20} />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2.5 flex-wrap">
                 <span className="text-xs font-bold text-slate-800 dark:text-dark-100">Compte Portail Incubé :</span>
                 {incube.compteUtilisateur ? (
@@ -256,7 +259,7 @@ export default function ProfilIncube() {
       )}
 
       {/* Tabs Navigation */}
-      <div className="flex overflow-x-auto pb-2 -mb-2 gap-2 p-1.5 bg-slate-50 dark:bg-dark-800/40 rounded-2xl border border-slate-200 dark:border-dark-700/30 hide-scrollbar">
+      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 p-1.5 bg-slate-50 dark:bg-dark-800/40 rounded-2xl border border-slate-200 dark:border-dark-700/30">
         {TABS.map(tab => {
           const Icon = tab.icon;
           return (

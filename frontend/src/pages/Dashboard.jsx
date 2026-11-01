@@ -415,7 +415,7 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="mt-4">
-                <div className="text-2xl md:text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 tracking-tight">
+                <div className="text-2xl md:text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 tracking-tight truncate">
                   {formatDH(caTotal)}
                 </div>
                 <p className="text-xs text-slate-500 dark:text-dark-400 mt-1 flex items-center gap-1">
