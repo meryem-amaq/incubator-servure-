@@ -26,6 +26,65 @@ function normalizeName(str) {
     .trim();
 }
 
+const PARTICLES = new Set(['el', 'al', 'la', 'le', 'ben', 'ibn', 'ait', 'ould', 'bou', 'bel', 'der']);
+
+function cleanWord(w) {
+  return w.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function getSignificantWords(str) {
+  if (!str) return [];
+  return str.split(/[\s\-_\/]+/)
+    .map(cleanWord)
+    .filter(w => w.length >= 2 && !PARTICLES.has(w));
+}
+
+function similarity(w1, w2) {
+  if (w1 === w2) return 1;
+  if (w1.length < 3 || w2.length < 3) return 0;
+  if (w1.includes(w2) || w2.includes(w1)) return 0.85;
+  const a = w1, b = w2;
+  const m = a.length, n = b.length;
+  if (Math.abs(m - n) > 2) return 0;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+    }
+  }
+  return (Math.max(m, n) - dp[m][n]) / Math.max(m, n);
+}
+
+function matchesPersonName(nameA, nameB) {
+  if (!nameA || !nameB) return false;
+  const cleanA = cleanWord(nameA);
+  const cleanB = cleanWord(nameB);
+  if (cleanA === cleanB) return true;
+
+  const sigA = getSignificantWords(nameA);
+  const sigB = getSignificantWords(nameB);
+  if (sigA.length === 0 || sigB.length === 0) return false;
+
+  if (sigA.length === sigB.length && sigA.every(wa => sigB.includes(wa))) {
+    return true;
+  }
+
+  let matchedCount = 0;
+  for (const wa of sigA) {
+    const hasMatch = sigB.some(wb => similarity(wa, wb) >= 0.75);
+    if (hasMatch) matchedCount++;
+  }
+
+  const minRequired = Math.min(sigA.length, sigB.length);
+  if (minRequired >= 2) {
+    return matchedCount >= 2;
+  }
+  return matchedCount >= 1 && sigA.length === 1 && sigB.length === 1;
+}
+
 /**
  * Encode une Date (en heure locale GMT+0 / UTC) au format entier 32-bit ZKTeco
  */
@@ -218,11 +277,11 @@ async function collectFromAllDevices() {
   try {
     // 1. Pré-charger tous les utilisateurs et incubés avec leur badge_id
     const [users, incubes] = await Promise.all([
-      User.findAll({ attributes: ['id', 'badge_id', 'nom', 'prenom', 'type'] }),
-      Incube.findAll({ attributes: ['id', 'user_id', 'badge_id', 'nom_incube'] })
+      User.findAll({ attributes: ['id', 'badge_id', 'nom', 'prenom', 'type', 'role'] }),
+      Incube.findAll({ attributes: ['id', 'user_id', 'badge_id', 'matricule', 'nom_incube'] })
     ]);
 
-    // Dictionnaire badge_id -> user_id
+    // Dictionnaire badge_id / matricule -> user_id
     const badgeToUserMap = new Map();
     users.forEach(u => {
       if (u.badge_id) badgeToUserMap.set(String(u.badge_id).trim(), u.id);
@@ -230,6 +289,9 @@ async function collectFromAllDevices() {
     incubes.forEach(inc => {
       if (inc.badge_id && !badgeToUserMap.has(String(inc.badge_id).trim())) {
         badgeToUserMap.set(String(inc.badge_id).trim(), inc.user_id || null);
+      }
+      if (inc.matricule && !badgeToUserMap.has(String(inc.matricule).trim())) {
+        badgeToUserMap.set(String(inc.matricule).trim(), inc.user_id || null);
       }
     });
 
@@ -259,10 +321,16 @@ async function collectFromAllDevices() {
               continue;
             }
 
-            // 2. Redirection des heures futures aberrantes (> maintenant + 15 min) vers l'heure réelle de collecte
-            if (scanTime.getTime() > (nowServerUtc.getTime() + 15 * 60 * 1000)) {
-              console.warn(`⚠️ [Tourniquet ${ip}] Scan futur aberrant (${scanTime.toISOString()}) badge #${rawBadgeId} -> Redirigé vers l'heure réelle GMT+0 (${nowServerUtc.toISOString()})`);
-              scanTime = new Date(nowServerUtc.getTime());
+            // 2. Gestion intelligente du décalage (+1h GMT+1 Maroc vs GMT+0 UTC) ou heures futures
+            const driftMs = scanTime.getTime() - nowServerUtc.getTime();
+            if (driftMs > 15 * 60 * 1000) {
+              if (driftMs >= 35 * 60 * 1000 && driftMs <= 75 * 60 * 1000) {
+                // Décalage typique d'1 heure (GMT+1 Maroc -> GMT+0 UTC) : on recalibre exactement à la minute et seconde près
+                scanTime = new Date(scanTime.getTime() - 3600 * 1000);
+              } else {
+                console.warn(`⚠️ [Tourniquet ${ip}] Scan futur aberrant (${scanTime.toISOString()}) badge #${rawBadgeId} -> Recalé sur l'heure réelle GMT+0 (${nowServerUtc.toISOString()})`);
+                scanTime = new Date(nowServerUtc.getTime());
+              }
             }
 
             rawLogsAcrossAllDevices.push({
@@ -733,34 +801,97 @@ async function importUsersFromTurnstiles() {
       device_ip: DEVICES[0] || '10.0.1.120'
     }).catch(() => {});
 
-    // 1. Chercher un incubé correspondant par nom
-    const matchInc = incubes.find(inc => {
-      const inName = normalizeName(inc.nom_incube);
-      return inName === zuName || 
-             (zuName.length >= 4 && inName.includes(zuName)) ||
-             (inName.length >= 4 && zuName.includes(inName));
+    // 1. Chercher un incubé correspondant par nom ou carte RFID
+    let matchInc = incubes.find(inc => {
+      if (zuCard && inc.badge_id && String(inc.badge_id).trim() === zuCard) return true;
+      return matchesPersonName(zu.name, inc.nom_incube);
     });
 
+    // 2. Chercher dans les comptes utilisateurs
+    let matchStaff = null;
+    if (!matchInc) {
+      matchStaff = users.find(u => matchesPersonName(zu.name, `${u.prenom || ''} ${u.nom || ''}`) || matchesPersonName(zu.name, `${u.nom || ''} ${u.prenom || ''}`));
+      if (matchStaff && matchStaff.role === 'incube') {
+        matchInc = incubes.find(i => i.user_id === matchStaff.id || matchesPersonName(zu.name, i.nom_incube));
+        if (matchInc) matchStaff = null;
+      }
+    }
+
     if (matchInc) {
+      const nomFinal = matchInc.nom_incube;
       await Incube.update({
         badge_id: finalBadge,
         matricule: finalMatricule
       }, { where: { id: matchInc.id } });
+
+      if (matchInc.user_id) {
+        await User.update({ badge_id: finalBadge }, { where: { id: matchInc.user_id } }).catch(() => {});
+      }
+
+      // Enregistrer dans TourniquetUser pour les 2 identifiants (matricule et RFID)
+      await TourniquetUser.upsert({
+        badge_id: zuId,
+        name: nomFinal,
+        cardno: zuCard || null,
+        type: 'Incube',
+        device_ip: DEVICES[0] || '10.0.1.120'
+      }).catch(() => {});
+
+      if (finalBadge !== zuId) {
+        await TourniquetUser.upsert({
+          badge_id: finalBadge,
+          name: nomFinal,
+          cardno: zuCard || null,
+          type: 'Incube',
+          device_ip: DEVICES[0] || '10.0.1.120'
+        }).catch(() => {});
+      }
+
       countUpdatedIncubes++;
       await tourniquetService.syncIncubeTourniquet(matchInc.id, currentYear).catch(() => {});
-    } else {
-      // 2. Chercher dans les comptes utilisateurs (Staff / Admins)
-      const matchStaff = users.find(u => {
-        const uName = normalizeName(`${u.prenom} ${u.nom}`);
-        const uNameRev = normalizeName(`${u.nom} ${u.prenom}`);
-        return uName === zuName || uNameRev === zuName;
-      });
+    } else if (matchStaff) {
+      const staffName = `${matchStaff.prenom || ''} ${matchStaff.nom || ''}`.trim() || zu.name;
+      const staffType = matchStaff.role === 'incube' ? 'Incube' : 'Administration';
 
-      if (matchStaff) {
-        await User.update({
-          badge_id: finalBadge
-        }, { where: { id: matchStaff.id } });
-        countUpdatedStaff++;
+      await User.update({ badge_id: finalBadge }, { where: { id: matchStaff.id } });
+
+      await TourniquetUser.upsert({
+        badge_id: zuId,
+        name: staffName,
+        cardno: zuCard || null,
+        type: staffType,
+        device_ip: DEVICES[0] || '10.0.1.120'
+      }).catch(() => {});
+
+      if (finalBadge !== zuId) {
+        await TourniquetUser.upsert({
+          badge_id: finalBadge,
+          name: staffName,
+          cardno: zuCard || null,
+          type: staffType,
+          device_ip: DEVICES[0] || '10.0.1.120'
+        }).catch(() => {});
+      }
+
+      countUpdatedStaff++;
+    } else {
+      const visitorName = zu.name || `Visiteur #${zuId}`;
+      await TourniquetUser.upsert({
+        badge_id: zuId,
+        name: visitorName,
+        cardno: zuCard || null,
+        type: 'Visiteur',
+        device_ip: DEVICES[0] || '10.0.1.120'
+      }).catch(() => {});
+
+      if (finalBadge !== zuId) {
+        await TourniquetUser.upsert({
+          badge_id: finalBadge,
+          name: visitorName,
+          cardno: zuCard || null,
+          type: 'Visiteur',
+          device_ip: DEVICES[0] || '10.0.1.120'
+        }).catch(() => {});
       }
     }
   }

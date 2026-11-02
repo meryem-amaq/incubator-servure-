@@ -282,14 +282,10 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Serveur démarré sur le port ${PORT} (0.0.0.0)`);
 });
 
-// Connexion à la base de données
+// Connexion à la base de données (Démarrage instantané 1s en production sans alter: true)
 sequelize.authenticate()
-  .then(() => {
-    console.log('✅ Base de données connectée (MariaDB/MySQL)');
-    return sequelize.sync({ alter: true });
-  })
   .then(async () => {
-    console.log('✅ Modèles synchronisés');
+    console.log('✅ Base de données connectée (MariaDB/MySQL) - Démarrage instantané (1s)');
     try {
       const bcrypt = require('bcryptjs');
       const { User } = require('./models');
@@ -312,7 +308,7 @@ sequelize.authenticate()
       console.error('Initialisation admin:', adminErr.message);
     }
 
-    // Démarrage de la collecte automatique des tourniquets ZKTeco (démarrage + toutes les 60 secondes)
+    // Démarrage immédiat de la collecte automatique des tourniquets ZKTeco (démarrage + toutes les 60 secondes)
     try {
       const { collectFromAllDevices } = require('./services/tourniquetCollector');
       setTimeout(() => {
@@ -320,7 +316,7 @@ sequelize.authenticate()
         setInterval(() => {
           collectFromAllDevices().catch(err => console.warn('⚠️ Collecte tourniquets interval:', err.message));
         }, 60 * 1000);
-      }, 3000);
+      }, 1000);
     } catch (collErr) {
       console.warn('⚠️ Erreur init collecteur tourniquets:', collErr.message);
     }

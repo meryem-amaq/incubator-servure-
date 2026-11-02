@@ -28,6 +28,65 @@ function normalizeDateString(dateInput) {
   return s;
 }
 
+const PARTICLES = new Set(['el', 'al', 'la', 'le', 'ben', 'ibn', 'ait', 'ould', 'bou', 'bel', 'der']);
+
+function cleanWord(w) {
+  return w.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function getSignificantWords(str) {
+  if (!str) return [];
+  return str.split(/[\s\-_\/]+/)
+    .map(cleanWord)
+    .filter(w => w.length >= 2 && !PARTICLES.has(w));
+}
+
+function similarity(w1, w2) {
+  if (w1 === w2) return 1;
+  if (w1.length < 3 || w2.length < 3) return 0;
+  if (w1.includes(w2) || w2.includes(w1)) return 0.85;
+  const a = w1, b = w2;
+  const m = a.length, n = b.length;
+  if (Math.abs(m - n) > 2) return 0;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+    }
+  }
+  return (Math.max(m, n) - dp[m][n]) / Math.max(m, n);
+}
+
+function matchesPersonName(nameA, nameB) {
+  if (!nameA || !nameB) return false;
+  const cleanA = cleanWord(nameA);
+  const cleanB = cleanWord(nameB);
+  if (cleanA === cleanB) return true;
+
+  const sigA = getSignificantWords(nameA);
+  const sigB = getSignificantWords(nameB);
+  if (sigA.length === 0 || sigB.length === 0) return false;
+
+  if (sigA.length === sigB.length && sigA.every(wa => sigB.includes(wa))) {
+    return true;
+  }
+
+  let matchedCount = 0;
+  for (const wa of sigA) {
+    const hasMatch = sigB.some(wb => similarity(wa, wb) >= 0.75);
+    if (hasMatch) matchedCount++;
+  }
+
+  const minRequired = Math.min(sigA.length, sigB.length);
+  if (minRequired >= 2) {
+    return matchedCount >= 2;
+  }
+  return matchedCount >= 1 && sigA.length === 1 && sigB.length === 1;
+}
+
 // Helper : vérifie si l'atelier est actuellement ouvert pour l'émargement
 function isAtelierAttendanceWindowOpen(atelier, body = {}) {
   if (!atelier) return { isOpen: true };
@@ -94,17 +153,17 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
     });
 
     const incubeByUserId = new Map();
-    incubes.forEach(i => {
-      if (i.user_id) incubeByUserId.set(i.user_id, i);
-    });
     const incubeByBadge = new Map();
     incubes.forEach(i => {
+      if (i.user_id) incubeByUserId.set(i.user_id, i);
       if (i.badge_id) incubeByBadge.set(String(i.badge_id).trim(), i);
+      if (i.matricule) incubeByBadge.set(String(i.matricule).trim(), i);
     });
 
     const tourniquetUserByBadge = new Map();
     tourniquetUsers.forEach(tu => {
       if (tu.badge_id) tourniquetUserByBadge.set(String(tu.badge_id).trim(), tu);
+      if (tu.cardno) tourniquetUserByBadge.set(String(tu.cardno).trim(), tu);
     });
 
     // 2. Récupérer tous les scans de la date ciblée (plage horaire directe ultra-rapide avec index MySQL sur time)
@@ -133,9 +192,12 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
         u = userByBadge.get(rawBadge);
       }
 
-      // 2. Recherche par user_id ou badge_id dans incubes
+      // 2. Recherche par user_id, badge_id ou matricule dans incubes
       let inc = null;
-      if (u) {
+      if (scan.user_id) {
+        inc = incubeByUserId.get(scan.user_id);
+      }
+      if (!inc && u) {
         inc = incubeByUserId.get(u.id);
       }
       if (!inc && rawBadge) {
@@ -145,13 +207,24 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
       // 3. Recherche dans le répertoire physique des tourniquets
       const tu = rawBadge ? tourniquetUserByBadge.get(rawBadge) : null;
 
+      // 4. Fallback intelligent par comparaison de nom si le badge physique est enregistré avec un nom
+      if (!inc && tu && tu.name) {
+        inc = incubes.find(i => matchesPersonName(tu.name, i.nom_incube));
+      }
+      if (!inc && !u && tu && tu.name) {
+        u = users.find(usr => matchesPersonName(tu.name, `${usr.prenom || ''} ${usr.nom || ''}`) || matchesPersonName(tu.name, `${usr.nom || ''} ${usr.prenom || ''}`));
+        if (u && u.role === 'incube') {
+          inc = incubes.find(i => i.user_id === u.id || matchesPersonName(i.nom_incube, `${u.prenom || ''} ${u.nom || ''}`));
+        }
+      }
+
       let name = '';
       let category = 'Autre';
       let email = null;
       let photo = null;
 
       if (inc) {
-        // Priorité 1 : Incubé reconnu (affiche nom_incube et catégorie 'Incube')
+        // Priorité 1 : Incubé reconnu (affiche nom_incube officiel et catégorie 'Incube')
         name = inc.nom_incube;
         email = inc.email || u?.email || null;
         photo = inc.photo_path || u?.photo_url || null;

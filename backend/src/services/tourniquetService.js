@@ -42,6 +42,65 @@ function normalizeName(str) {
     .trim();
 }
 
+const PARTICLES = new Set(['el', 'al', 'la', 'le', 'ben', 'ibn', 'ait', 'ould', 'bou', 'bel', 'der']);
+
+function cleanWord(w) {
+  return w.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function getSignificantWords(str) {
+  if (!str) return [];
+  return str.split(/[\s\-_\/]+/)
+    .map(cleanWord)
+    .filter(w => w.length >= 2 && !PARTICLES.has(w));
+}
+
+function similarity(w1, w2) {
+  if (w1 === w2) return 1;
+  if (w1.length < 3 || w2.length < 3) return 0;
+  if (w1.includes(w2) || w2.includes(w1)) return 0.85;
+  const a = w1, b = w2;
+  const m = a.length, n = b.length;
+  if (Math.abs(m - n) > 2) return 0;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+    }
+  }
+  return (Math.max(m, n) - dp[m][n]) / Math.max(m, n);
+}
+
+function matchesPersonName(nameA, nameB) {
+  if (!nameA || !nameB) return false;
+  const cleanA = cleanWord(nameA);
+  const cleanB = cleanWord(nameB);
+  if (cleanA === cleanB) return true;
+
+  const sigA = getSignificantWords(nameA);
+  const sigB = getSignificantWords(nameB);
+  if (sigA.length === 0 || sigB.length === 0) return false;
+
+  if (sigA.length === sigB.length && sigA.every(wa => sigB.includes(wa))) {
+    return true;
+  }
+
+  let matchedCount = 0;
+  for (const wa of sigA) {
+    const hasMatch = sigB.some(wb => similarity(wa, wb) >= 0.75);
+    if (hasMatch) matchedCount++;
+  }
+
+  const minRequired = Math.min(sigA.length, sigB.length);
+  if (minRequired >= 2) {
+    return matchedCount >= 2;
+  }
+  return matchedCount >= 1 && sigA.length === 1 && sigB.length === 1;
+}
+
 /**
  * Connexion sécurisée à un tourniquet avec timeout
  */
@@ -478,30 +537,54 @@ async function getLivePresence() {
       let email = null;
       let incubeId = null;
 
-      // 1. Chercher dans Incube
-      const incMatch = incubes.find(i => String(i.badge_id) === badgeId);
+      // 1. Chercher dans Incube (par badge_id ou matricule)
+      let incMatch = incubes.find(i => 
+        (i.badge_id && String(i.badge_id).trim() === badgeId) ||
+        (i.matricule && String(i.matricule).trim() === badgeId)
+      );
+
+      // 2. Chercher dans TourniquetUser
+      const tuMatch = tourniquetUsers.find(tu => 
+        String(tu.badge_id).trim() === badgeId || 
+        (tu.cardno && String(tu.cardno).trim() === badgeId)
+      );
+
+      // Fallback par carte RFID ou nom
+      if (!incMatch && tuMatch) {
+        if (tuMatch.cardno) {
+          incMatch = incubes.find(i => i.badge_id && String(i.badge_id).trim() === String(tuMatch.cardno).trim());
+        }
+        if (!incMatch && tuMatch.name) {
+          incMatch = incubes.find(i => matchesPersonName(tuMatch.name, i.nom_incube));
+        }
+      }
+
+      // 3. Chercher dans User
+      let uMatch = null;
+      if (!incMatch) {
+        uMatch = users.find(u => 
+          (u.badge_id && String(u.badge_id).trim() === badgeId) || 
+          (lastScan.user_id && u.id === lastScan.user_id) ||
+          (tuMatch && matchesPersonName(tuMatch.name, `${u.prenom || ''} ${u.nom || ''}`))
+        );
+        if (uMatch && uMatch.role === 'incube') {
+          incMatch = incubes.find(i => i.user_id === uMatch.id || matchesPersonName(i.nom_incube, `${uMatch.prenom || ''} ${uMatch.nom || ''}`));
+        }
+      }
+
       if (incMatch) {
         nom = incMatch.nom_incube;
         type = 'Incube';
         email = incMatch.email;
         incubeId = incMatch.id;
-      } else {
-        // 2. Chercher dans User
-        const uMatch = users.find(u => String(u.badge_id) === badgeId || (lastScan.user_id && u.id === lastScan.user_id));
-        if (uMatch) {
-          nom = uMatch.nom;
-          prenom = uMatch.prenom;
-          type = uMatch.type || (uMatch.role === 'incube' ? 'Incube' : 'Administration');
-          email = uMatch.email;
-        } else {
-          // 3. Chercher dans TourniquetUser
-          const tuMatch = tourniquetUsers.find(tu => String(tu.badge_id) === badgeId);
-          if (tuMatch) {
-            nom = tuMatch.name;
-            prenom = '';
-            type = tuMatch.type || 'Visiteur';
-          }
-        }
+      } else if (uMatch) {
+        nom = `${uMatch.prenom || ''} ${uMatch.nom || ''}`.trim() || 'Utilisateur';
+        type = uMatch.type || (uMatch.role === 'incube' ? 'Incube' : 'Administration');
+        email = uMatch.email;
+      } else if (tuMatch) {
+        nom = tuMatch.name;
+        prenom = '';
+        type = tuMatch.type || 'Visiteur';
       }
 
       liveList.push({
