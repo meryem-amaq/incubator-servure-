@@ -66,3 +66,4 @@ cleanAttendances().catch(err => {
   console.error('❌ Erreur lors du nettoyage:', err);
   process.exit(1);
 });
+

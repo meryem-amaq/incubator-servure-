@@ -159,3 +159,4 @@ setupAllAdmins()
     console.error('Erreur setupAllAdmins:', err);
     process.exit(1);
   });
+

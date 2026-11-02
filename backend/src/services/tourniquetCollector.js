@@ -921,5 +921,7 @@ module.exports = {
   syncSingleDeviceClock,
   encodeTimeToInteger,
   parseTimeToDateUTC,
-  toUtcExactDate
+  toUtcExactDate,
+  matchesPersonName,
+  normalizeName
 };

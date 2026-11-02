@@ -934,7 +934,7 @@ exports.create = async (req, res) => {
     }
 
     if (!data.matricule) {
-      data.matricule = await tourniquetService.getNextAvailableMatricule();
+      data.matricule = await tourniquetService.getOrCreateMatriculeForBadge(data.badge_id, data.nom_incube);
     }
 
     // --- Création de l'Incube avec user_id lié — tout dans la même transaction ---
@@ -1141,7 +1141,7 @@ exports.update = async (req, res) => {
         }
       }
       if (!incube.matricule && !data.matricule) {
-        data.matricule = await tourniquetService.getNextAvailableMatricule();
+        data.matricule = await tourniquetService.getOrCreateMatriculeForBadge(data.badge_id, incube.nom_incube, incube.matricule);
       }
     } else if (data.badge_id === '' || data.badge_id === null) {
       data.badge_id = null;
@@ -1307,6 +1307,73 @@ exports.broadcastRfid = async (req, res) => {
   } catch (err) {
     console.error('Erreur broadcastRfid:', err);
     res.status(500).json({ message: "Erreur lors de la diffusion vers les tourniquets", error: err.message });
+  }
+};
+
+// PUT /api/incubes/:id/associe-badge — Enregistrer ou mettre à jour le badge RFID d'un associé
+exports.updateAssocieBadge = async (req, res) => {
+  try {
+    const incube = await Incube.findByPk(req.params.id);
+    if (!incube) return res.status(404).json({ message: 'Incubé introuvable' });
+
+    const { associeIndex, associeNom, badge_id } = req.body;
+    let associes = Array.isArray(incube.associes) ? [...incube.associes] : [];
+
+    let targetIdx = associeIndex;
+    if (targetIdx === undefined || targetIdx === null || targetIdx < 0 || targetIdx >= associes.length) {
+      if (associeNom) {
+        targetIdx = associes.findIndex(a => a.nom?.trim().toLowerCase() === associeNom.trim().toLowerCase());
+      }
+    }
+
+    if (targetIdx === -1 || targetIdx === undefined || !associes[targetIdx]) {
+      return res.status(404).json({ message: 'Associé non trouvé dans le profil de cet incubé' });
+    }
+
+    const currentAssoc = { ...associes[targetIdx] };
+    const cleanBadge = badge_id ? String(badge_id).trim() : null;
+
+    if (cleanBadge) {
+      // Vérifier l'unicité
+      const rfidCheck = await tourniquetService.checkBadgeRfidUniqueness(cleanBadge);
+      if (!rfidCheck.isUnique) {
+        if (!(rfidCheck.conflictType === 'Associé Startup' && rfidCheck.conflictName === currentAssoc.nom)) {
+          return res.status(400).json({
+            message: `Le badge RFID (${cleanBadge}) est déjà attribué à ${rfidCheck.conflictName} (${rfidCheck.conflictType} - ${rfidCheck.conflictEntity}).`
+          });
+        }
+      }
+
+      // Obtenir ou réutiliser le matricule machine
+      const matricule = await tourniquetService.getOrCreateMatriculeForBadge(cleanBadge, currentAssoc.nom, currentAssoc.matricule);
+      currentAssoc.badge_id = cleanBadge;
+      currentAssoc.matricule = matricule;
+
+      // Diffuser sur les 7 bornes F18
+      tourniquetService.broadcastUserToTurnstiles({
+        matricule,
+        name: currentAssoc.nom,
+        cardno: cleanBadge,
+        type: 'Incube'
+      }).catch(err => console.error('Erreur diffusion tourniquet F18 associé:', err.message));
+    } else {
+      currentAssoc.badge_id = null;
+    }
+
+    associes[targetIdx] = currentAssoc;
+    incube.associes = associes;
+    await incube.save();
+
+    res.json({
+      success: true,
+      associe: currentAssoc,
+      message: cleanBadge 
+        ? `Badge #${cleanBadge} attribué à l'associé ${currentAssoc.nom} (Matricule #${currentAssoc.matricule}) et diffusé sur les 7 bornes F18 !`
+        : `Badge retiré pour l'associé ${currentAssoc.nom}.`
+    });
+  } catch (err) {
+    console.error('Erreur updateAssocieBadge:', err);
+    res.status(500).json({ message: 'Erreur lors de la mise à jour du badge associé', error: err.message });
   }
 };
 

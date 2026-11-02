@@ -133,16 +133,19 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
     const typeFilter = req.query.type || 'Tous';
     const searchFilter = (req.query.search || '').trim().toLowerCase();
 
-    // 1. Récupérer les utilisateurs, incubés et usagers tourniquet pour le rapprochement
-    const [users, incubes, tourniquetUsers] = await Promise.all([
+    // 1. Récupérer les utilisateurs, incubés, usagers tourniquet et salariés RH pour le rapprochement
+    const [users, incubes, tourniquetUsers, rhDetails] = await Promise.all([
       User.findAll({
         attributes: ['id', 'nom', 'prenom', 'email', 'type', 'badge_id', 'role', 'photo_url']
       }),
       Incube.findAll({
-        attributes: ['id', 'user_id', 'nom_incube', 'email', 'badge_id', 'photo_path']
+        attributes: ['id', 'user_id', 'nom_incube', 'email', 'badge_id', 'matricule', 'photo_path', 'raison_sociale', 'associes']
       }),
       TourniquetUser.findAll({
         attributes: ['badge_id', 'name', 'cardno', 'type']
+      }),
+      RhDetail.findAll({
+        include: [{ model: Incube, as: 'incube', attributes: ['id', 'nom_incube', 'raison_sociale'] }]
       })
     ]);
 
@@ -154,10 +157,23 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
 
     const incubeByUserId = new Map();
     const incubeByBadge = new Map();
+    const associeByBadge = new Map();
     incubes.forEach(i => {
       if (i.user_id) incubeByUserId.set(i.user_id, i);
       if (i.badge_id) incubeByBadge.set(String(i.badge_id).trim(), i);
       if (i.matricule) incubeByBadge.set(String(i.matricule).trim(), i);
+      if (Array.isArray(i.associes)) {
+        i.associes.forEach(a => {
+          if (a && a.badge_id) associeByBadge.set(String(a.badge_id).trim(), { associe: a, incube: i });
+          if (a && a.matricule) associeByBadge.set(String(a.matricule).trim(), { associe: a, incube: i });
+        });
+      }
+    });
+
+    const rhByBadge = new Map();
+    rhDetails.forEach(rh => {
+      if (rh.badge_id) rhByBadge.set(String(rh.badge_id).trim(), rh);
+      if (rh.matricule) rhByBadge.set(String(rh.matricule).trim(), rh);
     });
 
     const tourniquetUserByBadge = new Map();
@@ -222,6 +238,35 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
         };
       }
 
+      // 0.5 Vérification directe dans les associés des startups (Incubés)
+      const matchedAssoc = rawBadge ? associeByBadge.get(rawBadge) : null;
+      if (matchedAssoc) {
+        const startupName = matchedAssoc.incube.raison_sociale || matchedAssoc.incube.nom_incube || 'Startup';
+        return {
+          name: `${matchedAssoc.associe.nom} [Associé - ${startupName}]`,
+          category: 'Incube',
+          email: matchedAssoc.associe.email || matchedAssoc.incube.email || null,
+          photo: null,
+          userId: matchedAssoc.incube.user_id || null,
+          badgeId: scan.raw_badge_id
+        };
+      }
+
+      // 0.6 Vérification directe dans les salariés RH / stagiaires de la startup
+      const matchedRh = rawBadge ? rhByBadge.get(rawBadge) : null;
+      if (matchedRh) {
+        const startupName = matchedRh.incube?.raison_sociale || matchedRh.incube?.nom_incube || 'Startup';
+        const roleLabel = matchedRh.poste || 'Salarié';
+        return {
+          name: `${matchedRh.nom_complet} [${roleLabel} - ${startupName}]`,
+          category: 'Incube',
+          email: null,
+          photo: null,
+          userId: matchedRh.incube?.user_id || null,
+          badgeId: scan.raw_badge_id
+        };
+      }
+
       // 1. Recherche par user_id ou badge_id dans users
       let u = scan.user_id ? userById.get(scan.user_id) : null;
       if (!u && rawBadge) {
@@ -244,10 +289,26 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
       const tu = rawBadge ? tourniquetUserByBadge.get(rawBadge) : null;
 
       // 4. Fallback intelligent par comparaison de nom si le badge physique est enregistré avec un nom
+      let rhFromTu = null;
+      let assocFromTu = null;
       if (!inc && tu && tu.name) {
         inc = incubes.find(i => matchesPersonName(tu.name, i.nom_incube));
+        if (!inc) {
+          rhFromTu = rhDetails.find(r => matchesPersonName(tu.name, r.nom_complet));
+        }
+        if (!inc && !rhFromTu) {
+          for (const i of incubes) {
+            if (Array.isArray(i.associes)) {
+              const a = i.associes.find(ass => matchesPersonName(tu.name, ass.nom));
+              if (a) {
+                assocFromTu = { associe: a, incube: i };
+                break;
+              }
+            }
+          }
+        }
       }
-      if (!inc && !u && tu && tu.name) {
+      if (!inc && !u && !rhFromTu && !assocFromTu && tu && tu.name) {
         u = users.find(usr => matchesPersonName(tu.name, `${usr.prenom || ''} ${usr.nom || ''}`) || matchesPersonName(tu.name, `${usr.nom || ''} ${usr.prenom || ''}`));
         if (u && u.role === 'incube') {
           inc = incubes.find(i => i.user_id === u.id || matchesPersonName(i.nom_incube, `${u.prenom || ''} ${u.nom || ''}`));
@@ -259,9 +320,18 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
       let email = null;
       let photo = null;
 
-      if (inc) {
-        // Priorité 1 : Incubé reconnu (affiche nom_incube officiel et catégorie 'Incube')
-        name = inc.nom_incube;
+      if (rhFromTu) {
+        const startupName = rhFromTu.incube?.raison_sociale || rhFromTu.incube?.nom_incube || 'Startup';
+        name = `${rhFromTu.nom_complet} [${rhFromTu.poste || 'Salarié'} - ${startupName}]`;
+        category = 'Incube';
+      } else if (assocFromTu) {
+        const startupName = assocFromTu.incube.raison_sociale || assocFromTu.incube.nom_incube || 'Startup';
+        name = `${assocFromTu.associe.nom} [Associé - ${startupName}]`;
+        category = 'Incube';
+      } else if (inc) {
+        // Priorité 1 : Incubé reconnu (affiche nom_incube officiel et raison sociale)
+        const startupName = inc.raison_sociale ? ` (${inc.raison_sociale})` : '';
+        name = `${inc.nom_incube}${startupName}`;
         email = inc.email || u?.email || null;
         photo = inc.photo_path || u?.photo_url || null;
         category = 'Incube';
@@ -465,6 +535,32 @@ router.post('/superadmin/import-from-tourniquets', auth, isSuperAdmin, async (re
     });
   } catch (err) {
     res.status(500).json({ success: false, message: "Erreur lors de l'importation depuis les tourniquets", error: err.message });
+  }
+});
+
+// POST /api/presence/superadmin/verifier-badge : Vérifier le statut complet d'un badge RFID
+router.post('/superadmin/verifier-badge', auth, isSuperAdmin, async (req, res) => {
+  try {
+    const { badge_id } = req.body;
+    if (!badge_id) {
+      return res.status(400).json({ success: false, message: 'Le numéro de badge RFID est requis.' });
+    }
+    const result = await tourniquetService.verifyBadgeStatus(badge_id);
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('Erreur vérification badge:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Erreur lors de la vérification du badge' });
+  }
+});
+
+// POST /api/presence/superadmin/auto-link-rh-badges : Rapprochement automatique 1-clic des badges existants aux RH et associés
+router.post('/superadmin/auto-link-rh-badges', auth, isSuperAdmin, async (req, res) => {
+  try {
+    const result = await tourniquetService.autoLinkExistingTourniquetBadges();
+    return res.json(result);
+  } catch (err) {
+    console.error('Erreur liaison auto badges RH:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Erreur lors de la liaison automatique des badges' });
   }
 });
 

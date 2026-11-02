@@ -739,6 +739,23 @@ async function checkBadgeRfidUniqueness(badgeId, options = {}) {
     };
   }
 
+  // 2.5 associés des incubés
+  const allIncubesForAssoc = await Incube.findAll();
+  for (const inc of allIncubesForAssoc) {
+    if (excludeIncubeId && inc.id === excludeIncubeId) continue;
+    if (Array.isArray(inc.associes)) {
+      const matchedAssoc = inc.associes.find(a => String(a.badge_id || '').trim() === cleanBadge);
+      if (matchedAssoc) {
+        return {
+          isUnique: false,
+          conflictType: 'Associé Startup',
+          conflictName: matchedAssoc.nom,
+          conflictEntity: inc.raison_sociale || inc.nom_incube || 'Startup'
+        };
+      }
+    }
+  }
+
   // 3. users (staff interne)
   const whereUser = { badge_id: cleanBadge };
   if (excludeUserId) whereUser.id = { [Op.ne]: excludeUserId };
@@ -784,6 +801,16 @@ async function broadcastUserToTurnstiles({ matricule, name, cardno, role = 0, ty
       type: type || 'Incube',
       device_ip: ips[0]
     });
+    // Double indexation : enregistrer également sous le numéro RFID de la carte
+    if (cardInt > 0 && String(cardInt) !== String(uid)) {
+      await TourniquetUser.upsert({
+        badge_id: String(cardInt),
+        name: cleanName,
+        cardno: String(cardInt),
+        type: type || 'Incube',
+        device_ip: ips[0]
+      });
+    }
   } catch (err) {
     console.error('Erreur upsert TourniquetUser:', err.message);
   }
@@ -878,6 +905,269 @@ async function resyncAllBadgeHoldersToTurnstiles() {
   return { total: allToSync.length, successCount };
 }
 
+/**
+ * Récupère le matricule existant associé à un badge ou à un nom sur les tourniquets,
+ * ou calcule le prochain matricule disponible pour éviter TOUT DOUBLON D'ID !
+ */
+async function getOrCreateMatriculeForBadge(badgeId, personName = '', existingMatricule = null) {
+  if (existingMatricule && parseInt(existingMatricule, 10) > 0) {
+    return parseInt(existingMatricule, 10);
+  }
+
+  const { TourniquetUser, Incube, RhDetail } = require('../models');
+  const cleanBadge = badgeId ? String(badgeId).trim() : '';
+
+  // 1. Si le badge est déjà associé à un incubé ayant un matricule
+  if (cleanBadge) {
+    const inc = await Incube.findOne({ where: { badge_id: cleanBadge } });
+    if (inc && inc.matricule) return inc.matricule;
+
+    // 2. Si le badge est déjà associé à un salarié RH ayant un matricule
+    const rh = await RhDetail.findOne({ where: { badge_id: cleanBadge } });
+    if (rh && rh.matricule) return rh.matricule;
+
+    // 3. Si le badge existe déjà sur les tourniquets (TourniquetUser)
+    const tuByCard = await TourniquetUser.findOne({ where: { cardno: cleanBadge } });
+    if (tuByCard && parseInt(tuByCard.badge_id, 10) > 0 && parseInt(tuByCard.badge_id, 10) < 1000000) {
+      return parseInt(tuByCard.badge_id, 10);
+    }
+    const tuByBadge = await TourniquetUser.findByPk(cleanBadge);
+    if (tuByBadge && parseInt(tuByBadge.badge_id, 10) > 0 && parseInt(tuByBadge.badge_id, 10) < 1000000) {
+      return parseInt(tuByBadge.badge_id, 10);
+    }
+  }
+
+  // 4. Si le nom correspond à un usager déjà présent sur les tourniquets
+  if (personName && personName.trim()) {
+    const allTu = await TourniquetUser.findAll();
+    const tuMatch = allTu.find(t => matchesPersonName(personName, t.name));
+    if (tuMatch && parseInt(tuMatch.badge_id, 10) > 0 && parseInt(tuMatch.badge_id, 10) < 1000000) {
+      return parseInt(tuMatch.badge_id, 10);
+    }
+  }
+
+  // 5. Sinon, allouer le prochain matricule machine libre
+  return await getNextAvailableMatricule();
+}
+
+/**
+ * Vérification complète et approfondie de l'état d'un badge RFID
+ */
+async function verifyBadgeStatus(badgeId) {
+  if (!badgeId || !String(badgeId).trim()) {
+    return { valid: false, message: 'Numéro de badge manquant' };
+  }
+  const cleanBadge = String(badgeId).trim();
+  const { Incube, RhDetail, User, TourniquetUser } = require('../models');
+
+  let assignedTo = null;
+
+  // 1. Vérifier si c'est un Administrateur certifié
+  const ADMIN_KNOWN_BADGES = {
+    '1': { nom: 'Administrateur IDS', email: 'admin@cgs-incubateur.ma' },
+    '6': { nom: 'Nadia SEFIANI', email: 'nadia.sefiani@ctpes.ma' },
+    '3': { nom: 'Mustapha', email: 'mustapha@ctpes.ma' },
+    '143': { nom: 'Ayoub EL BOUCHIKHI', email: 'ayoub.elbouchikhi@ctpes.ma' },
+    '7587580': { nom: 'Ayoub EL BOUCHIKHI', email: 'ayoub.elbouchikhi@ctpes.ma' },
+    '194': { nom: 'Ilham LAHBOUB', email: 'ilham.lahboub@ctpes.ma' },
+    '7561307': { nom: 'Ilham LAHBOUB', email: 'ilham.lahboub@ctpes.ma' },
+    '227': { nom: 'Hicham BELAAZIZ', email: 'hicham@ctpes.ma' },
+    '6883058': { nom: 'Hicham BELAAZIZ', email: 'hicham@ctpes.ma' },
+    '144': { nom: 'Kawtar SBAI', email: 'kawtar@ctpes.ma' },
+    '7568112': { nom: 'Kawtar SBAI', email: 'kawtar@ctpes.ma' },
+    '205': { nom: 'Charaf EL AMRANI', email: 'charaf@ctpes.ma' },
+    '7586646': { nom: 'Charaf EL AMRANI', email: 'charaf@ctpes.ma' },
+    '142': { nom: 'Amine MEZZYANE', email: 'Aminemezzyane@gmail.com' },
+    '6895052': { nom: 'Amine MEZZYANE', email: 'Aminemezzyane@gmail.com' },
+    '145': { nom: 'Test AMA', email: 'incubateur.digital.solidaire@gmail.com' },
+    '7600900': { nom: 'Test AMA', email: 'incubateur.digital.solidaire@gmail.com' }
+  };
+  if (ADMIN_KNOWN_BADGES[cleanBadge]) {
+    assignedTo = {
+      type: 'Administration',
+      nom: ADMIN_KNOWN_BADGES[cleanBadge].nom,
+      email: ADMIN_KNOWN_BADGES[cleanBadge].email,
+      entite: 'Équipe IDS'
+    };
+  }
+
+  // 2. Vérifier dans incubes (Porteur)
+  if (!assignedTo) {
+    const inc = await Incube.findOne({ where: { badge_id: cleanBadge } });
+    if (inc) {
+      assignedTo = {
+        type: 'Incubé (Porteur de projet)',
+        nom: inc.nom_incube,
+        matricule: inc.matricule,
+        entite: inc.raison_sociale || inc.nom_incube,
+        incubeId: inc.id,
+        pp_numero: inc.pp_numero
+      };
+    }
+  }
+
+  // 3. Vérifier dans les associés de tous les incubés
+  if (!assignedTo) {
+    const allIncubes = await Incube.findAll();
+    for (const inc of allIncubes) {
+      if (Array.isArray(inc.associes)) {
+        const found = inc.associes.find(a => String(a.badge_id || '').trim() === cleanBadge);
+        if (found) {
+          assignedTo = {
+            type: 'Associé Startup',
+            nom: found.nom,
+            fonction: found.fonction || 'Associé',
+            matricule: found.matricule,
+            entite: inc.raison_sociale || inc.nom_incube,
+            incubeId: inc.id
+          };
+          break;
+        }
+      }
+    }
+  }
+
+  // 4. Vérifier dans rh_detail
+  if (!assignedTo) {
+    const rh = await RhDetail.findOne({
+      where: { badge_id: cleanBadge },
+      include: [{ model: Incube, as: 'incube', attributes: ['id', 'nom_incube', 'raison_sociale'] }]
+    });
+    if (rh) {
+      assignedTo = {
+        type: 'Salarié RH / Stagiaire',
+        nom: rh.nom_complet,
+        poste: rh.poste || 'Salarié',
+        matricule: rh.matricule,
+        entite: rh.incube?.raison_sociale || rh.incube?.nom_incube || 'Startup',
+        incubeId: rh.incube_id
+      };
+    }
+  }
+
+  // 5. Vérifier dans users
+  if (!assignedTo) {
+    const u = await User.findOne({ where: { badge_id: cleanBadge } });
+    if (u) {
+      assignedTo = {
+        type: 'Compte Utilisateur',
+        nom: `${u.prenom || ''} ${u.nom || ''}`.trim(),
+        role: u.role,
+        entite: u.type || 'Administration'
+      };
+    }
+  }
+
+  // 6. Vérifier dans la mémoire physique / cache tourniquet_users
+  const tuByCard = await TourniquetUser.findOne({ where: { cardno: cleanBadge } });
+  const tuByBadge = await TourniquetUser.findByPk(cleanBadge);
+  const tu = tuByCard || tuByBadge;
+
+  return {
+    badge_id: cleanBadge,
+    isAvailable: !assignedTo,
+    assignedTo,
+    tourniquetInfo: tu ? {
+      machineId: tu.badge_id,
+      nameOnDevice: tu.name,
+      cardno: tu.cardno,
+      type: tu.type
+    } : null
+  };
+}
+
+/**
+ * Relie automatiquement les badges physiques déjà présents sur les tourniquets
+ * aux salariés RH et aux associés des incubés.
+ */
+async function autoLinkExistingTourniquetBadges() {
+  const { RhDetail, TourniquetUser, Incube } = require('../models');
+
+  const rhList = await RhDetail.findAll({
+    include: [{ model: Incube, as: 'incube', attributes: ['id', 'nom_incube', 'raison_sociale'] }]
+  });
+  const tUsers = await TourniquetUser.findAll();
+  const incubes = await Incube.findAll();
+
+  let linkedRhCount = 0;
+  const linkedRhDetails = [];
+
+  for (const rh of rhList) {
+    if (!rh.badge_id || String(rh.badge_id).trim() === '') {
+      const tu = tUsers.find(t => matchesPersonName(rh.nom_complet, t.name));
+      if (tu) {
+        const finalBadge = (tu.cardno && tu.cardno !== '0') ? String(tu.cardno) : String(tu.badge_id);
+        const finalMatricule = parseInt(tu.badge_id, 10) > 0 && parseInt(tu.badge_id, 10) < 1000000 ? parseInt(tu.badge_id, 10) : null;
+        
+        rh.badge_id = finalBadge;
+        if (finalMatricule) rh.matricule = finalMatricule;
+        await rh.save();
+
+        tu.type = 'Incube';
+        await tu.save();
+
+        linkedRhCount++;
+        linkedRhDetails.push({
+          rhId: rh.id,
+          nom: rh.nom_complet,
+          startup: rh.incube?.raison_sociale || rh.incube?.nom_incube || 'Startup',
+          badge: finalBadge,
+          matricule: finalMatricule
+        });
+      }
+    }
+  }
+
+  // Matching pour les Associés
+  let linkedAssocCount = 0;
+  const linkedAssocDetails = [];
+
+  for (const inc of incubes) {
+    if (Array.isArray(inc.associes) && inc.associes.length > 0) {
+      let changed = false;
+      const updatedAssocies = inc.associes.map(a => {
+        if (!a.badge_id || String(a.badge_id).trim() === '') {
+          const tu = tUsers.find(t => matchesPersonName(a.nom, t.name));
+          if (tu) {
+            const finalBadge = (tu.cardno && tu.cardno !== '0') ? String(tu.cardno) : String(tu.badge_id);
+            const finalMatricule = parseInt(tu.badge_id, 10) > 0 && parseInt(tu.badge_id, 10) < 1000000 ? parseInt(tu.badge_id, 10) : null;
+            changed = true;
+            linkedAssocCount++;
+            tu.type = 'Incube';
+            tu.save().catch(() => {});
+            linkedAssocDetails.push({
+              nom: a.nom,
+              startup: inc.raison_sociale || inc.nom_incube,
+              badge: finalBadge,
+              matricule: finalMatricule
+            });
+            return {
+              ...a,
+              badge_id: finalBadge,
+              matricule: finalMatricule
+            };
+          }
+        }
+        return a;
+      });
+
+      if (changed) {
+        inc.associes = updatedAssocies;
+        await inc.save();
+      }
+    }
+  }
+
+  return {
+    success: true,
+    totalLinked: linkedRhCount + linkedAssocCount,
+    linkedRhCount,
+    linkedRhDetails,
+    linkedAssocCount,
+    linkedAssocDetails
+  };
+}
+
 module.exports = {
   fetchFromAllDevices,
   findBadgeForIncube,
@@ -888,7 +1178,10 @@ module.exports = {
   getActivityByType,
   encodeUser72,
   getNextAvailableMatricule,
+  getOrCreateMatriculeForBadge,
   checkBadgeRfidUniqueness,
+  verifyBadgeStatus,
+  autoLinkExistingTourniquetBadges,
   broadcastUserToTurnstiles,
   resyncAllBadgeHoldersToTurnstiles,
   MOIS_NOMS

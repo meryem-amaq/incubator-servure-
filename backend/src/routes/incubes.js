@@ -23,6 +23,7 @@ router.post('/:id/alerte-assiduite', auth, incubeCtrl.envoyerAlerteAssiduite);
 router.get('/:id/sync-tourniquet', auth, incubeCtrl.syncTourniquet);
 router.post('/:id/sync-tourniquet', auth, incubeCtrl.syncTourniquet);
 router.post('/:id/broadcast-rfid', auth, incubeCtrl.broadcastRfid);
+router.put('/:id/associe-badge', auth, incubeCtrl.updateAssocieBadge);
 router.post('/:id/welcome-email', auth, incubeCtrl.envoyerWelcomeEmail);
 router.delete('/:id', auth, incubeCtrl.delete);
 

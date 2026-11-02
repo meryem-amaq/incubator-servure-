@@ -89,7 +89,7 @@ function createSubController(Model, modelName) {
             req.body.badge_id = trimmedBadge;
           }
           if (!req.body.matricule) {
-            req.body.matricule = await tourniquetService.getNextAvailableMatricule();
+            req.body.matricule = await tourniquetService.getOrCreateMatriculeForBadge(req.body.badge_id, req.body.nom_complet);
           }
         }
 
@@ -195,7 +195,7 @@ function createSubController(Model, modelName) {
             req.body.badge_id = trimmedBadge;
           }
           if (!item.matricule && !req.body.matricule) {
-            req.body.matricule = await tourniquetService.getNextAvailableMatricule();
+            req.body.matricule = await tourniquetService.getOrCreateMatriculeForBadge(req.body.badge_id, item.nom_complet);
           }
         }
 
