@@ -1,6 +1,15 @@
 // Configuration de l'environnement en heure locale GMT+0 (UTC)
 process.env.TZ = process.env.APP_TIMEZONE || 'UTC';
 
+// Bouclier de protection global anti-crash (ex: déconnexions TCP inopinées node-zklib)
+process.on('uncaughtException', (err) => {
+  console.warn('⚠️ [Sécurité Système] uncaughtException interceptée sans arrêt du serveur :', err.message);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.warn('⚠️ [Sécurité Système] unhandledRejection interceptée sans arrêt du serveur :', reason?.message || reason);
+});
+
 const dns = require('dns');
 if (dns.setDefaultResultOrder) {
   dns.setDefaultResultOrder('ipv4first');

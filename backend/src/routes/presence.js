@@ -231,10 +231,12 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
         category = 'Incube';
       } else if (u) {
         // Priorité 2 : Compte utilisateur (Administration, Staff, Consultant...)
+        const staffRoles = ['super_admin', 'administrateur', 'superadmin', 'admin', 'accompagnateur', 'gestionnaire', 'consultant', 'coach'];
+        const isStaff = staffRoles.includes(u.role);
         name = `${u.prenom || ''} ${u.nom || ''}`.trim() || tu?.name || 'Utilisateur';
         email = u.email;
         photo = u.photo_url;
-        category = u.type || (u.role === 'incube' ? 'Incube' : 'Administration');
+        category = isStaff ? 'Administration' : (u.type === 'Administration' ? 'Administration' : 'Incube');
       } else if (tu) {
         // Priorité 3 : Usager inscrit sur la borne tourniquet (Ali FARFRA, Reda BENHAMIDA...)
         name = tu.name;
@@ -272,11 +274,31 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
       personScansMap.get(canonicalKey).pScans.push(scan);
     }
 
+    const statsCategoriesJournee = {
+      Administration: 0,
+      Incube: 0,
+      Formation: 0,
+      Visiteur: 0,
+      Prestataire: 0,
+      Autre: 0
+    };
+    const statsCategoriesPresents = {
+      Administration: 0,
+      Incube: 0,
+      Formation: 0,
+      Visiteur: 0,
+      Prestataire: 0,
+      Autre: 0
+    };
+
     const allPresentsOnSite = [];
     for (const [key, { personInfo, pScans }] of personScansMap.entries()) {
+      // Compter chaque usager unique pour la journée dans sa catégorie
+      statsCategoriesJournee[personInfo.category] = (statsCategoriesJournee[personInfo.category] || 0) + 1;
+
       const lastScan = pScans[pScans.length - 1];
       if (lastScan.type === 'IN') {
-        statsCategories[personInfo.category] = (statsCategories[personInfo.category] || 0) + 1;
+        statsCategoriesPresents[personInfo.category] = (statsCategoriesPresents[personInfo.category] || 0) + 1;
         const d = new Date(lastScan.time);
         const heureStr = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'UTC' });
         allPresentsOnSite.push({
@@ -294,6 +316,20 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
         });
       }
     }
+
+    // Répartition des rôles avec pourcentages
+    const totalUsagersJournee = personScansMap.size;
+    const repartitionRoles = CATEGORIES.map(cat => {
+      const count = statsCategoriesJournee[cat] || 0;
+      const countPresents = statsCategoriesPresents[cat] || 0;
+      const pct = totalUsagersJournee > 0 ? Math.round((count / totalUsagersJournee) * 100) : 0;
+      return {
+        categorie: cat,
+        countJournee: count,
+        countPresents,
+        pourcentage: pct
+      };
+    }).filter(r => r.countJournee > 0);
 
     const totalPresentsSurSite = allPresentsOnSite.length;
 
@@ -333,7 +369,10 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
       success: true,
       date: targetDate,
       total_presents_sur_site: totalPresentsSurSite,
-      stats_categories: statsCategories,
+      total_usagers_journee: totalUsagersJournee,
+      stats_categories: statsCategoriesJournee,
+      stats_presents_categories: statsCategoriesPresents,
+      repartition_roles: repartitionRoles,
       presents_actuellement: filteredPresents,
       historique_flux: filteredFlux,
       all_presents: allPresentsOnSite,

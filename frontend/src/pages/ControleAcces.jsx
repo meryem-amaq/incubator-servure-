@@ -20,7 +20,8 @@ import {
   HelpCircle,
   HardHat,
   Sparkles,
-  Wifi
+  Wifi,
+  PieChart
 } from 'lucide-react';
 import api, { getPhotoUrl } from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -31,6 +32,7 @@ const CATEGORY_STYLES = {
   Administration: {
     label: 'Administration',
     bg: 'bg-blue-500/10 dark:bg-blue-500/20',
+    barBg: 'bg-blue-600',
     border: 'border-blue-500/30',
     text: 'text-blue-700 dark:text-blue-300',
     badge: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-300/40',
@@ -42,6 +44,7 @@ const CATEGORY_STYLES = {
   Incube: {
     label: 'Incubé',
     bg: 'bg-amber-500/10 dark:bg-amber-500/20',
+    barBg: 'bg-amber-500',
     border: 'border-amber-500/30',
     text: 'text-amber-700 dark:text-amber-400',
     badge: 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-300/40',
@@ -53,6 +56,7 @@ const CATEGORY_STYLES = {
   Formation: {
     label: 'Formation',
     bg: 'bg-purple-500/10 dark:bg-purple-500/20',
+    barBg: 'bg-purple-600',
     border: 'border-purple-500/30',
     text: 'text-purple-700 dark:text-purple-300',
     badge: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 border border-purple-300/40',
@@ -64,6 +68,7 @@ const CATEGORY_STYLES = {
   Visiteur: {
     label: 'Visiteur',
     bg: 'bg-slate-500/10 dark:bg-slate-500/20',
+    barBg: 'bg-slate-500',
     border: 'border-slate-500/30',
     text: 'text-slate-700 dark:text-slate-300',
     badge: 'bg-slate-100 text-slate-800 dark:bg-slate-800/80 dark:text-slate-300 border border-slate-300/40',
@@ -75,6 +80,7 @@ const CATEGORY_STYLES = {
   Prestataire: {
     label: 'Prestataire',
     bg: 'bg-teal-500/10 dark:bg-teal-500/20',
+    barBg: 'bg-teal-600',
     border: 'border-teal-500/30',
     text: 'text-teal-700 dark:text-teal-300',
     badge: 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300 border border-teal-300/40',
@@ -86,6 +92,7 @@ const CATEGORY_STYLES = {
   Autre: {
     label: 'Autre',
     bg: 'bg-zinc-500/10 dark:bg-zinc-500/20',
+    barBg: 'bg-zinc-400',
     border: 'border-zinc-500/30',
     text: 'text-zinc-700 dark:text-zinc-300',
     badge: 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800/80 dark:text-zinc-300 border border-zinc-300/40',
@@ -151,6 +158,7 @@ export default function ControleAcces() {
   };
   const [dashboardData, setDashboardData] = useState({
     total_presents_sur_site: 0,
+    total_usagers_journee: 0,
     stats_categories: {
       Administration: 0,
       Incube: 0,
@@ -159,6 +167,15 @@ export default function ControleAcces() {
       Prestataire: 0,
       Autre: 0
     },
+    stats_presents_categories: {
+      Administration: 0,
+      Incube: 0,
+      Formation: 0,
+      Visiteur: 0,
+      Prestataire: 0,
+      Autre: 0
+    },
+    repartition_roles: [],
     presents_actuellement: [],
     historique_flux: [],
     all_presents: [],
@@ -417,7 +434,7 @@ export default function ControleAcces() {
       {/* 2. CARTES KPI EN TEMPS RÉEL (1 PRINCIPALE + 6 PAR CATÉGORIE) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-3.5">
         
-        {/* CARTE PRINCIPALE : TOTAL SUR SITE */}
+        {/* CARTE PRINCIPALE : TOTAL USAGERS JOURNÉE & PRÉSENTS */}
         <div 
           onClick={() => setSelectedType('Tous')}
           className={`p-4 rounded-2xl bg-white dark:bg-dark-800/80 border transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md ${
@@ -425,7 +442,7 @@ export default function ControleAcces() {
               ? 'ring-2 ring-primary-500 shadow-primary-500/20 border-transparent dark:border-transparent' 
               : 'border-slate-200 dark:border-dark-700/60 hover:border-primary-500/60'
           }`}
-          title="Afficher tous les usagers présents sur site"
+          title="Afficher tous les usagers de la journée"
         >
           <div className="flex items-center justify-between mb-1.5">
             <span className="p-1.5 rounded-lg bg-primary-500/10 text-primary-600 dark:text-primary-400">
@@ -433,19 +450,20 @@ export default function ControleAcces() {
             </span>
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Sur site
+              Journée
             </span>
           </div>
 
           <div className="mt-2">
             <span className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-              {loading ? '—' : dashboardData.total_presents_sur_site}
+              {loading ? '—' : (dashboardData.total_usagers_journee ?? dashboardData.total_presents_sur_site ?? 0)}
             </span>
           </div>
 
           <div className="mt-2 pt-2 border-t border-slate-100 dark:border-dark-700/50 flex items-center justify-between text-[11px]">
-            <span className="text-slate-500 dark:text-dark-400 text-[10px]">
-              Tous usagers
+            <span className="text-slate-500 dark:text-dark-400 text-[10px] flex items-center gap-1.5 font-medium">
+              <span className={`w-1.5 h-1.5 rounded-full ${(dashboardData.total_presents_sur_site || 0) > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300 dark:bg-dark-600'}`} />
+              {loading ? '…' : (dashboardData.total_presents_sur_site || 0)} sur site
             </span>
             {selectedType === 'Tous' ? (
               <span className="text-[10px] font-bold text-primary-600 dark:text-primary-400 flex items-center gap-0.5">
@@ -462,6 +480,7 @@ export default function ControleAcces() {
         {/* 6 CARTES PAR CATÉGORIE */}
         {Object.entries(CATEGORY_STYLES).map(([catKey, style]) => {
           const count = dashboardData.stats_categories?.[catKey] || 0;
+          const presentCount = dashboardData.stats_presents_categories?.[catKey] || 0;
           const isSelected = selectedType === catKey;
           const IconComponent = style.icon;
 
@@ -492,8 +511,9 @@ export default function ControleAcces() {
               </div>
 
               <div className="mt-2 pt-2 border-t border-slate-100 dark:border-dark-700/50 flex items-center justify-between text-[11px]">
-                <span className="text-slate-500 dark:text-dark-400 text-[10px]">
-                  Présents
+                <span className="text-slate-500 dark:text-dark-400 text-[10px] flex items-center gap-1.5 font-medium">
+                  <span className={`w-1.5 h-1.5 rounded-full ${presentCount > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300 dark:bg-dark-600'}`} />
+                  {loading ? '…' : presentCount} sur site
                 </span>
                 {isSelected && (
                   <span className="text-[10px] font-bold text-amber-500 flex items-center gap-0.5">
@@ -504,6 +524,99 @@ export default function ControleAcces() {
             </div>
           );
         })}
+      </div>
+
+      {/* 2.5 SECTION VISUELLE : RÉPARTITION DES RÔLES & DES FLUX */}
+      <div className="card p-4 sm:p-5 bg-white dark:bg-dark-800/90 border border-slate-200 dark:border-dark-700/70 shadow-sm rounded-2xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2.5">
+            <span className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+              <PieChart size={18} />
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Répartition des Rôles & Passages
+                </h3>
+                {(dashboardData.total_usagers_journee || 0) > 0 && (
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-dark-700 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-dark-600">
+                    {dashboardData.total_usagers_journee} usager{(dashboardData.total_usagers_journee || 0) > 1 ? 's' : ''} unique{(dashboardData.total_usagers_journee || 0) > 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 dark:text-dark-400">
+                Distribution globale des usagers identifiés par les tourniquets pour la journée sélectionnée
+              </p>
+            </div>
+          </div>
+
+          {dashboardData.repartition_roles && dashboardData.repartition_roles.length > 0 && (
+            <span className="text-[11px] text-slate-400 dark:text-dark-400 self-end sm:self-auto italic">
+              Cliquez sur un rôle pour filtrer le tableau
+            </span>
+          )}
+        </div>
+
+        {/* Barre segmentée proportionnelle */}
+        {(dashboardData.total_usagers_journee || 0) > 0 && dashboardData.repartition_roles && dashboardData.repartition_roles.length > 0 ? (
+          <div className="space-y-3">
+            <div className="h-3.5 w-full bg-slate-100 dark:bg-dark-700/70 rounded-full overflow-hidden flex shadow-inner p-0.5 gap-0.5">
+              {dashboardData.repartition_roles.map((item) => {
+                const style = CATEGORY_STYLES[item.categorie] || CATEGORY_STYLES.Autre;
+                const isSelected = selectedType === item.categorie;
+                return (
+                  <div
+                    key={item.categorie}
+                    style={{ width: `${Math.max(item.pourcentage, 3)}%` }}
+                    onClick={() => setSelectedType(isSelected ? 'Tous' : item.categorie)}
+                    className={`h-full ${style.barBg || 'bg-slate-400'} rounded-sm transition-all duration-200 cursor-pointer hover:opacity-80 hover:scale-y-110 relative`}
+                    title={`${item.label || item.categorie}: ${item.countJournee} usager(s) (${item.pourcentage}%) • ${item.countPresents} actuellement sur site`}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Badges de chaque rôle avec nombre et pourcentage */}
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              {dashboardData.repartition_roles.map((item) => {
+                const style = CATEGORY_STYLES[item.categorie] || CATEGORY_STYLES.Autre;
+                const isSelected = selectedType === item.categorie;
+                const IconComponent = style.icon || Users;
+
+                return (
+                  <button
+                    key={item.categorie}
+                    onClick={() => setSelectedType(isSelected ? 'Tous' : item.categorie)}
+                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border ${
+                      isSelected
+                        ? `${style.badge} ring-2 ring-amber-500 shadow-sm scale-105`
+                        : 'bg-slate-50 dark:bg-dark-900/60 text-slate-700 dark:text-slate-300 border-slate-200/80 dark:border-dark-700/70 hover:border-slate-300 dark:hover:border-dark-600'
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${style.barBg || 'bg-slate-400'}`} />
+                    <IconComponent size={14} className={style.text} />
+                    <span>{item.label || item.categorie}</span>
+                    <span className="font-bold text-slate-900 dark:text-white">
+                      {item.countJournee}
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-black/5 dark:bg-white/10 font-mono text-slate-600 dark:text-slate-400">
+                      {item.pourcentage}%
+                    </span>
+                    {item.countPresents > 0 && (
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                        • {item.countPresents} sur site
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="py-4 px-4 rounded-xl bg-slate-50 dark:bg-dark-900/40 text-center text-xs text-slate-500 dark:text-dark-400 border border-slate-200/60 dark:border-dark-700/40">
+            {loading ? 'Calcul de la répartition en cours...' : 'Aucun passage enregistré pour cette date.'}
+          </div>
+        )}
       </div>
 
       {/* 3. BARRE DE FILTRES ET RECHERCHE */}
