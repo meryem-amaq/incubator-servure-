@@ -689,11 +689,95 @@ async function discoverAndSyncTourniquetUsers() {
   }
 }
 
+/**
+ * Importe et associe automatiquement les utilisateurs et badges enregistrés dans les bornes ZKTeco aux incubés et au personnel
+ */
+async function importUsersFromTurnstiles() {
+  const ZKLib = require('node-zklib');
+  const tourniquetService = require('./tourniquetService');
+
+  let allZkUsers = [];
+  for (const ip of DEVICES) {
+    const zk = new ZKLib(ip, PORT, 3000, 4000);
+    try {
+      await zk.createSocket();
+      const usersRes = await zk.getUsers();
+      await zk.disconnect().catch(() => {});
+      if (usersRes?.data && Array.isArray(usersRes.data) && usersRes.data.length > 0) {
+        allZkUsers = usersRes.data;
+        break; // La base utilisateur est répliquée sur les bornes
+      }
+    } catch (e) {}
+  }
+
+  const incubes = await Incube.findAll();
+  const users = await User.findAll();
+
+  let countUpdatedIncubes = 0;
+  let countUpdatedStaff = 0;
+  const currentYear = new Date().getFullYear();
+
+  for (const zu of allZkUsers) {
+    const zuName = normalizeName(zu.name);
+    const zuId = String(zu.userId || '').trim();
+    const zuCard = String(zu.cardno || '').trim();
+    if (!zuName || !zuId) continue;
+
+    const finalBadge = zuCard && zuCard !== '0' ? zuCard : zuId;
+    const finalMatricule = zuId;
+
+    await TourniquetUser.upsert({
+      badge_id: finalBadge,
+      name: zu.name,
+      cardno: zuCard || null,
+      device_ip: DEVICES[0] || '10.0.1.120'
+    }).catch(() => {});
+
+    // 1. Chercher un incubé correspondant par nom
+    const matchInc = incubes.find(inc => {
+      const inName = normalizeName(inc.nom_incube);
+      return inName === zuName || 
+             (zuName.length >= 4 && inName.includes(zuName)) ||
+             (inName.length >= 4 && zuName.includes(inName));
+    });
+
+    if (matchInc) {
+      await Incube.update({
+        badge_id: finalBadge,
+        matricule: finalMatricule
+      }, { where: { id: matchInc.id } });
+      countUpdatedIncubes++;
+      await tourniquetService.syncIncubeTourniquet(matchInc.id, currentYear).catch(() => {});
+    } else {
+      // 2. Chercher dans les comptes utilisateurs (Staff / Admins)
+      const matchStaff = users.find(u => {
+        const uName = normalizeName(`${u.prenom} ${u.nom}`);
+        const uNameRev = normalizeName(`${u.nom} ${u.prenom}`);
+        return uName === zuName || uNameRev === zuName;
+      });
+
+      if (matchStaff) {
+        await User.update({
+          badge_id: finalBadge
+        }, { where: { id: matchStaff.id } });
+        countUpdatedStaff++;
+      }
+    }
+  }
+
+  return {
+    totalZkUsers: allZkUsers.length,
+    countUpdatedIncubes,
+    countUpdatedStaff
+  };
+}
+
 module.exports = {
   collectFromAllDevices,
   recalibrateAllAttendances,
   recalibrateBadgeDay,
   discoverAndSyncTourniquetUsers,
+  importUsersFromTurnstiles,
   syncAllDeviceClocks,
   syncSingleDeviceClock,
   encodeTimeToInteger,

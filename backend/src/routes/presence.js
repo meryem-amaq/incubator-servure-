@@ -305,6 +305,21 @@ router.put('/superadmin/tourniquet-users/:badge_id', auth, isSuperAdmin, async (
   }
 });
 
+// POST /api/presence/superadmin/import-from-tourniquets : Importer et associer les badges enregistrés dans les bornes aux incubés
+router.post('/superadmin/import-from-tourniquets', auth, isSuperAdmin, async (req, res) => {
+  try {
+    const { importUsersFromTurnstiles } = require('../services/tourniquetCollector');
+    const result = await importUsersFromTurnstiles();
+    res.json({
+      success: true,
+      message: `${result.countUpdatedIncubes} incubés et ${result.countUpdatedStaff} membres du personnel ont été importés et reliés depuis les tourniquets physiques !`,
+      result
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Erreur lors de l'importation depuis les tourniquets", error: err.message });
+  }
+});
+
 // POST /api/presence/superadmin/tourniquet-sync : Lancer la synchronisation complète avec les bornes
 router.post('/superadmin/tourniquet-sync', auth, isSuperAdmin, async (req, res) => {
   try {

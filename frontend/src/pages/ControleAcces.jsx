@@ -130,6 +130,25 @@ export default function ControleAcces() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [syncingClocks, setSyncingClocks] = useState(false);
+  const [importingFromBornes, setImportingFromBornes] = useState(false);
+
+  const handleImportFromTourniquets = async () => {
+    setImportingFromBornes(true);
+    const toastId = toast.loading('Lecture des badges et utilisateurs depuis les 7 tourniquets...');
+    try {
+      const res = await api.post('/presence/superadmin/import-from-tourniquets');
+      if (res.data?.success) {
+        toast.success(res.data.message || 'Importation terminée avec succès !', { id: toastId, duration: 5000 });
+        await fetchDashboardData(false);
+      } else {
+        toast.error(res.data?.message || "Erreur lors de l'importation", { id: toastId });
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Échec de communication avec les tourniquets", { id: toastId });
+    } finally {
+      setImportingFromBornes(false);
+    }
+  };
   const [dashboardData, setDashboardData] = useState({
     total_presents_sur_site: 0,
     stats_categories: {
@@ -326,6 +345,20 @@ export default function ControleAcces() {
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span>GMT+0 (Heure Locale)</span>
           </div>
+
+          {/* Bouton Importer Badges depuis les Tourniquets (SuperAdmin) */}
+          {(user?.role === 'super_admin' || user?.role === 'admin') && (
+            <button
+              type="button"
+              onClick={handleImportFromTourniquets}
+              disabled={importingFromBornes}
+              className="btn btn-secondary btn-sm flex items-center gap-1.5 border-primary-500/40 text-primary-700 dark:text-primary-300 hover:bg-primary-500/10 font-bold"
+              title="Récupérer et lier automatiquement tous les badges enregistrés dans les bornes ZKTeco aux incubés et au personnel"
+            >
+              <Users size={14} className={importingFromBornes ? 'animate-spin text-primary-500' : 'text-primary-500'} />
+              <span>{importingFromBornes ? 'Import en cours...' : 'Importer Badges Bornes'}</span>
+            </button>
+          )}
 
           {/* Bouton Synchroniser Horloges Bornes (SuperAdmin) */}
           {(user?.role === 'super_admin' || user?.role === 'admin') && (
