@@ -923,7 +923,7 @@ exports.create = async (req, res) => {
 
     // --- Validation Badge RFID & Auto-attribution Matricule (Étape 1 : Création Startup) ---
     if (data.badge_id && String(data.badge_id).trim()) {
-      data.badge_id = String(data.badge_id).trim();
+      data.badge_id = tourniquetService.normalizeBadgeId(data.badge_id);
       const rfidCheck = await tourniquetService.checkBadgeRfidUniqueness(data.badge_id);
       if (!rfidCheck.isUnique) {
         await t.rollback();
@@ -1131,8 +1131,8 @@ exports.update = async (req, res) => {
 
     // Validation Badge RFID & Auto-attribution Matricule
     if (data.badge_id && String(data.badge_id).trim()) {
-      data.badge_id = String(data.badge_id).trim();
-      if (data.badge_id !== incube.badge_id) {
+      data.badge_id = tourniquetService.normalizeBadgeId(data.badge_id);
+      if (data.badge_id !== tourniquetService.normalizeBadgeId(incube.badge_id)) {
         const rfidCheck = await tourniquetService.checkBadgeRfidUniqueness(data.badge_id, { excludeIncubeId: incube.id });
         if (!rfidCheck.isUnique) {
           return res.status(400).json({
@@ -1331,7 +1331,7 @@ exports.updateAssocieBadge = async (req, res) => {
     }
 
     const currentAssoc = { ...associes[targetIdx] };
-    const cleanBadge = badge_id ? String(badge_id).trim() : null;
+    const cleanBadge = badge_id ? tourniquetService.normalizeBadgeId(badge_id) : null;
 
     if (cleanBadge) {
       // Vérifier l'unicité

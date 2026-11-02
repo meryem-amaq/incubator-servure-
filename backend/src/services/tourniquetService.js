@@ -699,66 +699,119 @@ function encodeUser72(uid, userId, name, cardno = 0, password = '', role = 0) {
 }
 
 /**
- * Calculer le prochain numéro de matricule libre
+ * Normalise un numéro de badge RFID en supprimant les espaces et les zéros initiaux (ex: '0005510520' -> '5510520')
+ */
+function normalizeBadgeId(badgeId) {
+  if (!badgeId) return '';
+  const str = String(badgeId).trim();
+  if (/^\d+$/.test(str)) {
+    return str.replace(/^0+(?=\d)/, '');
+  }
+  return str;
+}
+
+const ADMIN_KNOWN_MATRICULES = {
+  'admin@cgs-incubateur.ma': { matricule: 1, cardno: '1', nom: 'Administrateur IDS' },
+  'nadia.sefiani@ctpes.ma': { matricule: 6, cardno: '6', nom: 'Nadia SEFIANI' },
+  'mustapha@ctpes.ma': { matricule: 3, cardno: '3', nom: 'Mustapha' },
+  'ayoub.elbouchikhi@ctpes.ma': { matricule: 143, cardno: '7587580', nom: 'Ayoub EL BOUCHIKHI' },
+  'ilham.lahboub@ctpes.ma': { matricule: 194, cardno: '7561307', nom: 'Ilham LAHBOUB' },
+  'hicham@ctpes.ma': { matricule: 227, cardno: '6883058', nom: 'Hicham BELAAZIZ' },
+  'kawtar@ctpes.ma': { matricule: 144, cardno: '7568112', nom: 'Kawtar SBAI' },
+  'charaf@ctpes.ma': { matricule: 205, cardno: '7586646', nom: 'Charaf EL AMRANI' },
+  'aminemezzyane@gmail.com': { matricule: 142, cardno: '6895052', nom: 'Amine MEZZYANE' },
+  'incubateur.digital.solidaire@gmail.com': { matricule: 145, cardno: '7600900', nom: 'Test AMA' }
+};
+
+/**
+ * Calculer le prochain numéro de matricule libre sans JAMAIS entrer en collision avec les bornes
  */
 async function getNextAvailableMatricule() {
-  const { sequelize } = require('../models');
-  const [incubeMax] = await sequelize.query('SELECT MAX(matricule) as m FROM incubes');
-  const [rhMax] = await sequelize.query('SELECT MAX(matricule) as m FROM rh_detail');
-  
-  const m1 = incubeMax?.[0]?.m ? parseInt(incubeMax[0].m, 10) : 0;
-  const m2 = rhMax?.[0]?.m ? parseInt(rhMax[0].m, 10) : 0;
-  
-  const currentMax = Math.max(m1, m2);
-  return currentMax >= 112 ? currentMax + 1 : 112;
+  const { sequelize, Incube, RhDetail, TourniquetUser } = require('../models');
+  const [incubes, rhs, tus] = await Promise.all([
+    Incube.findAll({ attributes: ['matricule', 'associes'], raw: true }),
+    RhDetail.findAll({ attributes: ['matricule'], raw: true }),
+    TourniquetUser.findAll({ attributes: ['badge_id'], raw: true })
+  ]);
+
+  const usedSet = new Set([1, 3, 6, 100, 142, 143, 144, 145, 194, 205, 227]);
+  let maxUsed = 253; // Plancher de sécurité correspondant aux usagers physiques existants (#1 à #253)
+
+  const registerNum = (val) => {
+    const n = parseInt(val, 10);
+    if (!isNaN(n) && n > 0 && n < 5000) {
+      usedSet.add(n);
+      if (n > maxUsed) maxUsed = n;
+    }
+  };
+
+  for (const inc of incubes) {
+    registerNum(inc.matricule);
+    let assoc = inc.associes;
+    if (typeof assoc === 'string') { try { assoc = JSON.parse(assoc); } catch {} }
+    if (Array.isArray(assoc)) {
+      assoc.forEach(a => registerNum(a?.matricule));
+    }
+  }
+  for (const r of rhs) {
+    registerNum(r.matricule);
+  }
+  for (const t of tus) {
+    registerNum(t.badge_id);
+  }
+
+  let candidate = maxUsed + 1;
+  while (usedSet.has(candidate)) {
+    candidate++;
+  }
+  return candidate;
 }
 
 /**
- * Vérifier l'unicité d'un badge RFID à travers toute la base de données
+ * Vérifier l'unicité d'un badge RFID à travers toute la base de données (insensible aux zéros initiaux)
  */
 async function checkBadgeRfidUniqueness(badgeId, options = {}) {
-  if (!badgeId) return { isUnique: true };
-  const cleanBadge = String(badgeId).trim();
+  const cleanBadge = normalizeBadgeId(badgeId);
   if (!cleanBadge) return { isUnique: true };
 
   const { excludeIncubeId = null, excludeRhId = null, excludeUserId = null } = options;
   const { Incube, RhDetail, User } = require('../models');
 
   // 1. incubes
-  const whereIncube = { badge_id: cleanBadge };
-  if (excludeIncubeId) whereIncube.id = { [Op.ne]: excludeIncubeId };
-  const existingIncube = await Incube.findOne({ where: whereIncube });
-  if (existingIncube) {
-    return {
-      isUnique: false,
-      conflictType: 'Porteur de Projet (Startup)',
-      conflictName: existingIncube.nom_incube,
-      conflictEntity: existingIncube.raison_sociale || 'Startup'
-    };
+  const allIncubes = await Incube.findAll();
+  for (const inc of allIncubes) {
+    if (excludeIncubeId && Number(inc.id) === Number(excludeIncubeId)) continue;
+    if (normalizeBadgeId(inc.badge_id) === cleanBadge) {
+      return {
+        isUnique: false,
+        conflictType: 'Porteur de Projet (Startup)',
+        conflictName: inc.nom_incube,
+        conflictEntity: inc.raison_sociale || 'Startup'
+      };
+    }
   }
 
   // 2. rh_detail
-  const whereRh = { badge_id: cleanBadge };
-  if (excludeRhId) whereRh.id = { [Op.ne]: excludeRhId };
-  const existingRh = await RhDetail.findOne({ 
-    where: whereRh,
+  const allRhs = await RhDetail.findAll({
     include: [{ model: Incube, as: 'incube', attributes: ['id', 'nom_incube', 'raison_sociale'] }]
   });
-  if (existingRh) {
-    return {
-      isUnique: false,
-      conflictType: 'Salarié Staff Startup',
-      conflictName: existingRh.nom_complet,
-      conflictEntity: existingRh.incube?.raison_sociale || 'Startup'
-    };
+  for (const rh of allRhs) {
+    if (excludeRhId && Number(rh.id) === Number(excludeRhId)) continue;
+    if (normalizeBadgeId(rh.badge_id) === cleanBadge) {
+      return {
+        isUnique: false,
+        conflictType: 'Salarié Staff Startup',
+        conflictName: rh.nom_complet,
+        conflictEntity: rh.incube?.raison_sociale || 'Startup'
+      };
+    }
   }
 
   // 2.5 associés des incubés
-  const allIncubesForAssoc = await Incube.findAll();
-  for (const inc of allIncubesForAssoc) {
-    if (excludeIncubeId && inc.id === excludeIncubeId) continue;
+  for (const inc of allIncubes) {
+    if (excludeIncubeId && Number(inc.id) === Number(excludeIncubeId)) continue;
     if (Array.isArray(inc.associes)) {
-      const matchedAssoc = inc.associes.find(a => String(a.badge_id || '').trim() === cleanBadge);
+      const matchedAssoc = inc.associes.find(a => normalizeBadgeId(a?.badge_id) === cleanBadge);
       if (matchedAssoc) {
         return {
           isUnique: false,
@@ -771,16 +824,17 @@ async function checkBadgeRfidUniqueness(badgeId, options = {}) {
   }
 
   // 3. users (staff interne)
-  const whereUser = { badge_id: cleanBadge };
-  if (excludeUserId) whereUser.id = { [Op.ne]: excludeUserId };
-  const existingUser = await User.findOne({ where: whereUser });
-  if (existingUser) {
-    return {
-      isUnique: false,
-      conflictType: 'Utilisateur Plateforme',
-      conflictName: `${existingUser.prenom} ${existingUser.nom}`,
-      conflictEntity: existingUser.role
-    };
+  const allUsers = await User.findAll();
+  for (const u of allUsers) {
+    if (excludeUserId && Number(u.id) === Number(excludeUserId)) continue;
+    if (normalizeBadgeId(u.badge_id) === cleanBadge) {
+      return {
+        isUnique: false,
+        conflictType: 'Utilisateur Plateforme',
+        conflictName: `${u.prenom} ${u.nom}`,
+        conflictEntity: u.role
+      };
+    }
   }
 
   return { isUnique: true };
@@ -792,8 +846,9 @@ async function checkBadgeRfidUniqueness(badgeId, options = {}) {
 async function broadcastUserToTurnstiles({ matricule, name, cardno, role = 0, type = 'Incube' }) {
   const ips = getDeviceIps();
   const uid = parseInt(matricule, 10) || 1;
-  const userId = String(matricule);
-  const cardInt = parseInt(cardno, 10) || 0;
+  const userId = String(uid);
+  const cleanCard = normalizeBadgeId(cardno);
+  const cardInt = parseInt(cleanCard, 10) || 0;
   const cleanName = String(name || '').trim().slice(0, 24);
 
   const results = {
@@ -805,7 +860,7 @@ async function broadcastUserToTurnstiles({ matricule, name, cardno, role = 0, ty
     failedDevices: []
   };
 
-  // 1. Mettre à jour le cache MySQL TourniquetUser
+  // 1. Mettre à jour le cache MySQL TourniquetUser (1 seule ligne canonique par usager, sans doublon)
   try {
     const { TourniquetUser } = require('../models');
     await TourniquetUser.upsert({
@@ -815,15 +870,9 @@ async function broadcastUserToTurnstiles({ matricule, name, cardno, role = 0, ty
       type: type || 'Incube',
       device_ip: ips[0]
     });
-    // Double indexation : enregistrer également sous le numéro RFID de la carte
+    // Supprimer tout ancien doublon indexé par numéro de carte brut
     if (cardInt > 0 && String(cardInt) !== String(uid)) {
-      await TourniquetUser.upsert({
-        badge_id: String(cardInt),
-        name: cleanName,
-        cardno: String(cardInt),
-        type: type || 'Incube',
-        device_ip: ips[0]
-      });
+      await TourniquetUser.destroy({ where: { badge_id: String(cardInt) } });
     }
   } catch (err) {
     console.error('Erreur upsert TourniquetUser:', err.message);
@@ -855,7 +904,7 @@ async function broadcastUserToTurnstiles({ matricule, name, cardno, role = 0, ty
 
 /**
  * Ré-injecter en masse tous les incubés, salariés RH, associés et admins ayant un badge RFID
- * vers les 7 Tourniquets F18 pour forcer l'écrasement de tous les anciens noms physiques.
+ * vers les 7 Tourniquets F18 sans jamais écraser les matricules existants.
  */
 async function resyncAllBadgeHoldersToTurnstiles() {
   const { Incube, RhDetail, User } = require('../models');
@@ -869,10 +918,11 @@ async function resyncAllBadgeHoldersToTurnstiles() {
 
   for (const inc of incubes) {
     if (inc.badge_id) {
+      inc.badge_id = normalizeBadgeId(inc.badge_id);
       if (!inc.matricule) {
-        inc.matricule = await getNextAvailableMatricule();
-        await inc.save();
+        inc.matricule = await getOrCreateMatriculeForBadge(inc.badge_id, inc.nom_incube);
       }
+      await inc.save();
       allToSync.push({
         matricule: inc.matricule,
         name: inc.nom_incube,
@@ -881,26 +931,42 @@ async function resyncAllBadgeHoldersToTurnstiles() {
       });
     }
 
-    // Inclure les associés de la startup
+    // Inclure les associés de la startup (chacun avec son PROPRE matricule distinct !)
     if (Array.isArray(inc.associes)) {
+      let assocChanged = false;
+      const updatedAssocies = [];
       for (const a of inc.associes) {
         if (a && a.badge_id) {
+          const cleanABadge = normalizeBadgeId(a.badge_id);
+          let aMat = a.matricule;
+          if (!aMat || aMat === inc.matricule) {
+            aMat = await getOrCreateMatriculeForBadge(cleanABadge, a.nom);
+            assocChanged = true;
+          }
+          updatedAssocies.push({ ...a, badge_id: cleanABadge, matricule: aMat });
           allToSync.push({
-            matricule: a.matricule || inc.matricule,
+            matricule: aMat,
             name: a.nom,
-            cardno: a.badge_id,
+            cardno: cleanABadge,
             type: 'Incube'
           });
+        } else {
+          updatedAssocies.push(a);
         }
+      }
+      if (assocChanged) {
+        inc.associes = updatedAssocies;
+        await inc.save();
       }
     }
   }
 
   for (const s of staff) {
+    s.badge_id = normalizeBadgeId(s.badge_id);
     if (!s.matricule) {
-      s.matricule = await getNextAvailableMatricule();
-      await s.save();
+      s.matricule = await getOrCreateMatriculeForBadge(s.badge_id, s.nom_complet);
     }
+    await s.save();
     allToSync.push({
       matricule: s.matricule,
       name: s.nom_complet,
@@ -910,12 +976,16 @@ async function resyncAllBadgeHoldersToTurnstiles() {
   }
 
   for (const u of users) {
-    allToSync.push({
-      matricule: u.id,
-      name: `${u.prenom || ''} ${u.nom || ''}`.trim() || 'Admin',
-      cardno: u.badge_id,
-      type: u.type || 'Administration'
-    });
+    const emailKey = (u.email || '').trim().toLowerCase();
+    const knownAdmin = ADMIN_KNOWN_MATRICULES[emailKey];
+    if (knownAdmin) {
+      allToSync.push({
+        matricule: knownAdmin.matricule,
+        name: knownAdmin.nom,
+        cardno: knownAdmin.cardno,
+        type: 'Administration'
+      });
+    }
   }
 
   let successCount = 0;
@@ -933,7 +1003,7 @@ async function resyncAllBadgeHoldersToTurnstiles() {
 
 /**
  * Récupère le matricule existant associé à un badge ou à un nom sur les tourniquets,
- * ou calcule le prochain matricule disponible pour éviter TOUT DOUBLON D'ID !
+ * ou calcule le prochain matricule disponible pour éviter TOUTE COLLISION D'ID !
  */
 async function getOrCreateMatriculeForBadge(badgeId, personName = '', existingMatricule = null) {
   if (existingMatricule && parseInt(existingMatricule, 10) > 0) {
@@ -941,38 +1011,69 @@ async function getOrCreateMatriculeForBadge(badgeId, personName = '', existingMa
   }
 
   const { TourniquetUser, Incube, RhDetail } = require('../models');
-  const cleanBadge = badgeId ? String(badgeId).trim() : '';
+  const cleanBadge = normalizeBadgeId(badgeId);
 
-  // 1. Si le badge est déjà associé à un incubé ayant un matricule
-  if (cleanBadge) {
-    const inc = await Incube.findOne({ where: { badge_id: cleanBadge } });
-    if (inc && inc.matricule) return inc.matricule;
+  const [allIncubes, allRhs, allTu] = await Promise.all([
+    Incube.findAll({ raw: true }),
+    RhDetail.findAll({ raw: true }),
+    TourniquetUser.findAll({ raw: true })
+  ]);
 
-    // 2. Si le badge est déjà associé à un salarié RH ayant un matricule
-    const rh = await RhDetail.findOne({ where: { badge_id: cleanBadge } });
-    if (rh && rh.matricule) return rh.matricule;
-
-    // 3. Si le badge existe déjà sur les tourniquets (TourniquetUser)
-    const tuByCard = await TourniquetUser.findOne({ where: { cardno: cleanBadge } });
-    if (tuByCard && parseInt(tuByCard.badge_id, 10) > 0 && parseInt(tuByCard.badge_id, 10) < 1000000) {
-      return parseInt(tuByCard.badge_id, 10);
+  // Recenser tous les matricules déjà attribués en base pour interdire toute collision
+  const assignedMatricules = new Set([1, 3, 6, 100, 142, 143, 144, 145, 194, 205, 227]);
+  for (const inc of allIncubes) {
+    if (inc.matricule) {
+      if (cleanBadge && normalizeBadgeId(inc.badge_id) === cleanBadge) return parseInt(inc.matricule, 10);
+      assignedMatricules.add(parseInt(inc.matricule, 10));
     }
-    const tuByBadge = await TourniquetUser.findByPk(cleanBadge);
-    if (tuByBadge && parseInt(tuByBadge.badge_id, 10) > 0 && parseInt(tuByBadge.badge_id, 10) < 1000000) {
-      return parseInt(tuByBadge.badge_id, 10);
+    let assoc = inc.associes;
+    if (typeof assoc === 'string') { try { assoc = JSON.parse(assoc); } catch {} }
+    if (Array.isArray(assoc)) {
+      for (const a of assoc) {
+        if (a?.matricule) {
+          if (cleanBadge && normalizeBadgeId(a.badge_id) === cleanBadge) return parseInt(a.matricule, 10);
+          assignedMatricules.add(parseInt(a.matricule, 10));
+        }
+      }
     }
   }
 
-  // 4. Si le nom correspond à un usager déjà présent sur les tourniquets
+  for (const rh of allRhs) {
+    if (rh.matricule) {
+      if (cleanBadge && normalizeBadgeId(rh.badge_id) === cleanBadge) return parseInt(rh.matricule, 10);
+      assignedMatricules.add(parseInt(rh.matricule, 10));
+    }
+  }
+
+  // 3. Si le numéro de carte RFID existe déjà physiquement sur les tourniquets (TourniquetUser)
+  //    et que ce matricule n'est pas déjà pris par un autre incubé/salarié en base :
+  if (cleanBadge) {
+    const tuByCard = allTu.find(t =>
+      normalizeBadgeId(t.cardno) === cleanBadge &&
+      parseInt(t.badge_id, 10) > 0 &&
+      parseInt(t.badge_id, 10) < 5000
+    );
+    if (tuByCard) {
+      const m = parseInt(tuByCard.badge_id, 10);
+      if (!assignedMatricules.has(m)) return m;
+    }
+  }
+
+  // 4. Si le nom correspond exactement à un usager déjà présent sur les tourniquets
+  //    UNIQUEMENT si cet emplacement n'appartient pas déjà à une autre carte ou un autre dossier en base
   if (personName && personName.trim()) {
-    const allTu = await TourniquetUser.findAll();
-    const tuMatch = allTu.find(t => matchesPersonName(personName, t.name));
-    if (tuMatch && parseInt(tuMatch.badge_id, 10) > 0 && parseInt(tuMatch.badge_id, 10) < 1000000) {
+    const tuMatch = allTu.find(t => {
+      const m = parseInt(t.badge_id, 10);
+      if (!(m > 0 && m < 5000) || assignedMatricules.has(m)) return false;
+      if (cleanBadge && t.cardno && normalizeBadgeId(t.cardno) !== cleanBadge) return false;
+      return matchesPersonName(personName, t.name);
+    });
+    if (tuMatch) {
       return parseInt(tuMatch.badge_id, 10);
     }
   }
 
-  // 5. Sinon, allouer le prochain matricule machine libre
+  // 5. Sinon, allouer un tout nouveau matricule libre après le dernier emplacement des bornes (> 253)
   return await getNextAvailableMatricule();
 }
 
@@ -980,10 +1081,10 @@ async function getOrCreateMatriculeForBadge(badgeId, personName = '', existingMa
  * Vérification complète et approfondie de l'état d'un badge RFID
  */
 async function verifyBadgeStatus(badgeId) {
-  if (!badgeId || !String(badgeId).trim()) {
+  const cleanBadge = normalizeBadgeId(badgeId);
+  if (!cleanBadge) {
     return { valid: false, message: 'Numéro de badge manquant' };
   }
-  const cleanBadge = String(badgeId).trim();
   const { Incube, RhDetail, User, TourniquetUser } = require('../models');
 
   let assignedTo = null;
@@ -1104,7 +1205,7 @@ async function verifyBadgeStatus(badgeId) {
 
 /**
  * Relie automatiquement les badges physiques déjà présents sur les tourniquets
- * aux salariés RH et aux associés des incubés.
+ * aux salariés RH et aux associés des incubés (sans jamais dupliquer le badge d'un Porteur de Projet).
  */
 async function autoLinkExistingTourniquetBadges() {
   const { RhDetail, TourniquetUser, Incube } = require('../models');
@@ -1115,15 +1216,33 @@ async function autoLinkExistingTourniquetBadges() {
   const tUsers = await TourniquetUser.findAll();
   const incubes = await Incube.findAll();
 
+  const porteurBadges = new Set();
+  const porteurMatricules = new Set();
+  for (const inc of incubes) {
+    if (inc.badge_id) porteurBadges.add(normalizeBadgeId(inc.badge_id));
+    if (inc.matricule) porteurMatricules.add(parseInt(inc.matricule, 10));
+  }
+
   let linkedRhCount = 0;
   const linkedRhDetails = [];
 
   for (const rh of rhList) {
+    // Si ce salarié a le même nom que le Porteur de Projet de sa propre startup, ignorer (son badge est déjà sur le profil Porteur)
+    if (rh.incube && matchesPersonName(rh.nom_complet, rh.incube.nom_incube)) {
+      continue;
+    }
+
     if (!rh.badge_id || String(rh.badge_id).trim() === '') {
-      const tu = tUsers.find(t => matchesPersonName(rh.nom_complet, t.name));
+      const tu = tUsers.find(t => {
+        const m = parseInt(t.badge_id, 10);
+        if (!(m > 0 && m < 5000)) return false;
+        const c = normalizeBadgeId(t.cardno || t.badge_id);
+        if (porteurBadges.has(c) || porteurMatricules.has(m)) return false;
+        return matchesPersonName(rh.nom_complet, t.name);
+      });
       if (tu) {
-        const finalBadge = (tu.cardno && tu.cardno !== '0') ? String(tu.cardno) : String(tu.badge_id);
-        const finalMatricule = parseInt(tu.badge_id, 10) > 0 && parseInt(tu.badge_id, 10) < 1000000 ? parseInt(tu.badge_id, 10) : null;
+        const finalBadge = normalizeBadgeId((tu.cardno && tu.cardno !== '0') ? String(tu.cardno) : String(tu.badge_id));
+        const finalMatricule = parseInt(tu.badge_id, 10) > 0 && parseInt(tu.badge_id, 10) < 5000 ? parseInt(tu.badge_id, 10) : null;
         
         rh.badge_id = finalBadge;
         if (finalMatricule) rh.matricule = finalMatricule;
@@ -1153,10 +1272,16 @@ async function autoLinkExistingTourniquetBadges() {
       let changed = false;
       const updatedAssocies = inc.associes.map(a => {
         if (!a.badge_id || String(a.badge_id).trim() === '') {
-          const tu = tUsers.find(t => matchesPersonName(a.nom, t.name));
+          const tu = tUsers.find(t => {
+            const m = parseInt(t.badge_id, 10);
+            if (!(m > 0 && m < 5000)) return false;
+            const c = normalizeBadgeId(t.cardno || t.badge_id);
+            if (porteurBadges.has(c) || porteurMatricules.has(m)) return false;
+            return matchesPersonName(a.nom, t.name);
+          });
           if (tu) {
-            const finalBadge = (tu.cardno && tu.cardno !== '0') ? String(tu.cardno) : String(tu.badge_id);
-            const finalMatricule = parseInt(tu.badge_id, 10) > 0 && parseInt(tu.badge_id, 10) < 1000000 ? parseInt(tu.badge_id, 10) : null;
+            const finalBadge = normalizeBadgeId((tu.cardno && tu.cardno !== '0') ? String(tu.cardno) : String(tu.badge_id));
+            const finalMatricule = parseInt(tu.badge_id, 10) > 0 && parseInt(tu.badge_id, 10) < 5000 ? parseInt(tu.badge_id, 10) : null;
             changed = true;
             linkedAssocCount++;
             tu.type = 'Incube';
@@ -1203,6 +1328,7 @@ module.exports = {
   getLivePresence,
   getActivityByType,
   encodeUser72,
+  normalizeBadgeId,
   getNextAvailableMatricule,
   getOrCreateMatriculeForBadge,
   checkBadgeRfidUniqueness,

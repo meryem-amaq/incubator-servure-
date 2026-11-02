@@ -79,7 +79,7 @@ function createSubController(Model, modelName) {
             req.body.date_embauche = null;
           }
           if (req.body.badge_id && String(req.body.badge_id).trim()) {
-            const trimmedBadge = String(req.body.badge_id).trim();
+            const trimmedBadge = tourniquetService.normalizeBadgeId(req.body.badge_id);
             const rfidCheck = await tourniquetService.checkBadgeRfidUniqueness(trimmedBadge);
             if (!rfidCheck.isUnique) {
               return res.status(400).json({
@@ -183,8 +183,8 @@ function createSubController(Model, modelName) {
             req.body.date_embauche = null;
           }
           if (req.body.badge_id && String(req.body.badge_id).trim()) {
-            const trimmedBadge = String(req.body.badge_id).trim();
-            if (trimmedBadge !== item.badge_id) {
+            const trimmedBadge = tourniquetService.normalizeBadgeId(req.body.badge_id);
+            if (trimmedBadge !== tourniquetService.normalizeBadgeId(item.badge_id)) {
               const rfidCheck = await tourniquetService.checkBadgeRfidUniqueness(trimmedBadge, { excludeRhId: item.id });
               if (!rfidCheck.isUnique) {
                 return res.status(400).json({

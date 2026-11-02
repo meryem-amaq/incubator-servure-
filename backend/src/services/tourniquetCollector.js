@@ -140,12 +140,12 @@ function toUtcExactDate(dateObj) {
 }
 
 /**
- * Synchronise l'horloge interne d'une borne physique ZKTeco avec l'heure exacte GMT+0.
+ * Synchronise l'horloge interne d'une borne physique ZKTeco avec l'heure locale exacte du serveur.
  * Utilise disableDevice() / enableDevice() pour garantir l'application immédiate du RTC.
  */
 async function syncSingleDeviceClock(zk, ip) {
   try {
-    const nowUtc = new Date();
+    const nowUtc = toUtcExactDate(new Date());
     let driftSeconds = null;
     let devTime = null;
 
@@ -160,8 +160,8 @@ async function syncSingleDeviceClock(zk, ip) {
       // Lecture non bloquante
     }
 
-    // Si dérive supérieure à 2 secondes ou année aberrante (< 2025)
-    if (driftSeconds === null || Math.abs(driftSeconds) > 2 || (devTime && devTime.getUTCFullYear() < 2025)) {
+    // Si dérive supérieure à 5 secondes ou année aberrante (< 2025)
+    if (driftSeconds === null || Math.abs(driftSeconds) > 5 || (devTime && devTime.getUTCFullYear() < 2025)) {
       try { await zk.disableDevice(); } catch (e) {}
 
       const timeVal = encodeTimeToInteger(nowUtc);
@@ -171,7 +171,7 @@ async function syncSingleDeviceClock(zk, ip) {
 
       try { await zk.enableDevice(); } catch (e) {}
 
-      console.log(`⏱️ [Tourniquet ${ip}] Horloge synchronisée sur GMT+0 : ${nowUtc.toISOString()} (dérive précédente : ${driftSeconds !== null ? driftSeconds + 's' : 'inconnue'})`);
+      console.log(`⏱️ [Tourniquet ${ip}] Horloge synchronisée : ${nowUtc.toISOString()} (dérive précédente : ${driftSeconds !== null ? driftSeconds + 's' : 'inconnue'})`);
       return { ip, success: true, synced: true, previousDrift: driftSeconds, nowUtc };
     }
 
@@ -184,14 +184,14 @@ async function syncSingleDeviceClock(zk, ip) {
 }
 
 /**
- * Synchronise les horloges de l'ensemble des 7 bornes physiques sur l'heure locale exacte GMT+0
+ * Synchronise les horloges de l'ensemble des 7 bornes physiques sur l'heure locale exacte du serveur
  */
 async function syncAllDeviceClocks() {
   const results = [];
-  const nowUtc = new Date();
+  const nowUtc = toUtcExactDate(new Date());
 
   for (const ip of DEVICES) {
-    const zk = new ZKLib(ip, PORT, 3000, 0);
+    const zk = new ZKLib(ip, PORT, 5000, 0);
     try {
       await zk.createSocket();
 
@@ -219,7 +219,7 @@ async function syncAllDeviceClocks() {
         const replyAfter = await zk.executeCmd(COMMANDS.CMD_GET_TIME, '');
         if (replyAfter && replyAfter.length >= 12) {
           const tAfter = parseTimeToDateUTC(replyAfter.readUInt32LE(8));
-          driftAfter = Math.round((tAfter.getTime() - new Date().getTime()) / 1000);
+          driftAfter = Math.round((tAfter.getTime() - toUtcExactDate(new Date()).getTime()) / 1000);
           devTimeStr = tAfter.toISOString();
         }
       } catch (e) {}
@@ -245,13 +245,13 @@ async function syncAllDeviceClocks() {
   }
 
   const successCount = results.filter(r => r.success).length;
-  console.log(`✅ Synchro 7 bornes GMT+0 : ${successCount}/${DEVICES.length} synchronisées.`);
+  console.log(`✅ Synchro 7 bornes : ${successCount}/${DEVICES.length} synchronisées.`);
   return {
     success: true,
     totalDevices: DEVICES.length,
     successCount,
     serverTimeUtc: nowUtc.toISOString(),
-    timezone: 'GMT+0 (Heure Locale)',
+    timezone: 'Heure Locale Maroc',
     results
   };
 }
@@ -275,32 +275,63 @@ async function collectFromAllDevices() {
   isCollecting = true;
 
   try {
-    // 1. Pré-charger tous les utilisateurs et incubés avec leur badge_id
-    const [users, incubes] = await Promise.all([
+    // 1. Pré-charger tous les utilisateurs, incubés, RH et usagers tourniquet avec leur badge_id / matricule
+    const { RhDetail } = require('../models');
+    const [users, incubes, rhDetails, tourniquetUsers] = await Promise.all([
       User.findAll({ attributes: ['id', 'badge_id', 'nom', 'prenom', 'type', 'role'] }),
-      Incube.findAll({ attributes: ['id', 'user_id', 'badge_id', 'matricule', 'nom_incube'] })
+      Incube.findAll({ attributes: ['id', 'user_id', 'badge_id', 'matricule', 'nom_incube', 'associes'] }),
+      RhDetail ? RhDetail.findAll({ attributes: ['id', 'incube_id', 'badge_id', 'matricule', 'nom_complet'] }) : Promise.resolve([]),
+      TourniquetUser.findAll({ attributes: ['badge_id', 'cardno', 'name'], raw: true })
     ]);
 
-    // Dictionnaire badge_id / matricule -> user_id
+    // Dictionnaire badge_id / matricule -> user_id & normalisation cardno -> matricule
     const badgeToUserMap = new Map();
+    const cardToMatriculeMap = new Map();
+
+    tourniquetUsers.forEach(tu => {
+      const bId = String(tu.badge_id || '').trim().replace(/^0+(?=\d)/, '');
+      const cNo = String(tu.cardno || '').trim().replace(/^0+(?=\d)/, '');
+      if (bId && cNo && bId !== cNo && parseInt(bId, 10) > 0 && parseInt(bId, 10) < 100000) {
+        cardToMatriculeMap.set(cNo, bId);
+      }
+    });
+
     users.forEach(u => {
-      if (u.badge_id) badgeToUserMap.set(String(u.badge_id).trim(), u.id);
+      if (u.badge_id) {
+        const cleanB = String(u.badge_id).trim().replace(/^0+(?=\d)/, '');
+        badgeToUserMap.set(cleanB, u.id);
+      }
     });
     incubes.forEach(inc => {
-      if (inc.badge_id && !badgeToUserMap.has(String(inc.badge_id).trim())) {
-        badgeToUserMap.set(String(inc.badge_id).trim(), inc.user_id || null);
+      const cleanB = inc.badge_id ? String(inc.badge_id).trim().replace(/^0+(?=\d)/, '') : '';
+      const cleanM = inc.matricule ? String(inc.matricule).trim() : '';
+      if (cleanB && cleanM) cardToMatriculeMap.set(cleanB, cleanM);
+      if (cleanB && !badgeToUserMap.has(cleanB)) {
+        badgeToUserMap.set(cleanB, inc.user_id || null);
       }
-      if (inc.matricule && !badgeToUserMap.has(String(inc.matricule).trim())) {
-        badgeToUserMap.set(String(inc.matricule).trim(), inc.user_id || null);
+      if (cleanM && !badgeToUserMap.has(cleanM)) {
+        badgeToUserMap.set(cleanM, inc.user_id || null);
       }
+      if (Array.isArray(inc.associes)) {
+        inc.associes.forEach(a => {
+          const aB = a?.badge_id ? String(a.badge_id).trim().replace(/^0+(?=\d)/, '') : '';
+          const aM = a?.matricule ? String(a.matricule).trim() : '';
+          if (aB && aM) cardToMatriculeMap.set(aB, aM);
+        });
+      }
+    });
+    rhDetails.forEach(rh => {
+      const cleanB = rh.badge_id ? String(rh.badge_id).trim().replace(/^0+(?=\d)/, '') : '';
+      const cleanM = rh.matricule ? String(rh.matricule).trim() : '';
+      if (cleanB && cleanM) cardToMatriculeMap.set(cleanB, cleanM);
     });
 
     // 2. Extraire les logs bruts de TOUS les tourniquets dans un pool unique
     const rawLogsAcrossAllDevices = [];
-    const nowServerUtc = new Date();
+    const nowServerLocal = toUtcExactDate(new Date());
 
     for (const ip of DEVICES) {
-      const zk = new ZKLib(ip, PORT, 3000, 0);
+      const zk = new ZKLib(ip, PORT, 5000, 0);
       try {
         await zk.createSocket();
 
@@ -308,10 +339,16 @@ async function collectFromAllDevices() {
         const logs = await zk.getAttendances();
         if (logs && logs.data && Array.isArray(logs.data)) {
           for (const log of logs.data) {
-            const rawBadgeId = String(log.deviceUserId || log.id || log.userSn || '').trim();
-            if (!rawBadgeId) continue;
+            let rawBadgeId = String(log.deviceUserId || log.id || log.userSn || '').trim().replace(/^0+(?=\d)/, '');
+            // Ignorer les scans vides ou le code '0' (bouton poussoir / lecture anonyme)
+            if (!rawBadgeId || rawBadgeId === '0') continue;
 
-            // Reconstitution pure GMT+0 (indépendant des fuseaux Windows/Node)
+            // Si la borne a renvoyé le numéro de carte RFID brut au lieu du matricule machine, normaliser vers le matricule
+            if (cardToMatriculeMap.has(rawBadgeId)) {
+              rawBadgeId = cardToMatriculeMap.get(rawBadgeId);
+            }
+
+            // Reconstitution pure de l'heure locale Maroc stockée sur la borne
             let scanTime = toUtcExactDate(log.recordTime);
             if (!scanTime) continue;
 
@@ -321,16 +358,11 @@ async function collectFromAllDevices() {
               continue;
             }
 
-            // 2. Gestion intelligente du décalage (+1h GMT+1 Maroc vs GMT+0 UTC) ou heures futures
-            const driftMs = scanTime.getTime() - nowServerUtc.getTime();
+            // 2. Ignorer tout scan véritablement dans le futur (> 15 min d'avance sur l'heure locale Maroc)
+            //    NE JAMAIS remplacer scanTime par l'heure actuelle (ce qui créait des doublons à chaque cycle !)
+            const driftMs = scanTime.getTime() - nowServerLocal.getTime();
             if (driftMs > 15 * 60 * 1000) {
-              if (driftMs >= 35 * 60 * 1000 && driftMs <= 75 * 60 * 1000) {
-                // Décalage typique d'1 heure (GMT+1 Maroc -> GMT+0 UTC) : on recalibre exactement à la minute et seconde près
-                scanTime = new Date(scanTime.getTime() - 3600 * 1000);
-              } else {
-                console.warn(`⚠️ [Tourniquet ${ip}] Scan futur aberrant (${scanTime.toISOString()}) badge #${rawBadgeId} -> Recalé sur l'heure réelle GMT+0 (${nowServerUtc.toISOString()})`);
-                scanTime = new Date(nowServerUtc.getTime());
-              }
+              continue;
             }
 
             rawLogsAcrossAllDevices.push({

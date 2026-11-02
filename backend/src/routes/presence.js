@@ -149,10 +149,16 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
       })
     ]);
 
+    const cleanBadgeKey = (val) => {
+      if (!val) return '';
+      const s = String(val).trim();
+      return /^\d+$/.test(s) ? s.replace(/^0+(?=\d)/, '') : s;
+    };
+
     const userById = new Map(users.map(u => [u.id, u]));
     const userByBadge = new Map();
     users.forEach(u => {
-      if (u.badge_id) userByBadge.set(String(u.badge_id).trim(), u);
+      if (u.badge_id) userByBadge.set(cleanBadgeKey(u.badge_id), u);
     });
 
     const incubeByUserId = new Map();
@@ -160,32 +166,32 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
     const associeByBadge = new Map();
     incubes.forEach(i => {
       if (i.user_id) incubeByUserId.set(i.user_id, i);
-      if (i.badge_id) incubeByBadge.set(String(i.badge_id).trim(), i);
-      if (i.matricule) incubeByBadge.set(String(i.matricule).trim(), i);
+      if (i.badge_id) incubeByBadge.set(cleanBadgeKey(i.badge_id), i);
+      if (i.matricule) incubeByBadge.set(cleanBadgeKey(i.matricule), i);
       if (Array.isArray(i.associes)) {
         i.associes.forEach(a => {
-          if (a && a.badge_id) associeByBadge.set(String(a.badge_id).trim(), { associe: a, incube: i });
-          if (a && a.matricule) associeByBadge.set(String(a.matricule).trim(), { associe: a, incube: i });
+          if (a && a.badge_id) associeByBadge.set(cleanBadgeKey(a.badge_id), { associe: a, incube: i });
+          if (a && a.matricule) associeByBadge.set(cleanBadgeKey(a.matricule), { associe: a, incube: i });
         });
       }
     });
 
     const rhByBadge = new Map();
     rhDetails.forEach(rh => {
-      if (rh.badge_id) rhByBadge.set(String(rh.badge_id).trim(), rh);
-      if (rh.matricule) rhByBadge.set(String(rh.matricule).trim(), rh);
+      if (rh.badge_id) rhByBadge.set(cleanBadgeKey(rh.badge_id), rh);
+      if (rh.matricule) rhByBadge.set(cleanBadgeKey(rh.matricule), rh);
     });
 
     const tourniquetUserByBadge = new Map();
     tourniquetUsers.forEach(tu => {
-      if (tu.badge_id) tourniquetUserByBadge.set(String(tu.badge_id).trim(), tu);
-      if (tu.cardno) tourniquetUserByBadge.set(String(tu.cardno).trim(), tu);
+      if (tu.badge_id) tourniquetUserByBadge.set(cleanBadgeKey(tu.badge_id), tu);
+      if (tu.cardno) tourniquetUserByBadge.set(cleanBadgeKey(tu.cardno), tu);
     });
 
-    // 2. Récupérer tous les scans de la date ciblée (plage horaire directe ultra-rapide avec index MySQL sur time)
+    // 2. Récupérer tous les scans de la date ciblée (en excluant le badge '0' anonyme)
     const cleanDate = /^\d{4}-\d{2}-\d{2}$/.test(targetDate) ? targetDate : new Date().toISOString().split('T')[0];
-    const scans = await Attendance.findAll({
-      where: sequelize.literal(`\`Attendance\`.\`time\` BETWEEN '${cleanDate} 00:00:00' AND '${cleanDate} 23:59:59'`),
+    const rawScans = await Attendance.findAll({
+      where: sequelize.literal(`\`Attendance\`.\`time\` BETWEEN '${cleanDate} 00:00:00' AND '${cleanDate} 23:59:59' AND \`Attendance\`.\`raw_badge_id\` != '0'`),
       order: [['time', 'ASC']]
     });
 
@@ -221,7 +227,7 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
     };
 
     function resolvePerson(scan) {
-      const rawBadge = scan.raw_badge_id ? String(scan.raw_badge_id).trim() : '';
+      const rawBadge = cleanBadgeKey(scan.raw_badge_id);
 
       // 0. Vérification directe dans la cartographie des administrateurs certifiés
       const knownAdmin = ADMIN_KNOWN_BADGES[rawBadge];
@@ -229,6 +235,7 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
         let uMatch = scan.user_id ? userById.get(scan.user_id) : null;
         if (!uMatch) uMatch = users.find(usr => (usr.email || '').toLowerCase() === knownAdmin.email.toLowerCase());
         return {
+          personKey: `admin_${knownAdmin.email.toLowerCase()}`,
           name: knownAdmin.nom,
           category: 'Administration',
           email: knownAdmin.email,
@@ -238,11 +245,28 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
         };
       }
 
-      // 0.5 Vérification directe dans les associés des startups (Incubés)
+      // 1. Priorité Porteur de Projet (Incubé) par badge_id ou matricule direct
+      const directInc = rawBadge ? incubeByBadge.get(rawBadge) : null;
+      if (directInc) {
+        const u = directInc.user_id ? userById.get(directInc.user_id) : null;
+        const startupName = directInc.raison_sociale ? ` (${directInc.raison_sociale})` : '';
+        return {
+          personKey: `incube_${directInc.id}`,
+          name: `${directInc.nom_incube}${startupName}`,
+          category: 'Incube',
+          email: directInc.email || u?.email || null,
+          photo: directInc.photo_path || u?.photo_url || null,
+          userId: directInc.user_id || null,
+          badgeId: scan.raw_badge_id
+        };
+      }
+
+      // 1.1 Vérification directe dans les associés des startups (Incubés)
       const matchedAssoc = rawBadge ? associeByBadge.get(rawBadge) : null;
       if (matchedAssoc) {
         const startupName = matchedAssoc.incube.raison_sociale || matchedAssoc.incube.nom_incube || 'Startup';
         return {
+          personKey: `assoc_${matchedAssoc.incube.id}_${cleanWord(matchedAssoc.associe.nom)}`,
           name: `${matchedAssoc.associe.nom} [Associé - ${startupName}]`,
           category: 'Incube',
           email: matchedAssoc.associe.email || matchedAssoc.incube.email || null,
@@ -252,12 +276,13 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
         };
       }
 
-      // 0.6 Vérification directe dans les salariés RH / stagiaires de la startup
+      // 1.2 Vérification directe dans les salariés RH / stagiaires de la startup
       const matchedRh = rawBadge ? rhByBadge.get(rawBadge) : null;
       if (matchedRh) {
         const startupName = matchedRh.incube?.raison_sociale || matchedRh.incube?.nom_incube || 'Startup';
         const roleLabel = matchedRh.poste || 'Salarié';
         return {
+          personKey: `rh_${matchedRh.id}`,
           name: `${matchedRh.nom_complet} [${roleLabel} - ${startupName}]`,
           category: 'Incube',
           email: null,
@@ -267,22 +292,19 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
         };
       }
 
-      // 1. Recherche par user_id ou badge_id dans users
+      // 2. Recherche par user_id ou badge_id dans users
       let u = scan.user_id ? userById.get(scan.user_id) : null;
       if (!u && rawBadge) {
         u = userByBadge.get(rawBadge);
       }
 
-      // 2. Recherche par user_id, badge_id ou matricule dans incubes
+      // 2.5 Recherche par user_id dans incubes
       let inc = null;
       if (scan.user_id) {
         inc = incubeByUserId.get(scan.user_id);
       }
       if (!inc && u) {
         inc = incubeByUserId.get(u.id);
-      }
-      if (!inc && rawBadge) {
-        inc = incubeByBadge.get(rawBadge);
       }
 
       // 3. Recherche dans le répertoire physique des tourniquets
@@ -315,40 +337,47 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
         }
       }
 
+      let personKey = `badge_${rawBadge || scan.id}`;
       let name = '';
       let category = 'Autre';
       let email = null;
       let photo = null;
 
-      if (rhFromTu) {
-        const startupName = rhFromTu.incube?.raison_sociale || rhFromTu.incube?.nom_incube || 'Startup';
-        name = `${rhFromTu.nom_complet} [${rhFromTu.poste || 'Salarié'} - ${startupName}]`;
-        category = 'Incube';
-      } else if (assocFromTu) {
-        const startupName = assocFromTu.incube.raison_sociale || assocFromTu.incube.nom_incube || 'Startup';
-        name = `${assocFromTu.associe.nom} [Associé - ${startupName}]`;
-        category = 'Incube';
-      } else if (inc) {
+      if (inc) {
         // Priorité 1 : Incubé reconnu (affiche nom_incube officiel et raison sociale)
         const startupName = inc.raison_sociale ? ` (${inc.raison_sociale})` : '';
+        personKey = `incube_${inc.id}`;
         name = `${inc.nom_incube}${startupName}`;
         email = inc.email || u?.email || null;
         photo = inc.photo_path || u?.photo_url || null;
+        category = 'Incube';
+      } else if (assocFromTu) {
+        const startupName = assocFromTu.incube.raison_sociale || assocFromTu.incube.nom_incube || 'Startup';
+        personKey = `assoc_${assocFromTu.incube.id}_${cleanWord(assocFromTu.associe.nom)}`;
+        name = `${assocFromTu.associe.nom} [Associé - ${startupName}]`;
+        category = 'Incube';
+      } else if (rhFromTu) {
+        const startupName = rhFromTu.incube?.raison_sociale || rhFromTu.incube?.nom_incube || 'Startup';
+        personKey = `rh_${rhFromTu.id}`;
+        name = `${rhFromTu.nom_complet} [${rhFromTu.poste || 'Salarié'} - ${startupName}]`;
         category = 'Incube';
       } else if (u) {
         // Priorité 2 : Compte utilisateur (Administration, Staff, Consultant...)
         const staffRoles = ['super_admin', 'administrateur', 'superadmin', 'admin', 'accompagnateur', 'gestionnaire', 'consultant', 'coach'];
         const isStaff = staffRoles.includes(u.role);
+        personKey = `user_${u.id}`;
         name = `${u.prenom || ''} ${u.nom || ''}`.trim() || tu?.name || 'Utilisateur';
         email = u.email;
         photo = u.photo_url;
         category = isStaff ? 'Administration' : (u.type === 'Administration' ? 'Administration' : 'Incube');
       } else if (tu) {
-        // Priorité 3 : Usager inscrit sur la borne tourniquet (Ali FARFRA, Reda BENHAMIDA...)
+        // Priorité 3 : Usager inscrit sur la borne tourniquet
+        personKey = `tu_${cleanWord(tu.name || tu.badge_id)}`;
         name = tu.name;
         category = tu.type || 'Visiteur';
       } else {
         // Priorité 4 : Badge non identifié
+        personKey = `badge_${rawBadge}`;
         name = `Visiteur (Badge #${rawBadge})`;
         category = 'Visiteur';
       }
@@ -358,6 +387,7 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
       }
 
       return {
+        personKey,
         name,
         category,
         email,
@@ -367,13 +397,24 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
       };
     }
 
-    // Grouper par personne unique pour déterminer le DERNIER scan de la journée
-    const personScansMap = new Map();
-    for (const scan of scans) {
+    // Dédoublonnage par personne (anti-rebond 60s sur la même personne toutes bornes confondues)
+    const lastScanTimeByPerson = new Map();
+    const scans = [];
+    for (const scan of rawScans) {
       const personInfo = resolvePerson(scan);
-      const canonicalKey = (scan.raw_badge_id && String(scan.raw_badge_id).trim())
-        ? ('b_' + String(scan.raw_badge_id).trim())
-        : (personInfo.userId ? ('u_' + personInfo.userId) : ('scan_' + scan.id));
+      const t = new Date(scan.time).getTime();
+      const prevT = lastScanTimeByPerson.get(personInfo.personKey) || 0;
+      if (prevT > 0 && Math.abs(t - prevT) < 60000) {
+        continue;
+      }
+      lastScanTimeByPerson.set(personInfo.personKey, t);
+      scans.push({ scan, personInfo });
+    }
+
+    // Grouper par personne unique (personKey) pour déterminer le DERNIER scan de la journée sans AUCUN doublon
+    const personScansMap = new Map();
+    for (const { scan, personInfo } of scans) {
+      const canonicalKey = personInfo.personKey;
       if (!personScansMap.has(canonicalKey)) {
         personScansMap.set(canonicalKey, { personInfo, pScans: [] });
       }
@@ -439,9 +480,8 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
 
     const totalPresentsSurSite = allPresentsOnSite.length;
 
-    // Journal chronologique complet (du plus récent au plus ancien)
-    const fullFlux = scans.slice().reverse().map(scan => {
-      const personInfo = resolvePerson(scan);
+    // Journal chronologique complet dédoublonné (du plus récent au plus ancien)
+    const fullFlux = scans.slice().reverse().map(({ scan, personInfo }) => {
       const d = new Date(scan.time);
       return {
         id: scan.id,
