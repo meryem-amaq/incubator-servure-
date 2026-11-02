@@ -715,10 +715,12 @@ async function discoverAndSyncTourniquetUsers() {
           if (!tuBadge) continue;
 
           if (rawName) {
+            const existingTu = await TourniquetUser.findByPk(tuBadge);
             await TourniquetUser.upsert({
               badge_id: tuBadge,
               name: rawName,
               cardno: tuCardno || null,
+              type: (existingTu && existingTu.type) || 'Visiteur',
               device_ip: ip
             }).catch(() => {});
           }
@@ -876,11 +878,17 @@ async function importUsersFromTurnstiles() {
       countUpdatedStaff++;
     } else {
       const visitorName = zu.name || `Visiteur #${zuId}`;
+      const existingTu = await TourniquetUser.findByPk(zuId);
+      const existingTuFinal = finalBadge !== zuId ? await TourniquetUser.findByPk(finalBadge) : null;
+      const preservedType = (existingTu && (existingTu.type === 'Administration' || existingTu.type === 'Incube')) 
+        ? existingTu.type 
+        : ((existingTuFinal && (existingTuFinal.type === 'Administration' || existingTuFinal.type === 'Incube')) ? existingTuFinal.type : 'Visiteur');
+
       await TourniquetUser.upsert({
         badge_id: zuId,
         name: visitorName,
         cardno: zuCard || null,
-        type: 'Visiteur',
+        type: preservedType,
         device_ip: DEVICES[0] || '10.0.1.120'
       }).catch(() => {});
 
@@ -889,7 +897,7 @@ async function importUsersFromTurnstiles() {
           badge_id: finalBadge,
           name: visitorName,
           cardno: zuCard || null,
-          type: 'Visiteur',
+          type: preservedType,
           device_ip: DEVICES[0] || '10.0.1.120'
         }).catch(() => {});
       }

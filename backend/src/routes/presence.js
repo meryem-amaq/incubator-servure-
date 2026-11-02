@@ -183,8 +183,44 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
       Autre: 0
     };
 
+    // Cartographie officielle des badges de l'équipe administrative (PINs bornes & cartes RFID)
+    const ADMIN_KNOWN_BADGES = {
+      '1': { nom: 'Administrateur IDS', email: 'admin@cgs-incubateur.ma' },
+      '6': { nom: 'Nadia SEFIANI', email: 'nadia.sefiani@ctpes.ma' },
+      '3': { nom: 'Mustapha', email: 'mustapha@ctpes.ma' },
+      '143': { nom: 'Ayoub EL BOUCHIKHI', email: 'ayoub.elbouchikhi@ctpes.ma' },
+      '7587580': { nom: 'Ayoub EL BOUCHIKHI', email: 'ayoub.elbouchikhi@ctpes.ma' },
+      '194': { nom: 'Ilham LAHBOUB', email: 'ilham.lahboub@ctpes.ma' },
+      '7561307': { nom: 'Ilham LAHBOUB', email: 'ilham.lahboub@ctpes.ma' },
+      '227': { nom: 'Hicham BELAAZIZ', email: 'hicham@ctpes.ma' },
+      '6883058': { nom: 'Hicham BELAAZIZ', email: 'hicham@ctpes.ma' },
+      '144': { nom: 'Kawtar SBAI', email: 'kawtar@ctpes.ma' },
+      '7568112': { nom: 'Kawtar SBAI', email: 'kawtar@ctpes.ma' },
+      '205': { nom: 'Charaf EL AMRANI', email: 'charaf@ctpes.ma' },
+      '7586646': { nom: 'Charaf EL AMRANI', email: 'charaf@ctpes.ma' },
+      '142': { nom: 'Amine MEZZYANE', email: 'Aminemezzyane@gmail.com' },
+      '6895052': { nom: 'Amine MEZZYANE', email: 'Aminemezzyane@gmail.com' },
+      '145': { nom: 'Test AMA', email: 'incubateur.digital.solidaire@gmail.com' },
+      '7600900': { nom: 'Test AMA', email: 'incubateur.digital.solidaire@gmail.com' }
+    };
+
     function resolvePerson(scan) {
       const rawBadge = scan.raw_badge_id ? String(scan.raw_badge_id).trim() : '';
+
+      // 0. Vérification directe dans la cartographie des administrateurs certifiés
+      const knownAdmin = ADMIN_KNOWN_BADGES[rawBadge];
+      if (knownAdmin) {
+        let uMatch = scan.user_id ? userById.get(scan.user_id) : null;
+        if (!uMatch) uMatch = users.find(usr => (usr.email || '').toLowerCase() === knownAdmin.email.toLowerCase());
+        return {
+          name: knownAdmin.nom,
+          category: 'Administration',
+          email: knownAdmin.email,
+          photo: uMatch ? uMatch.photo_url : null,
+          userId: uMatch ? uMatch.id : null,
+          badgeId: scan.raw_badge_id
+        };
+      }
 
       // 1. Recherche par user_id ou badge_id dans users
       let u = scan.user_id ? userById.get(scan.user_id) : null;

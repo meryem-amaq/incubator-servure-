@@ -59,3 +59,4 @@ fixRolesAndTypes().catch(err => {
   console.error('Erreur:', err);
   process.exit(1);
 });
+

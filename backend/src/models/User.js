@@ -19,6 +19,20 @@ const User = sequelize.define('User', {
     defaultValue: 'Incube',
   },
   badge_id: { type: DataTypes.STRING(50), allowNull: true },
-}, { tableName: 'users' });
+}, {
+  tableName: 'users',
+  hooks: {
+    beforeSave: (user) => {
+      const staffRoles = ['super_admin', 'admin', 'administrateur', 'accompagnateur', 'gestionnaire', 'consultant', 'coach'];
+      if (staffRoles.includes(user.role)) {
+        if (!user.type || user.type === 'Incube') {
+          user.type = 'Administration';
+        }
+      } else if (user.role === 'incube' && !user.type) {
+        user.type = 'Incube';
+      }
+    }
+  }
+});
 
 module.exports = User;
