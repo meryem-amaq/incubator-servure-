@@ -191,7 +191,7 @@ async function syncAllDeviceClocks() {
   const nowUtc = new Date();
 
   for (const ip of DEVICES) {
-    const zk = new ZKLib(ip, PORT, 3000, 4000);
+    const zk = new ZKLib(ip, PORT, 3000, 0);
     try {
       await zk.createSocket();
 
@@ -300,7 +300,7 @@ async function collectFromAllDevices() {
     const nowServerUtc = new Date();
 
     for (const ip of DEVICES) {
-      const zk = new ZKLib(ip, PORT, 3000, 4000);
+      const zk = new ZKLib(ip, PORT, 3000, 0);
       try {
         await zk.createSocket();
 
@@ -702,7 +702,7 @@ async function discoverAndSyncTourniquetUsers() {
     });
 
     for (const ip of DEVICES) {
-      const zk = new ZKLib(ip, PORT, 3000, 4000);
+      const zk = new ZKLib(ip, PORT, 3000, 0);
       try {
         await zk.createSocket();
         const usersRes = await zk.getUsers();
@@ -768,7 +768,7 @@ async function importUsersFromTurnstiles() {
 
   let allZkUsers = [];
   for (const ip of DEVICES) {
-    const zk = new ZKLib(ip, PORT, 3000, 4000);
+    const zk = new ZKLib(ip, PORT, 3000, 0);
     try {
       await zk.createSocket();
       const usersRes = await zk.getUsers();

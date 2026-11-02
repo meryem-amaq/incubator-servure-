@@ -1,4 +1,5 @@
 const ZKLib = require('node-zklib');
+const ZKLibUDP = require('node-zklib/zklibudp');
 const { Op } = require('sequelize');
 const { Attendance, User, Incube, SuiviEngagement, TourniquetUser } = require('../models');
 
@@ -21,7 +22,7 @@ const getDeviceIps = () => {
 };
 
 const ZKT_PORT = parseInt(process.env.ZKT_PORT || '4370', 10);
-const ZKT_TIMEOUT = 2500; // 2.5s timeout per socket
+const ZKT_TIMEOUT = 5000; // 5s timeout per socket
 
 const MOIS_NOMS = [
   'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -102,12 +103,25 @@ function matchesPersonName(nameA, nameB) {
 }
 
 /**
- * Connexion sécurisée à un tourniquet avec timeout
+ * Connexion sécurisée à un tourniquet avec timeout et fallback TCP / UDP
  */
 async function connectToDevice(ip) {
-  const zk = new ZKLib(ip, ZKT_PORT, ZKT_TIMEOUT, 4000);
-  await zk.createSocket();
-  return zk;
+  // 1. Essai en TCP (port local aléatoire 0 pour éviter tout conflit EADDRINUSE)
+  const zk = new ZKLib(ip, ZKT_PORT, ZKT_TIMEOUT, 0);
+  try {
+    await zk.createSocket();
+    return { client: zk, type: 'tcp' };
+  } catch (err) {
+    // 2. Fallback automatique en UDP (notamment pour la Borne 6 - 10.0.1.17)
+    try {
+      const udp = new ZKLibUDP(ip, ZKT_PORT, ZKT_TIMEOUT, 0);
+      await udp.createSocket();
+      await udp.connect();
+      return { client: udp, type: 'udp' };
+    } catch (err2) {
+      throw new Error(`Échec connexion TCP (${err.message}) et UDP (${err2.message}) sur ${ip}`);
+    }
+  }
 }
 
 /**
@@ -815,28 +829,24 @@ async function broadcastUserToTurnstiles({ matricule, name, cardno, role = 0, ty
     console.error('Erreur upsert TourniquetUser:', err.message);
   }
 
-  // 2. Diffusion parallèle vers les 7 bornes physiques F18
+  // 2. Diffusion séquentielle fiable vers les 7 bornes physiques F18 (garantit zéro collision)
   const userBuf = encodeUser72(uid, userId, cleanName, cardInt, '', role);
   const CMD_USER_WRQ = 8;
   const CMD_REFRESHDATA = 1013;
 
-  const pushPromises = ips.map(async (ip) => {
-    let zk = null;
+  for (const ip of ips) {
+    let conn = null;
     try {
-      zk = await connectToDevice(ip);
-      await zk.executeCmd(CMD_USER_WRQ, userBuf);
-      await zk.executeCmd(CMD_REFRESHDATA, '');
-      await zk.disconnect().catch(() => {});
+      conn = await connectToDevice(ip);
+      await conn.client.executeCmd(CMD_USER_WRQ, userBuf);
+      await conn.client.executeCmd(CMD_REFRESHDATA, '');
+      await conn.client.disconnect().catch(() => {});
       results.successfulDevices.push(ip);
-      return { ip, success: true };
     } catch (err) {
-      if (zk) await zk.disconnect().catch(() => {});
+      if (conn && conn.client) await conn.client.disconnect().catch(() => {});
       results.failedDevices.push({ ip, error: err.message });
-      return { ip, success: false, error: err.message };
     }
-  });
-
-  await Promise.allSettled(pushPromises);
+  }
 
   console.log(`📡 [F18 Broadcast] Diffusion de l'usager #${uid} (${cleanName}, Badge: ${cardInt}) : ${results.successfulDevices.length}/${ips.length} bornes connectées.`);
 
@@ -844,13 +854,13 @@ async function broadcastUserToTurnstiles({ matricule, name, cardno, role = 0, ty
 }
 
 /**
- * Ré-injecter en masse tous les incubés, salariés RH et admins ayant un badge RFID
+ * Ré-injecter en masse tous les incubés, salariés RH, associés et admins ayant un badge RFID
  * vers les 7 Tourniquets F18 pour forcer l'écrasement de tous les anciens noms physiques.
  */
 async function resyncAllBadgeHoldersToTurnstiles() {
   const { Incube, RhDetail, User } = require('../models');
   const [incubes, staff, users] = await Promise.all([
-    Incube.findAll({ where: { badge_id: { [Op.ne]: null } } }),
+    Incube.findAll(),
     RhDetail.findAll({ where: { badge_id: { [Op.ne]: null } } }),
     User.findAll({ where: { badge_id: { [Op.ne]: null } } })
   ]);
@@ -858,16 +868,32 @@ async function resyncAllBadgeHoldersToTurnstiles() {
   const allToSync = [];
 
   for (const inc of incubes) {
-    if (!inc.matricule) {
-      inc.matricule = await getNextAvailableMatricule();
-      await inc.save();
+    if (inc.badge_id) {
+      if (!inc.matricule) {
+        inc.matricule = await getNextAvailableMatricule();
+        await inc.save();
+      }
+      allToSync.push({
+        matricule: inc.matricule,
+        name: inc.nom_incube,
+        cardno: inc.badge_id,
+        type: 'Incube'
+      });
     }
-    allToSync.push({
-      matricule: inc.matricule,
-      name: inc.nom_incube,
-      cardno: inc.badge_id,
-      type: 'Incube'
-    });
+
+    // Inclure les associés de la startup
+    if (Array.isArray(inc.associes)) {
+      for (const a of inc.associes) {
+        if (a && a.badge_id) {
+          allToSync.push({
+            matricule: a.matricule || inc.matricule,
+            name: a.nom,
+            cardno: a.badge_id,
+            type: 'Incube'
+          });
+        }
+      }
+    }
   }
 
   for (const s of staff) {
