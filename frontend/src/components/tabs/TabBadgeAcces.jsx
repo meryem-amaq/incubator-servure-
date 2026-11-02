@@ -10,13 +10,11 @@ import {
   Building2, 
   Server, 
   ShieldCheck, 
-  Wifi, 
   Save, 
   ExternalLink,
   Info,
   Clock,
   Sparkles,
-  Zap,
   RotateCcw
 } from 'lucide-react';
 import api from '../../api/axios';
@@ -196,35 +194,7 @@ export default function TabBadgeAcces({ incube, onUpdate, onNavigateToRH }) {
 
   return (
     <div className="space-y-6">
-      {/* 1. EN-TÊTE & EXPLICATION DU FLUX CONTRÔLE D'ACCÈS */}
-      <div className="p-4 sm:p-5 bg-gradient-to-r from-navy-900 via-primary-900 to-navy-950 text-white rounded-2xl shadow-lg border border-primary-500/20">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-xs flex items-center justify-center text-primary-300 border border-white/10 shrink-0">
-              <Radio size={26} className="animate-pulse" />
-            </div>
-            <div>
-              <h2 className="text-lg font-black tracking-tight flex items-center gap-2">
-                Gestion des Badges RFID & Contrôle d'Accès ZKTeco
-              </h2>
-              <p className="text-xs text-slate-300 mt-0.5">
-                Diffusion instantanée sur les <span className="font-bold text-amber-300">7 Tourniquets F18</span> dès le scan ou l'enregistrement d'une carte.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 text-xs flex-wrap">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
-              <Wifi size={13} className="text-emerald-400" /> 7 Bornes F18 Réseau Actives
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
-              <Zap size={13} className="text-amber-400" /> Mode Lecteur USB Plug & Play
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. SECTION ÉTAPE 1 : BADGE RFID DU PORTEUR DE PROJET (INCUBÉ) */}
+      {/* 1. SECTION ÉTAPE 1 : BADGE RFID DU PORTEUR DE PROJET (INCUBÉ) */}
       <div className="card p-5 sm:p-6 border border-slate-200 dark:border-dark-700/60 shadow-sm space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200 dark:border-dark-700/60">
           <div className="flex items-center gap-3">
