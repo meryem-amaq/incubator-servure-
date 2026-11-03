@@ -81,7 +81,7 @@ export default function Layout() {
       {/* Zone Principale (occupe l'espace restant exact sans aucun débordement) */}
       <div className="flex-1 min-w-0 flex flex-col min-h-screen bg-slate-50 dark:bg-dark-950">
         {/* Desktop Header - Logo institutionnel partenaire agrandi dans un header h-16 fixe */}
-        <header className="hidden lg:flex print:hidden items-center justify-between gap-4 h-16 px-6 border-b border-slate-200/80 dark:border-dark-800 bg-white/80 dark:bg-dark-950/80 backdrop-blur-md sticky top-0 z-20 w-full min-w-0 shrink-0">
+        <header className="hidden lg:flex print:hidden items-center justify-between gap-4 h-16 px-6 border-b border-slate-200/80 dark:border-dark-800 bg-white dark:bg-dark-950 shadow-xs sticky top-0 z-30 w-full min-w-0 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-dark-400 truncate">
               Incubateur Digital Solidaire

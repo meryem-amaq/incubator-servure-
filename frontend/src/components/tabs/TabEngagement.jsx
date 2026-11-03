@@ -807,7 +807,7 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
   return (
     <div className="space-y-6 slide-up w-full">
       {/* 1. Cartes de statistiques (KPI) EN HAUT DE PAGE — Alignées sur une seule ligne avec hauteur harmonieuse */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 relative z-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 relative">
         
         {/* CARTE 1 : Présence & Assiduité aux Horaires */}
         <div className="card p-3.5 sm:p-4 border border-slate-200 dark:border-dark-700/60 flex flex-col justify-between gap-2.5 overflow-hidden shadow-sm hover:border-blue-400/50 transition-all">
@@ -974,7 +974,7 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
       </div>
 
       {/* 2. Barre de contrôle épurée sans cadre EN DESSOUS DES CARTES DE STATISTIQUES */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5 relative z-30 py-1">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 relative z-10 py-1">
         <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 min-w-0">
           {incubeSelector}
 

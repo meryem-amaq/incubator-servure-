@@ -149,7 +149,7 @@ export default function Engagement() {
   const renderIncubeSelector = () => (
     <div className="flex flex-wrap items-center gap-2">
 
-    <div ref={dropdownRef} className="relative z-50 min-w-[220px] sm:min-w-[260px]">
+    <div ref={dropdownRef} className="relative min-w-[220px] sm:min-w-[260px]">
       <button
         type="button"
         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -191,7 +191,7 @@ export default function Engagement() {
 
       {/* Menu Déroulant */}
       {isDropdownOpen && (
-        <div className="absolute top-full left-0 mt-2 w-72 sm:w-80 bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 rounded-2xl shadow-2xl z-[60] overflow-hidden animate-in fade-in ring-1 ring-black/5 dark:ring-white/10">
+        <div className="absolute top-full left-0 mt-2 w-72 sm:w-80 bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 rounded-2xl shadow-2xl z-20 overflow-hidden animate-in fade-in ring-1 ring-black/5 dark:ring-white/10">
           <div className="p-2 border-b border-slate-100 dark:border-dark-700/60">
             <div className="relative">
               <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
