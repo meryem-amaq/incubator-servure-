@@ -111,11 +111,11 @@ export default function Profil() {
 
   return (
     <div className="space-y-6 animate-fade-in max-w-4xl mx-auto">
-      <div className="flex items-center gap-2.5 pb-2.5 border-b border-slate-200 dark:border-dark-700/60">
-        <User className="text-primary-500 shrink-0" size={22} />
+      <div className="flex items-center gap-2.5 mb-6">
+        <User className="text-primary-500 shrink-0" size={24} />
         <div>
-          <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Mon Profil</h1>
-          <p className="text-slate-500 dark:text-dark-400 text-xs mt-0.5">Gérez vos informations personnelles et préférences de sécurité.</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Mon Profil</h1>
+          <p className="text-sm text-slate-600 dark:text-dark-300 mt-1">Gérez vos informations personnelles et préférences de sécurité.</p>
         </div>
       </div>
 

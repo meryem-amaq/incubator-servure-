@@ -349,12 +349,12 @@ export default function ControleAcces() {
     <div className="space-y-6 pb-12 animate-in fade-in duration-300">
       
       {/* 1. EN-TÊTE STANDARD CONFORME À LA CHARTE GRAPHIQUE IDS */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2.5 border-b border-slate-200 dark:border-dark-700/60">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200 dark:border-dark-700/60">
         <div>
-          <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
             Contrôle d'Accès & Présence en Direct
           </h1>
-          <p className="text-slate-500 dark:text-dark-400 text-xs mt-0.5">
+          <p className="text-sm text-slate-600 dark:text-dark-300 mt-1">
             Supervision temps réel des 7 tourniquets physiques ZKTeco et suivi des présences sur site.
           </p>
         </div>

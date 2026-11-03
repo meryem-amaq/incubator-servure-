@@ -843,10 +843,10 @@ export default function Formations() {
               <GraduationCap size={28} />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
                 Formations & Parcours Pédagogiques
               </h1>
-              <p className="text-xs text-slate-500 dark:text-dark-400 mt-0.5">
+              <p className="text-sm text-slate-600 dark:text-dark-300 mt-1">
                 Organisation séparée des sessions, formateurs, collaborateurs et émargements
               </p>
             </div>

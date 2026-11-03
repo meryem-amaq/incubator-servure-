@@ -453,13 +453,13 @@ export default function GestionMateriel() {
   return (
     <div className="slide-up space-y-6 w-full pb-12">
       {/* EN-TÊTE DE PAGE AVEC BOUTON D'ACTION AJOUTER */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2.5 border-b border-slate-200 dark:border-dark-700/60">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-tight flex items-center gap-2.5">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
             <Wrench className="text-amber-500 shrink-0" size={22} />
             <span>Inventaire & Gestion du Matériel</span>
           </h1>
-          <p className="text-xs text-slate-500 dark:text-dark-400 mt-0.5">
+          <p className="text-sm text-slate-600 dark:text-dark-300 mt-1">
             Gérez l'inventaire exact de chaque espace, suivez l'état opérationnel et signalez les pannes avec photos.
           </p>
         </div>

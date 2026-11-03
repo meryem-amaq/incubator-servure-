@@ -423,11 +423,11 @@ export default function RapportsActivite() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-dark-900 p-4 md:p-5 rounded-2xl border border-slate-200 dark:border-dark-700 shadow-xs">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
               Rapport d'Activité & Pilotage
             </h1>
           </div>
-          <p className="text-xs text-slate-500 dark:text-dark-400 mt-0.5">
+          <p className="text-sm text-slate-600 dark:text-dark-300 mt-1">
             Consolidation officielle des 3 volets : Impact Économique, Espaces & Matériel et Gouvernance COPIL.
           </p>
         </div>

@@ -293,12 +293,12 @@ export default function Dashboard() {
   return (
     <div className="space-y-6 animate-fade-in pb-12" ref={dashboardRef}>
       {/* Header avec Titre, Filtre Promotion & Sélecteur d'onglets (masqué dans la capture PDF pour laisser place à l'en-tête officiel) */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-2.5 border-b border-slate-200 dark:border-dark-700/60" data-html2canvas-ignore="true">
-        <div className="shrink-0 min-w-0">
-          <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2 border-b border-slate-200 dark:border-dark-700/60" data-html2canvas-ignore="true">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
             Tableau de Bord & Impact
           </h1>
-          <p className="text-slate-500 dark:text-dark-400 text-xs mt-0.5 truncate max-w-md">
+          <p className="text-sm text-slate-600 dark:text-dark-300 mt-1">
             Indicateurs de performance économique, assiduité aux ateliers et utilisation des espaces.
           </p>
         </div>
