@@ -90,9 +90,9 @@ export default function Sidebar({
         id="mobile-navigation-drawer"
         aria-label="Navigation principale"
         className={`bg-[#02162B] border-r border-[#0A2744] flex flex-col transition-all duration-300 ease-in-out print:hidden fixed inset-y-0 left-0 z-50 ${
-          isMobileOpen ? 'translate-x-0 w-72 max-w-[85vw]' : '-translate-x-full'
+          isMobileOpen ? 'translate-x-0 w-64 max-w-[85vw]' : '-translate-x-full'
         } lg:static lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:translate-x-0 ${
-          isExpanded ? 'lg:w-72' : 'lg:w-20'
+          isExpanded ? 'lg:w-64' : 'lg:w-20'
         }`}
       >
         {/* 1. BRAND / LOGO HEADER */}
