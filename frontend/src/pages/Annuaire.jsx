@@ -784,15 +784,15 @@ export default function Annuaire() {
         </div>
       )}
 
-      {/* Barre d'outils & Filtres */}
-      <div className="flex flex-col lg:flex-row gap-2.5 items-stretch lg:items-center justify-between">
-        <div className="flex items-center gap-2 flex-wrap lg:flex-nowrap min-w-0">
-          <div className="relative w-full sm:w-48 lg:w-44 xl:w-56 shrink-0">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-dark-400 pointer-events-none" />
+      {/* Barre d'outils & Filtres (Solution 1 ligne ultra-compacte sans chevauchement) */}
+      <div className="flex items-center justify-between gap-1.5 flex-nowrap overflow-x-auto pb-1 scrollbar-none">
+        <div className="flex items-center gap-1.5 shrink min-w-0">
+          <div className="relative w-36 sm:w-40 xl:w-48 shrink-0">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-dark-400 pointer-events-none" />
             <input
               type="text"
-              className="input !pl-9 !py-2 !text-xs rounded-xl shadow-xs font-medium w-full"
-              placeholder="Rechercher nom, projet..."
+              className="input !pl-8 !pr-6 !py-1.5 !text-xs rounded-xl shadow-xs font-medium w-full"
+              placeholder="Rechercher..."
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
@@ -800,10 +800,10 @@ export default function Annuaire() {
               <button
                 type="button"
                 onClick={() => setSearch('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-dark-200"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-dark-200"
                 title="Effacer la recherche"
               >
-                <X size={13} />
+                <X size={12} />
               </button>
             )}
           </div>
@@ -812,8 +812,8 @@ export default function Annuaire() {
           {isSuperAdmin ? (
             <div className="flex items-center gap-1 shrink-0">
               <div className="relative flex items-center">
-                <div className="absolute left-2.5 pointer-events-none text-primary-500 flex items-center">
-                  <UserCheck size={14} />
+                <div className="absolute left-2 pointer-events-none text-primary-500 flex items-center">
+                  <UserCheck size={13} />
                 </div>
                 <select
                   value={selectedAdminFilter}
@@ -826,7 +826,7 @@ export default function Annuaire() {
                       return next;
                     });
                   }}
-                  className={`input pl-8 pr-7 py-2 text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-all border max-w-[185px] truncate ${
+                  className={`input pl-6 pr-6 py-1.5 text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-all border max-w-[155px] truncate ${
                     selectedAdminFilter !== 'all' || Boolean(accompagnateurFilterName)
                       ? 'border-primary-500 bg-primary-50/70 dark:bg-primary-950/40 text-primary-800 dark:text-primary-200 ring-2 ring-primary-500/20'
                       : 'border-slate-200 dark:border-dark-700 bg-white dark:bg-dark-900 text-slate-800 dark:text-dark-100'
@@ -856,19 +856,19 @@ export default function Annuaire() {
                       return next;
                     });
                   }}
-                  className="p-1.5 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-slate-200 dark:border-dark-700 transition-colors"
+                  className="p-1 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-slate-200 dark:border-dark-700 transition-colors"
                   title="Réinitialiser le filtre"
                 >
-                  <X size={14} />
+                  <X size={13} />
                 </button>
               )}
             </div>
           ) : (
-            <div className="flex items-center gap-1 bg-slate-100 dark:bg-dark-800 p-0.5 rounded-xl border border-slate-200 dark:border-dark-700/60 shrink-0 text-xs">
+            <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-dark-800 p-0.5 rounded-xl border border-slate-200 dark:border-dark-700/60 shrink-0 text-xs">
               <button
                 type="button"
                 onClick={() => setFilterSuivis(false)}
-                className={`px-2.5 py-1.5 rounded-lg font-bold transition-all ${
+                className={`px-2 py-1 rounded-lg font-bold transition-all ${
                   !filterSuivis
                     ? 'bg-white dark:bg-dark-900 text-primary-700 dark:text-primary-300 shadow-xs'
                     : 'text-slate-600 dark:text-dark-300 hover:text-slate-900 dark:hover:text-white'
@@ -880,7 +880,7 @@ export default function Annuaire() {
               <button
                 type="button"
                 onClick={() => setFilterSuivis(true)}
-                className={`px-2.5 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1 ${
+                className={`px-2 py-1 rounded-lg font-bold transition-all flex items-center gap-1 ${
                   filterSuivis
                     ? 'bg-primary-600 text-white shadow-xs'
                     : 'text-slate-600 dark:text-dark-300 hover:text-slate-900 dark:hover:text-white'
@@ -894,13 +894,13 @@ export default function Annuaire() {
 
           {/* Filtre Promotion */}
           <div className="relative flex items-center shrink-0">
-            <div className="absolute left-2.5 pointer-events-none text-primary-500 flex items-center">
-              <GraduationCap size={14} />
+            <div className="absolute left-2 pointer-events-none text-primary-500 flex items-center">
+              <GraduationCap size={13} />
             </div>
             <select
               value={selectedPromotionFilter}
               onChange={(e) => setSelectedPromotionFilter(e.target.value)}
-              className={`input pl-8 pr-7 py-2 text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-all border max-w-[155px] truncate ${
+              className={`input pl-6 pr-5 py-1.5 text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-all border max-w-[130px] truncate ${
                 selectedPromotionFilter !== 'all'
                   ? 'border-primary-500 bg-primary-50/70 dark:bg-primary-950/40 text-primary-800 dark:text-primary-200 ring-2 ring-primary-500/20'
                   : 'border-slate-200 dark:border-dark-700 bg-white dark:bg-dark-900 text-slate-800 dark:text-dark-100'
@@ -919,13 +919,13 @@ export default function Annuaire() {
           {/* Filtre État Plan d'Action */}
           <div className="flex items-center gap-1 shrink-0">
             <div className="relative flex items-center">
-              <div className="absolute left-2.5 pointer-events-none text-primary-500 flex items-center">
-                <ClipboardList size={14} />
+              <div className="absolute left-2 pointer-events-none text-primary-500 flex items-center">
+                <ClipboardList size={13} />
               </div>
               <select
                 value={selectedPlanStatus}
                 onChange={(e) => setSelectedPlanStatus(e.target.value)}
-                className={`input pl-8 pr-7 py-2 text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-all border max-w-[145px] truncate ${
+                className={`input pl-6 pr-5 py-1.5 text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-all border max-w-[120px] truncate ${
                   selectedPlanStatus !== 'all'
                     ? 'border-primary-500 bg-primary-50/70 dark:bg-primary-950/40 text-primary-800 dark:text-primary-200 ring-2 ring-primary-500/20'
                     : 'border-slate-200 dark:border-dark-700 bg-white dark:bg-dark-900 text-slate-800 dark:text-dark-100'
@@ -942,36 +942,36 @@ export default function Annuaire() {
               <button
                 type="button"
                 onClick={() => setSelectedPlanStatus('all')}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-slate-200 dark:border-dark-700 transition-colors"
+                className="p-1 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-slate-200 dark:border-dark-700 transition-colors"
                 title="Réinitialiser le filtre plan d'action"
               >
-                <X size={14} />
+                <X size={13} />
               </button>
             )}
           </div>
         </div>
 
-        {/* Boutons d'action */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Boutons d'action compacts */}
+        <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
-            className="btn btn-secondary btn-sm flex items-center gap-1.5 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 font-bold !py-2 !px-3 !text-xs rounded-xl shadow-xs whitespace-nowrap"
+            className="btn btn-secondary btn-sm flex items-center gap-1 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 font-bold !py-1.5 !px-2.5 !text-xs rounded-xl shadow-xs whitespace-nowrap"
             onClick={() => setShowExcelModal(true)}
             title="Importer une liste complète d'incubés depuis un fichier Excel"
           >
-            <FileSpreadsheet size={15} className="text-emerald-500" />
-            <span>Importer Excel</span>
+            <FileSpreadsheet size={14} className="text-emerald-500" />
+            <span>Importer</span>
           </button>
           <button 
             type="button"
-            className="btn btn-primary btn-sm flex items-center gap-1.5 font-bold !py-2 !px-3.5 !text-xs rounded-xl shadow-xs shrink-0 whitespace-nowrap" 
+            className="btn btn-primary btn-sm flex items-center gap-1 font-bold !py-1.5 !px-3 !text-xs rounded-xl shadow-xs shrink-0 whitespace-nowrap" 
             onClick={() => {
               setPhotoFile(null);
               setPreviewUrl(null);
               setShowModal(true);
             }}
           >
-            <Plus size={15} />
+            <Plus size={14} />
             <span>Nouvel incubé</span>
           </button>
         </div>
