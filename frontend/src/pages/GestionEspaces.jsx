@@ -30,7 +30,8 @@ import {
   Eye,
   Image as ImageIcon,
   Bell,
-  RefreshCw
+  RefreshCw,
+  FileSpreadsheet
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import toast from 'react-hot-toast';
@@ -665,6 +666,21 @@ export default function GestionEspaces() {
     return true;
   });
 
+  const displayedReservations = useMemo(() => {
+    return filteredReservations.filter(r => {
+      if (resStatusFilter !== 'all' && r.statut !== resStatusFilter) return false;
+      if (resMoisFilter !== 'all' && (!r.dateReservation || !r.dateReservation.startsWith(resMoisFilter))) return false;
+      if (resSearch.trim()) {
+        const q = resSearch.toLowerCase();
+        const mNom = r.nomIncube?.toLowerCase().includes(q);
+        const mMat = r.equipementsUtilises?.toLowerCase().includes(q);
+        const mMotif = r.motifUtilisation?.toLowerCase().includes(q);
+        if (!mNom && !mMat && !mMotif) return false;
+      }
+      return true;
+    });
+  }, [filteredReservations, resStatusFilter, resMoisFilter, resSearch]);
+
   return (
     <div className="slide-up space-y-6 w-full pb-12">
 
@@ -744,68 +760,78 @@ export default function GestionEspaces() {
         })}
       </div>
 
-      {/* BARRE D'ACTION UNIFIÉE SUR UNE SEULE LIGNE (ONGLETS + RECHERCHE & FILTRES) */}
-      <div className="flex flex-col xl:flex-row items-center justify-between gap-3 border-b border-slate-200 dark:border-dark-700 pb-2.5">
-        {/* SOUS-ONGLETS À GAUCHE */}
-        <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto">
-          <button
-            onClick={() => setActiveTab('demandes')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === 'demandes'
-                ? 'bg-gradient-to-r from-primary-400 to-primary-500 text-[#001633] shadow-md shadow-primary-500/25 border border-primary-300/40'
-                : 'bg-slate-100 dark:bg-dark-800 text-slate-600 dark:text-dark-300 hover:bg-slate-200 dark:hover:bg-dark-700/60'
-            }`}
-          >
-            <Calendar size={14} /> Réservation des Personnes ({filteredReservations.length})
-          </button>
+      {/* 1. BARRE DE NAVIGATION PAR ONGLETS (DÉDIÉE ET AÉRÉE) */}
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-dark-700 pb-2.5 overflow-x-auto scrollbar-none flex-nowrap">
+        <button
+          onClick={() => setActiveTab('demandes')}
+          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 whitespace-nowrap ${
+            activeTab === 'demandes'
+              ? 'bg-gradient-to-r from-primary-400 to-primary-500 text-[#001633] shadow-md shadow-primary-500/25 border border-primary-300/40'
+              : 'bg-slate-100 dark:bg-dark-800 text-slate-600 dark:text-dark-300 hover:bg-slate-200 dark:hover:bg-dark-700/60'
+          }`}
+        >
+          <Calendar size={14} /> Réservation des Personnes ({filteredReservations.length})
+        </button>
 
-          <button
-            onClick={() => setActiveTab('materiel')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === 'materiel'
-                ? 'bg-gradient-to-r from-primary-400 to-primary-500 text-[#001633] shadow-md shadow-primary-500/25 border border-primary-300/40'
-                : 'bg-slate-100 dark:bg-dark-800 text-slate-600 dark:text-dark-300 hover:bg-slate-200 dark:hover:bg-dark-700/60'
-            }`}
-          >
-            <Plus size={14} /> Matériel de l'Espace ({(equipements[selectedEspace] || []).length})
-          </button>
+        <button
+          onClick={() => setActiveTab('materiel')}
+          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 whitespace-nowrap ${
+            activeTab === 'materiel'
+              ? 'bg-gradient-to-r from-primary-400 to-primary-500 text-[#001633] shadow-md shadow-primary-500/25 border border-primary-300/40'
+              : 'bg-slate-100 dark:bg-dark-800 text-slate-600 dark:text-dark-300 hover:bg-slate-200 dark:hover:bg-dark-700/60'
+          }`}
+        >
+          <Plus size={14} /> Matériel de l'Espace ({(equipements[selectedEspace] || []).length})
+        </button>
 
-          <button
-            onClick={() => setActiveTab('etat_materiel')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === 'etat_materiel'
-                ? 'bg-gradient-to-r from-primary-400 to-primary-500 text-[#001633] shadow-md shadow-primary-500/25 border border-primary-300/40'
-                : 'bg-slate-100 dark:bg-dark-800 text-slate-600 dark:text-dark-300 hover:bg-slate-200 dark:hover:bg-dark-700/60'
-            }`}
-          >
-            <Wrench size={14} /> État du Matériel
-          </button>
+        <button
+          onClick={() => setActiveTab('etat_materiel')}
+          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 whitespace-nowrap ${
+            activeTab === 'etat_materiel'
+              ? 'bg-gradient-to-r from-primary-400 to-primary-500 text-[#001633] shadow-md shadow-primary-500/25 border border-primary-300/40'
+              : 'bg-slate-100 dark:bg-dark-800 text-slate-600 dark:text-dark-300 hover:bg-slate-200 dark:hover:bg-dark-700/60'
+          }`}
+        >
+          <Wrench size={14} /> État du Matériel
+        </button>
 
-          <button
-            onClick={() => setActiveTab('qr')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === 'qr'
-                ? 'bg-gradient-to-r from-primary-400 to-primary-500 text-[#001633] shadow-md shadow-primary-500/25 border border-primary-300/40'
-                : 'bg-slate-100 dark:bg-dark-800 text-slate-600 dark:text-dark-300 hover:bg-slate-200 dark:hover:bg-dark-700/60'
-            }`}
-          >
-            <QrCode size={14} /> QR Code Officiel
-          </button>
-        </div>
+        <button
+          onClick={() => setActiveTab('qr')}
+          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 whitespace-nowrap ${
+            activeTab === 'qr'
+              ? 'bg-gradient-to-r from-primary-400 to-primary-500 text-[#001633] shadow-md shadow-primary-500/25 border border-primary-300/40'
+              : 'bg-slate-100 dark:bg-dark-800 text-slate-600 dark:text-dark-300 hover:bg-slate-200 dark:hover:bg-dark-700/60'
+          }`}
+        >
+          <QrCode size={14} /> QR Code Officiel
+        </button>
+      </div>
 
-        {/* RECHERCHE ET LISTES DÉROULANTES À DROITE (SUR LA MÊME LIGNE) QUAND ON EST SUR L'ONGLET RÉSERVATIONS */}
-        {activeTab === 'demandes' && (
-          <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto justify-start xl:justify-end">
+      {/* 2. BARRE D'OUTILS ET FILTRES DÉDIÉE À L'ONGLET RÉSERVATIONS */}
+      {activeTab === 'demandes' && (
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5 pt-1">
+          {/* Recherche & Filtres à gauche */}
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
             {/* 1. RECHERCHE INCUBÉ / MOTIF */}
-            <div className="relative w-full sm:w-48 xl:w-56">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <div className="relative w-full sm:w-44 lg:w-40 xl:w-52 shrink-0">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Rechercher incubé, motif..."
                 value={resSearch}
                 onChange={(e) => setResSearch(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-dark-700 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-900 dark:text-white outline-none focus:border-primary-500 transition-colors"
+                className="w-full bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 rounded-xl pl-8 pr-7 py-1.5 text-xs text-slate-900 dark:text-white outline-none focus:border-primary-500 transition-colors shadow-xs"
               />
+              {resSearch && (
+                <button
+                  type="button"
+                  onClick={() => setResSearch('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-dark-200"
+                  title="Effacer la recherche"
+                >
+                  <X size={12} />
+                </button>
+              )}
             </div>
 
             {/* 2. LISTE DÉROULANTE ZONE / SALLE */}
@@ -813,11 +839,11 @@ export default function GestionEspaces() {
               const currentEsp = ESPACES.find(e => e.id === selectedEspace);
               if (!currentEsp?.salles || currentEsp.salles.length <= 1) return null;
               return (
-                <div className="relative w-full sm:w-44">
+                <div className="relative shrink-0">
                   <select
                     value={selectedSousSalleFilter}
                     onChange={(e) => setSelectedSousSalleFilter(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-dark-700 rounded-xl pl-3 pr-8 py-1.5 text-xs font-bold text-slate-700 dark:text-dark-200 outline-none focus:border-primary-500 cursor-pointer appearance-none"
+                    className="bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 rounded-xl pl-3 pr-8 py-1.5 text-xs font-bold text-slate-700 dark:text-dark-200 outline-none focus:border-primary-500 cursor-pointer appearance-none shadow-xs"
                   >
                     <option value="all">
                       Toutes les salles ({reservations.filter(r => r.espace === selectedEspace).length})
@@ -834,17 +860,17 @@ export default function GestionEspaces() {
                       );
                     })}
                   </select>
-                  <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 </div>
               );
             })()}
 
             {/* 3. LISTE DÉROULANTE STATUT */}
-            <div className="relative w-full sm:w-40">
+            <div className="relative shrink-0">
               <select
                 value={resStatusFilter}
                 onChange={(e) => setResStatusFilter(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-dark-700 rounded-xl pl-3 pr-8 py-1.5 text-xs font-bold text-slate-700 dark:text-dark-200 outline-none focus:border-primary-500 cursor-pointer appearance-none"
+                className="bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 rounded-xl pl-3 pr-8 py-1.5 text-xs font-bold text-slate-700 dark:text-dark-200 outline-none focus:border-primary-500 cursor-pointer appearance-none shadow-xs"
               >
                 <option value="all">
                   Tous les statuts ({filteredReservations.length})
@@ -859,15 +885,15 @@ export default function GestionEspaces() {
                   Refusées ({filteredReservations.filter(r => r.statut === 'refuse').length})
                 </option>
               </select>
-              <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
 
             {/* 3b. LISTE DÉROULANTE HISTORIQUE / MOIS */}
-            <div className="relative w-full sm:w-44">
+            <div className="relative shrink-0">
               <select
                 value={resMoisFilter}
                 onChange={(e) => setResMoisFilter(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-dark-700 rounded-xl pl-3 pr-8 py-1.5 text-xs font-bold text-slate-700 dark:text-dark-200 outline-none focus:border-primary-500 cursor-pointer appearance-none"
+                className="bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 rounded-xl pl-3 pr-8 py-1.5 text-xs font-bold text-slate-700 dark:text-dark-200 outline-none focus:border-primary-500 cursor-pointer appearance-none shadow-xs"
               >
                 <option value="all">Historique complet</option>
                 {availableReservationMonths.map(mStr => {
@@ -882,9 +908,12 @@ export default function GestionEspaces() {
                   );
                 })}
               </select>
-              <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
+          </div>
 
+          {/* Boutons d'action à droite */}
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
             {/* 4. BOUTON EXPORT EXCEL (.XLSX) */}
             <button
               type="button"
@@ -896,7 +925,8 @@ export default function GestionEspaces() {
               className="btn btn-secondary py-1.5 px-3 rounded-xl text-xs font-bold border border-emerald-500/30 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5 shadow-xs cursor-pointer transition-all shrink-0"
               title="Exporter les réservations en fichier Excel (.xlsx)"
             >
-              <span>📊 Exporter (.xlsx)</span>
+              <FileSpreadsheet size={14} className="text-emerald-500" />
+              <span>Exporter (.xlsx)</span>
             </button>
 
             {/* 4b. BOUTON SYNCHRONISER CLOUD HEROKU (INSTANTANÉ) */}
@@ -908,7 +938,7 @@ export default function GestionEspaces() {
               title="Aspirer immédiatement les réservations effectuées sur le lien Heroku"
             >
               <RefreshCw size={13} className={syncingCloud ? 'animate-spin' : ''} />
-              <span>{syncingCloud ? 'Synchronisation...' : '🔄 Sync Cloud'}</span>
+              <span>{syncingCloud ? 'Synchronisation...' : 'Sync Cloud'}</span>
             </button>
 
             {/* 5. BOUTON NOUVELLE RÉSERVATION DIRECTE ADMIN */}
@@ -932,11 +962,11 @@ export default function GestionEspaces() {
               className="btn py-1.5 px-3 rounded-xl text-xs font-black bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white flex items-center gap-1.5 shadow-sm shadow-emerald-500/25 cursor-pointer transition-all shrink-0 border border-emerald-400/30"
               title="Créer une réservation directe immédiate pour l'administration"
             >
-              <Plus size={14} /> Réserver pour l'Admin
+              <Plus size={14} /> <span>Réserver pour l'Admin</span>
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* =========================================================================
          ONGLET 1 : SUIVI DES RÉSERVATIONS & ÉTAT DU MATÉRIEL
