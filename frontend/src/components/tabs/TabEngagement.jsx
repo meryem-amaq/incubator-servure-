@@ -875,17 +875,10 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
               </div>
             </div>
 
-            <div className="flex items-center gap-1 shrink-0">
-              <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 whitespace-nowrap">
+            <div className="flex items-center shrink-0">
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 whitespace-nowrap">
                 {trackName}
               </span>
-              <button
-                onClick={handleSyncAllFormationsFromEvents}
-                className="p-1 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold flex items-center gap-0.5 transition-all shrink-0"
-                title="Calculer et synchroniser automatiquement depuis les feuilles de présence des formations obligatoires"
-              >
-                <Sparkles size={11} /> Sync
-              </button>
             </div>
           </div>
 
@@ -918,22 +911,13 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                 </div>
               </div>
             </div>
-
-            <button
-              onClick={() => handleSyncAteliers(false)}
-              disabled={syncingAteliers}
-              className="p-1 rounded-md bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-400 hover:bg-cyan-100 border border-cyan-200 dark:border-cyan-800 text-[10px] font-bold flex items-center gap-0.5 transition-all shrink-0"
-              title="Synchroniser les présences d'ateliers et animations"
-            >
-              <RefreshCw size={11} className={syncingAteliers ? "animate-spin" : ""} /> Sync
-            </button>
           </div>
 
           <div className="pt-2 border-t border-slate-100 dark:border-dark-700/60 flex items-center justify-between text-xs gap-1">
             <span className="text-slate-500 dark:text-dark-400 text-[11px] truncate">Rôle Animateur :</span>
             {Number(stats.totalNbAteliersAnimes) > 0 ? (
               <span className="font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-md text-[11px] flex items-center gap-1 shrink-0">
-                🎤 {stats.totalNbAteliersAnimes} ({stats.totalHeuresAteliersAnimes}h)
+                {stats.totalNbAteliersAnimes} ({stats.totalHeuresAteliersAnimes}h)
               </span>
             ) : (
               <span className="text-[11px] text-slate-400 shrink-0 font-medium">0 atelier animé</span>
@@ -1288,7 +1272,7 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                         <div className="flex items-center justify-center gap-1.5">
                           <span>Heures Totales / Mois ({tourniquetFilterMode === 'equipe' ? 'Équipe' : 'Incubé'})</span>
                           <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                            🔒 ZKTeco Direct
+                            ZKTeco Direct
                           </span>
                         </div>
                         <div className="text-[10px] font-semibold text-blue-600 dark:text-blue-400">Objectif : 60 h/mois (15 h/sem)</div>
@@ -1427,7 +1411,7 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                   ? 'bg-emerald-600 text-white shadow-xs' 
                   : 'bg-amber-500 text-white shadow-xs'
               }`}>
-                Objectif ≥ 80% : {stats.tauxFormationsReel >= 80 ? '✅ Validé' : '⚠️ En cours'}
+                Objectif ≥ 80% : {stats.tauxFormationsReel >= 80 ? 'Validé' : 'En cours'}
               </span>
             </div>
 
@@ -1519,25 +1503,11 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
         {/* ========================================================================= */}
         {activeEngagementTab === 'ateliers' && (
           <div className="space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 dark:text-dark-400 px-1">
-              <p>
-                🛠️ <strong>Workshops pratiques et initiatives d'animation</strong> • Synchronisés avec la page <em>Événements</em>.
-              </p>
-              <div className="flex items-center gap-2">
-                <span className="bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 px-2 py-0.5 rounded font-bold">
-                  📥 Suivis : {stats.totalHeuresAteliersSuivies}h ({stats.totalNbAteliersSuivis} atelier{stats.totalNbAteliersSuivis > 1 ? 's' : ''})
-                </span>
-                <span className="bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded font-bold">
-                  🎤 Animés : {stats.totalHeuresAteliersAnimes}h ({stats.totalNbAteliersAnimes} atelier{stats.totalNbAteliersAnimes > 1 ? 's' : ''})
-                </span>
-              </div>
-            </div>
-
             {/* 1. ATELIERS SUIVIS PAR L'INCUBÉ (RÔLE : BÉNÉFICIAIRE) */}
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold text-cyan-700 dark:text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <span>📥</span> 1. Ateliers Suivis par l'Incubé (Rôle : Bénéficiaire)
+                <h3 className="text-xs font-bold text-cyan-700 dark:text-cyan-400 uppercase tracking-wider">
+                  1. Ateliers Suivis par l'Incubé (Rôle : Bénéficiaire)
                 </h3>
                 <span className="text-xs font-bold text-slate-500">
                   Total : {stats.totalHeuresAteliersSuivies} h • {stats.totalNbAteliersSuivis} atelier(s)
@@ -1568,7 +1538,7 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                             <td className="py-2.5 px-3 text-center font-bold text-slate-700 dark:text-dark-300">{a.duree || `${a.heures}h`}</td>
                             <td className="py-2.5 px-3 text-center">
                               <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30">
-                                ✅ QR Validé
+                                QR Validé
                               </span>
                             </td>
                           </tr>
@@ -1590,7 +1560,6 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
             <div className="space-y-3 pt-2">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-500/20 pb-2">
                 <div className="flex items-center gap-2">
-                  <span className="p-1.5 rounded-lg bg-amber-500/20 text-amber-600">🎤</span>
                   <h3 className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
                     2. Ateliers Animés par l'Incubé & Initiatives ({annee})
                   </h3>
@@ -1663,7 +1632,7 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                                         {optM} {annee}
                                       </option>
                                     ))}
-                                    <option value="all">📋 Tous les 12 mois</option>
+                                    <option value="all">Tous les 12 mois</option>
                                   </select>
                                 </div>
                               </td>
@@ -1673,7 +1642,7 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                                 {nbAnimes > 0 ? (
                                   <div className="inline-flex flex-col items-center">
                                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-                                      🎤 {hAnimees} h ({nbAnimes} atelier{nbAnimes > 1 ? 's' : ''})
+                                      {hAnimees} h ({nbAnimes} atelier{nbAnimes > 1 ? 's' : ''})
                                     </span>
                                     {mStats.ateliers_animes && mStats.ateliers_animes.length > 0 && (
                                       <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium truncate max-w-[150px] block mt-0.5" title={mStats.ateliers_animes.map(a => a.titre).join(', ')}>
