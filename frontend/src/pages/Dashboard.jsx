@@ -293,31 +293,58 @@ export default function Dashboard() {
   return (
     <div className="space-y-6 animate-fade-in pb-12" ref={dashboardRef}>
       {/* Header avec Titre, Filtre Promotion & Sélecteur d'onglets (masqué dans la capture PDF pour laisser place à l'en-tête officiel) */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2 border-b border-slate-200 dark:border-dark-700/60" data-html2canvas-ignore="true">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-2.5 border-b border-slate-200 dark:border-dark-700/60" data-html2canvas-ignore="true">
+        <div className="shrink-0 min-w-0">
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
             Tableau de Bord & Impact
           </h1>
-          <p className="text-slate-500 dark:text-dark-400 text-xs sm:text-sm mt-1">
+          <p className="text-slate-500 dark:text-dark-400 text-xs mt-0.5 truncate max-w-md">
             Indicateurs de performance économique, assiduité aux ateliers et utilisation des espaces.
           </p>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2 shrink-0 flex-nowrap overflow-x-auto scrollbar-none pb-0.5">
+          {/* Boutons de bascule d'onglets */}
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-dark-800/80 p-0.5 rounded-xl border border-slate-200 dark:border-dark-700 shrink-0">
+            <button
+              type="button"
+              onClick={() => setActiveTab('economique')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'economique'
+                ? 'bg-white dark:bg-dark-900 text-slate-900 dark:text-white shadow-xs'
+                : 'text-slate-500 hover:text-slate-800 dark:text-dark-300'
+                }`}
+            >
+              <TrendingUp size={13} className="text-primary-600" />
+              <span>Impact Économique</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('impact')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'impact'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-500 hover:text-slate-800 dark:text-dark-300'
+                }`}
+            >
+              <Award size={13} className={activeTab === 'impact' ? 'text-white' : 'text-emerald-500'} />
+              <span>Assiduité & Espaces</span>
+            </button>
+          </div>
+
           {/* Filtre Promotion */}
-          <div className="relative">
+          <div className="relative shrink-0">
             <select
               value={selectedPromotion}
               onChange={(e) => setSelectedPromotion(e.target.value)}
-              className="appearance-none bg-slate-50 dark:bg-dark-800 text-slate-900 dark:text-white text-xs sm:text-sm font-semibold rounded-xl border border-slate-200 dark:border-dark-700 px-4 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-primary-500/50 cursor-pointer shadow-sm transition-all"
+              className="appearance-none bg-white dark:bg-dark-900 text-slate-900 dark:text-white text-xs font-bold rounded-xl border border-slate-200 dark:border-dark-700 pl-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500/50 cursor-pointer shadow-xs transition-all max-w-[170px] truncate"
             >
               <option value="all">Toutes les promotions</option>
               {allPromoOptions.map(p => (
                 <option key={p} value={p}>{p}</option>
               ))}
             </select>
-            <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-dark-400">
-              <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20">
+            <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400">
+              <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 20 20">
                 <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
               </svg>
             </div>
@@ -328,38 +355,12 @@ export default function Dashboard() {
             type="button"
             onClick={handleExportPdf}
             disabled={exportingPdf}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-amber-400 text-amber-950 hover:bg-amber-500 shadow-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-400 text-amber-950 hover:bg-amber-500 shadow-xs transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0 whitespace-nowrap"
+            title="Exporter l'ensemble du rapport en document PDF officiel"
           >
-            <Download size={14} />
-            {exportingPdf ? 'Génération...' : 'Télécharger en PDF'}
+            <Download size={13} />
+            <span>{exportingPdf ? 'Génération...' : 'Télécharger PDF'}</span>
           </button>
-
-          {/* Boutons de bascule d'onglets */}
-          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-dark-800/80 p-1 rounded-2xl border border-slate-200 dark:border-dark-700">
-            <button
-              type="button"
-              onClick={() => setActiveTab('economique')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${activeTab === 'economique'
-                ? 'bg-white dark:bg-dark-900 text-slate-900 dark:text-white shadow-sm'
-                : 'text-slate-500 hover:text-slate-800 dark:text-dark-300'
-                }`}
-            >
-              <TrendingUp size={14} className="text-primary-600" />
-              <span>Impact Économique</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('impact')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${activeTab === 'impact'
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'text-slate-500 hover:text-slate-800 dark:text-dark-300'
-                }`}
-            >
-              <Award size={14} className={activeTab === 'impact' ? 'text-white' : 'text-emerald-500'} />
-              <span>Assiduité & Espaces</span>
-            </button>
-          </div>
         </div>
       </div>
 
