@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Building2, Radio, Wrench, BarChart3, UsersRound, ClipboardList, DollarSign, Camera, FileSpreadsheet, KeyRound, Mail, UserX, Clock, CheckCircle2, FileText } from 'lucide-react';
+import { ArrowLeft, Building2, Radio, Wrench, BarChart3, UsersRound, ClipboardList, DollarSign, Camera, FileSpreadsheet, KeyRound, Mail, UserX, Clock, CheckCircle2, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
 import api, { getPhotoUrl } from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
@@ -45,6 +45,52 @@ export default function ProfilIncube() {
   const [loading, setLoading] = useState(true);
   const [showFullDossierModal, setShowFullDossierModal] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+
+  const tabsContainerRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = tabsContainerRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setCanScrollLeft(scrollLeft > 6);
+    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 6);
+  }, []);
+
+  useEffect(() => {
+    checkScroll();
+    const el = tabsContainerRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', checkScroll, { passive: true });
+    window.addEventListener('resize', checkScroll);
+    const timer = setTimeout(checkScroll, 100);
+    return () => {
+      el.removeEventListener('scroll', checkScroll);
+      window.removeEventListener('resize', checkScroll);
+      clearTimeout(timer);
+    };
+  }, [checkScroll]);
+
+  // Centrer automatiquement l'onglet actif s'il est hors champ
+  useEffect(() => {
+    const el = tabsContainerRef.current;
+    if (!el) return;
+    const activeEl = el.querySelector('.tab-active');
+    if (activeEl) {
+      activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }, [activeTab]);
+
+  const handleScroll = (direction) => {
+    const el = tabsContainerRef.current;
+    if (!el) return;
+    const scrollAmount = 260;
+    el.scrollBy({
+      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      behavior: 'smooth'
+    });
+  };
 
   const load = async () => {
     setLoading(true);
@@ -258,21 +304,60 @@ export default function ProfilIncube() {
         </div>
       )}
 
-      {/* Tabs Navigation */}
-      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 p-1.5 bg-slate-50 dark:bg-dark-800/40 rounded-2xl border border-slate-200 dark:border-dark-700/30">
-        {TABS.map(tab => {
-          const Icon = tab.icon;
-          return (
+      {/* Tabs Navigation — Sur un seul niveau avec défilement fluide et indicateurs de continuité */}
+      <div className="relative group">
+        {/* Bouton & Flèche Gauche (si onglets masqués à gauche) */}
+        {canScrollLeft && (
+          <div className="absolute left-0 top-0 bottom-0 z-10 flex items-center pl-1.5 pr-6 bg-gradient-to-r from-slate-100 via-slate-100/90 to-transparent dark:from-dark-900 dark:via-dark-900/90 dark:to-transparent rounded-l-2xl pointer-events-none">
             <button
-              key={tab.key}
-              className={`tab flex items-center gap-2 ${activeTab === tab.key ? 'tab-active' : ''}`}
-              onClick={() => setActiveTab(tab.key)}
+              type="button"
+              onClick={() => handleScroll('left')}
+              className="pointer-events-auto p-1.5 rounded-xl bg-white dark:bg-dark-800 text-slate-700 dark:text-dark-200 border border-slate-200 dark:border-dark-700 shadow-md hover:bg-slate-50 dark:hover:bg-dark-700 hover:text-primary-600 transition-all hover:scale-105 active:scale-95"
+              title="Faire défiler vers la gauche"
+              aria-label="Faire défiler vers la gauche"
             >
-              <Icon size={15} />
-              <span className="whitespace-nowrap">{tab.label}</span>
+              <ChevronLeft size={16} />
             </button>
-          );
-        })}
+          </div>
+        )}
+
+        {/* Conteneur des Onglets sur une seule ligne (nowrap) */}
+        <div
+          ref={tabsContainerRef}
+          className="flex items-center gap-1.5 sm:gap-2 p-1.5 bg-slate-50 dark:bg-dark-800/40 rounded-2xl border border-slate-200 dark:border-dark-700/30 overflow-x-auto no-scrollbar scroll-smooth"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
+          {TABS.map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                className={`tab flex items-center gap-2 ${isActive ? 'tab-active' : ''}`}
+                onClick={() => setActiveTab(tab.key)}
+              >
+                <Icon size={15} />
+                <span className="whitespace-nowrap">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Bouton & Flèche Droite (Indicateur de continuité pour voir la suite des onglets) */}
+        {canScrollRight && (
+          <div className="absolute right-0 top-0 bottom-0 z-10 flex items-center pr-1.5 pl-6 bg-gradient-to-l from-slate-100 via-slate-100/90 to-transparent dark:from-dark-900 dark:via-dark-900/90 dark:to-transparent rounded-r-2xl pointer-events-none">
+            <button
+              type="button"
+              onClick={() => handleScroll('right')}
+              className="pointer-events-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white dark:bg-dark-800 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-800/50 shadow-md hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-all font-bold text-xs hover:scale-105 active:scale-95"
+              title="Défiler pour voir la suite des onglets (Plan d'action, Finances, Fiche de suivi...)"
+              aria-label="Faire défiler vers la droite"
+            >
+              <span className="text-[11px] hidden sm:inline">Suite</span>
+              <ChevronRight size={16} className="animate-pulse" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Tab Content */}
