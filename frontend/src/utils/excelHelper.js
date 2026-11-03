@@ -70,16 +70,35 @@ export const formatExcelDate = (val) => {
 export const MAPPINGS = {
   incube: {
     nom_incube: ['nom_incube', 'nom', 'nomdelincube', 'nomincube', 'porteur', 'nomporteur', 'nomcomplet', 'nometprenom'],
+    email: ['email', 'mail', 'courriel', 'adresseemail', 'e-mail'],
+    telephone: ['telephone', 'tel', 'gsm', 'mobile', 'phone', 'contact'],
+    genre: ['genre', 'sexe', 'civilite'],
+    date_naissance: ['date_naissance', 'datenaissance', 'datedenaissance', 'ddn', 'naissance'],
+    age: ['age'],
+    niveau_etude: ['niveau_etude', 'niveau', 'etude', 'diplome', 'niveaudetude'],
+    situation_familiale: ['situation_familiale', 'situation', 'situationfamiliale', 'etatcivil'],
     raison_sociale: ['raison_sociale', 'raisonsociale', 'societe', 'entreprise', 'projet', 'nomprojet', 'startup', 'structure'],
-    phase_projet: ['phase_projet', 'phase', 'phaseprojet', 'etape', 'stadedeprojet', 'stade'],
     statut_juridique: ['statut_juridique', 'statut', 'formejuridique', 'statutjuridique', 'statutlegal'],
     pp_numero: ['pp_numero', 'pp', 'nopp', 'npp', 'numeropp', 'numpp', 'codepp', 'identifiant'],
-    situation_familiale: ['situation_familiale', 'situation', 'situationfamiliale', 'etatcivil'],
+    rc: ['rc', 'registrecommerce', 'registredecommerce', 'numrc'],
+    phase_projet: ['phase_projet', 'phase', 'phaseprojet', 'etape', 'stadedeprojet', 'stade'],
+    secteur_activite: ['secteur_activite', 'secteur', 'activite', 'domaine', 'secteuractivite', 'domainedactivite', 'secteurdactivite'],
+    province: ['province', 'prefecture', 'region'],
+    ville: ['ville', 'cite', 'commune'],
+    promotion: ['promotion', 'promo', 'promotion_nom', 'nopromotion', 'cohorte', 'session'],
     accompagnateur: ['accompagnateur', 'coach', 'responsable', 'mentore', 'referent'],
     date_demarrage: ['date_demarrage', 'datededemarrage', 'datedebut', 'debut', 'date', 'datedelancement'],
-    niveau_etude: ['niveau_etude', 'niveau', 'etude', 'diplome', 'niveaudetude'],
-    promotion: ['promotion', 'promo', 'promotion_nom', 'nopromotion', 'cohorte', 'session'],
-    secteur_activite: ['secteur_activite', 'secteur', 'activite', 'domaine', 'secteuractivite', 'domainedactivite', 'secteurdactivite'],
+    badge_id: ['badge_id', 'badge', 'badgerfid', 'rfid', 'numérobadge', 'numerobadge', 'codebadge', 'badgeacces'],
+    associes: ['associes', 'partenaires', 'co-fondateurs', 'cofondateurs']
+  },
+  formation: {
+    incube_ref: ['incube_ref', 'nom_incube', 'nomincube', 'nom', 'porteur', 'pp_numero', 'pp', 'projet', 'ref_incube', 'incubé'],
+    theme: ['theme', 'titre', 'intitule', 'formation', 'module', 'nomformation', 'nom_formation'],
+    formateur: ['formateur', 'intervenant', 'animateur', 'enseignant', 'expert'],
+    heures: ['heures', 'duree', 'volume_horaire', 'nb_heures'],
+    date_formation: ['date_formation', 'date', 'dateformation', 'jour'],
+    presence: ['presence', 'statut_presence', 'etat_presence', 'statut'],
+    attestation: ['attestation', 'certificat', 'valide']
   },
   associes: {
     nom: ['nom', 'nometprenom', 'nom_prenom', 'nomcomplet'],
@@ -810,20 +829,30 @@ export const exportFullIncubeTemplate = async () => {
   const XLSX = await loadXLSX();
   const wb = XLSX.utils.book_new();
 
-  // 1. Infos
+  // 1. Infos (Profil complet de l'incubé)
   const wsInfos = XLSX.utils.json_to_sheet([
     {
       "Nom de l'incubé": "Mohamed Alami",
+      "Email": "mohamed.alami@biotech.ma",
+      "Téléphone": "0661234567",
+      "Genre": "Homme",
+      "Date de naissance": "1994-05-12",
+      "Âge": "31",
+      "Niveau d'étude": "Master 2",
+      "Situation familiale": "Marié(e)",
       "Raison sociale": "BioTech Solutions SARL",
-      "Phase du projet": "Idéation",
       "Statut juridique": "SARL",
       "N° PP": "PP-2025-001",
-      "Situation familiale": "Marié(e)",
-      "Promotion": "Promotion 1",
+      "RC": "RC-124580",
+      "Phase du projet": "Idéation",
       "Secteur d'activité": "Intelligence Artificielle",
-      "Niveau d'étude": "Master 2",
+      "Province": "Casablanca",
+      "Ville": "Casablanca",
+      "Promotion": "Promotion 1",
       "Accompagnateur": "Meryem Amaqran",
-      "Date de démarrage": "2025-01-15"
+      "Date de démarrage": "2025-01-15",
+      "N° Badge RFID": "RFID-0042",
+      "Associés": "Karim Tazi (CIN: AB123456, 50%)"
     }
   ]);
   XLSX.utils.book_append_sheet(wb, wsInfos, "1. Infos Générales");
@@ -927,7 +956,20 @@ export const exportFullIncubeTemplate = async () => {
   ]);
   XLSX.utils.book_append_sheet(wb, wsAssocies, "8. Associés");
 
-  // 9. Fiche Technique
+  // 7. Engagement & Présence
+  const wsEng = XLSX.utils.json_to_sheet([
+    {
+      "Mois": "Janvier",
+      "Année": 2025,
+      "Heures présence": 36,
+      "Taux présence (%)": 95,
+      "Initiatives": "Participation active aux ateliers techniques",
+      "Observations": "Très assidu et motivé"
+    }
+  ]);
+  XLSX.utils.book_append_sheet(wb, wsEng, "7. Engagement");
+
+  // 9. Fiche Technique (Fiche de Suivi)
   const wsFicheTech = XLSX.utils.json_to_sheet([
     {
       "N° Ordre": "1",
@@ -940,6 +982,19 @@ export const exportFullIncubeTemplate = async () => {
     }
   ]);
   XLSX.utils.book_append_sheet(wb, wsFicheTech, "9. Fiche Technique");
+
+  // 10. Formations & Ateliers
+  const wsForm = XLSX.utils.json_to_sheet([
+    {
+      "Thème": "Business Model Canvas & Chiffrage Prévisionnel",
+      "Formateur": "Karim Alami",
+      "Date formation": "2025-02-10",
+      "Heures": 3,
+      "Présence": "Présent",
+      "Attestation": "Oui"
+    }
+  ]);
+  XLSX.utils.book_append_sheet(wb, wsForm, "10. Formations");
 
   XLSX.writeFile(wb, "modele_dossier_complet_incube.xlsx");
 };
@@ -956,6 +1011,7 @@ export const parseFullIncubeWorkbook = (allSheets) => {
     engagement: [],
     associes: [],
     fiche_technique: [],
+    formation: [],
   };
 
   for (const [sheetName, rows] of Object.entries(allSheets)) {
@@ -980,8 +1036,10 @@ export const parseFullIncubeWorkbook = (allSheets) => {
       } else {
         result.financier.push(...mapRowsToFields(rows, 'financier'));
       }
-    } else if (name.includes('technique') || name.includes('fiche')) {
+    } else if (name.includes('technique') || name.includes('suivi') || name.includes('fiche')) {
       result.fiche_technique.push(...mapRowsToFields(rows, 'fiche_technique'));
+    } else if (name.includes('format') || name.includes('atelier')) {
+      result.formation.push(...mapRowsToFields(rows, 'formation'));
     } else if (name.includes('engag') || name.includes('presenc')) {
       result.engagement.push(...mapRowsToFields(rows, 'engagement'));
     } else if (name.includes('associe') || name.includes('partenaire')) {
@@ -1026,31 +1084,53 @@ export const exportGlobalPromotionTemplate = async () => {
   const XLSX = await loadXLSX();
   const wb = XLSX.utils.book_new();
 
-  // 1. Liste des incubés
+  // 1. Liste des incubés (Toutes les informations d'un profil complet)
   const wsIncubes = XLSX.utils.json_to_sheet([
     {
       "Nom de l'incubé": "Mohamed Alami",
+      "Email": "mohamed.alami@biotech.ma",
+      "Téléphone": "0661234567",
+      "Genre": "Homme",
+      "Date de naissance": "1994-05-12",
+      "Âge": "31",
+      "Niveau d'étude": "Master 2",
+      "Situation familiale": "Marié(e)",
       "Raison sociale": "BioTech Solutions SARL",
-      "Phase du projet": "Idéation",
       "Statut juridique": "SARL",
       "N° PP": "PP-2025-001",
-      "Situation familiale": "Marié(e)",
-      "Promotion": "Promotion 1",
+      "RC": "RC-124580",
+      "Phase du projet": "Idéation",
       "Secteur d'activité": "Intelligence Artificielle",
+      "Province": "Casablanca",
+      "Ville": "Casablanca",
+      "Promotion": "Promotion 1",
       "Accompagnateur": "Meryem Amaqran",
-      "Date de démarrage": "2025-01-15"
+      "Date de démarrage": "2025-01-15",
+      "N° Badge RFID": "RFID-0042",
+      "Associés": "Karim Tazi (CIN: AB123456, 50%)"
     },
     {
       "Nom de l'incubé": "Fatima Zahra Mansouri",
+      "Email": "fatima.mansouri@ecopack.ma",
+      "Téléphone": "0662345678",
+      "Genre": "Femme",
+      "Date de naissance": "1997-11-23",
+      "Âge": "28",
+      "Niveau d'étude": "Licence / Bac+3",
+      "Situation familiale": "Célibataire",
       "Raison sociale": "EcoPack Maroc",
-      "Phase du projet": "Lancement",
       "Statut juridique": "Auto-entrepreneur",
       "N° PP": "PP-2025-002",
-      "Situation familiale": "Célibataire",
-      "Promotion": "Promotion 2",
+      "RC": "RC-985412",
+      "Phase du projet": "Lancement",
       "Secteur d'activité": "GREEN-TECH",
-      "Accompagnateur": "Meryem Amaqran",
-      "Date de démarrage": "2025-02-01"
+      "Province": "Rabat",
+      "Ville": "Rabat",
+      "Promotion": "Promotion 2",
+      "Accompagnateur": "Nadia Sefiani",
+      "Date de démarrage": "2025-02-01",
+      "N° Badge RFID": "RFID-0089",
+      "Associés": "Youssef Mansouri (CIN: CD987654, 30%)"
     }
   ]);
   XLSX.utils.book_append_sheet(wb, wsIncubes, "1. Incubes");
@@ -1174,7 +1254,7 @@ export const exportGlobalPromotionTemplate = async () => {
   ]);
   XLSX.utils.book_append_sheet(wb, wsFin, "6. Finances");
 
-  // 7. Engagement
+  // 7. Engagement & Assiduité
   const wsEng = XLSX.utils.json_to_sheet([
     {
       "Nom Incubé ou N° PP": "Mohamed Alami",
@@ -1197,12 +1277,83 @@ export const exportGlobalPromotionTemplate = async () => {
   ]);
   XLSX.utils.book_append_sheet(wb, wsEng, "7. Engagement");
 
+  // 8. Fiches de Suivi & Entretiens
+  const wsSuivi = XLSX.utils.json_to_sheet([
+    {
+      "Nom Incubé ou N° PP": "Mohamed Alami",
+      "N° Ordre": "1",
+      "Date suivi": "2025-01-20",
+      "Objet réunion": "Diagnostic initial & cadrage des besoins",
+      "Statut avancement": "En bonne voie",
+      "Statut juridique": "SARL en cours",
+      "Anomalie signalée": "Aucune",
+      "Déclaration échec": "Non",
+      "Observations": "Première séance d'alignement très positive"
+    },
+    {
+      "Nom Incubé ou N° PP": "Fatima Zahra Mansouri",
+      "N° Ordre": "1",
+      "Date suivi": "2025-02-15",
+      "Objet réunion": "Revue du prototype et plan de prospection",
+      "Statut avancement": "Normal",
+      "Statut juridique": "Auto-entrepreneur actif",
+      "Anomalie signalée": "Besoin de sourcing emballages biosourcés",
+      "Déclaration échec": "Non",
+      "Observations": "Mise en relation effectuée avec un fournisseur partenaire"
+    }
+  ]);
+  XLSX.utils.book_append_sheet(wb, wsSuivi, "8. Fiches de Suivi");
+
+  // 9. Formations & Ateliers
+  const wsFormations = XLSX.utils.json_to_sheet([
+    {
+      "Nom Incubé ou N° PP": "Mohamed Alami",
+      "Thème": "Business Model Canvas & Chiffrage Prévisionnel",
+      "Formateur": "Karim Alami",
+      "Date formation": "2025-02-10",
+      "Heures": 3,
+      "Présence": "Présent",
+      "Attestation": "Oui"
+    },
+    {
+      "Nom Incubé ou N° PP": "Fatima Zahra Mansouri",
+      "Thème": "Choix de la Forme Juridique et Statuts",
+      "Formateur": "Me. Benjelloun",
+      "Date formation": "2025-02-25",
+      "Heures": 3,
+      "Présence": "Présent",
+      "Attestation": "Oui"
+    }
+  ]);
+  XLSX.utils.book_append_sheet(wb, wsFormations, "9. Formations");
+
+  // 10. Associés & Partenaires
+  const wsAssocies = XLSX.utils.json_to_sheet([
+    {
+      "Nom Incubé ou N° PP": "Mohamed Alami",
+      "Nom & prénom": "Karim Tazi",
+      "CIN": "AB123456",
+      "Fonction": "Co-fondateur (CTO)",
+      "Téléphone": "0600112233",
+      "Part capital (%)": 50
+    },
+    {
+      "Nom Incubé ou N° PP": "Fatima Zahra Mansouri",
+      "Nom & prénom": "Youssef Mansouri",
+      "CIN": "CD987654",
+      "Fonction": "Responsable Opérations",
+      "Téléphone": "0699887766",
+      "Part capital (%)": 30
+    }
+  ]);
+  XLSX.utils.book_append_sheet(wb, wsAssocies, "10. Associés");
+
   XLSX.writeFile(wb, "modele_global_tous_incubes_avec_details.xlsx");
 };
 
 // Parser un classeur global contenant TOUS les incubés et TOUS leurs détails
 export const parseGlobalPromotionWorkbook = (allSheets, fileName = '') => {
-  const incubesMap = new Map(); // key -> { incube, materiel: [], plan_action: [], rh_personnel: [], rh_emploi: [], financier: [], engagement: [] }
+  const incubesMap = new Map(); // key -> { incube, materiel: [], plan_action: [], rh_personnel: [], rh_emploi: [], financier: [], engagement: [], fiche_suivi: [], formation: [], associes: [] }
 
   const getIncubeKey = (val) => {
     if (!val) return '';
@@ -1214,7 +1365,7 @@ export const parseGlobalPromotionWorkbook = (allSheets, fileName = '') => {
   for (const [sheetName, rows] of Object.entries(allSheets)) {
     if (!rows || !rows.length) continue;
     const name = cleanKey(sheetName);
-    if (name.includes('incube') || name.includes('liste') || name.includes('porteur') || name.includes('projet') || name.includes('beneficiaire')) {
+    if (name.includes('incube') || name.includes('liste') || name.includes('porteur') || name.includes('projet') || name.includes('beneficiaire') || name.includes('info')) {
       const mapped = mapRowsToFields(rows, 'incube');
       for (const inc of mapped) {
         if (!inc.nom_incube) continue;
@@ -1227,7 +1378,10 @@ export const parseGlobalPromotionWorkbook = (allSheets, fileName = '') => {
           rh_personnel: [],
           rh_emploi: [],
           financier: [],
-          engagement: []
+          engagement: [],
+          fiche_suivi: [],
+          formation: [],
+          associes: []
         };
         incubesMap.set(key, record);
         if (ppKey) incubesMap.set(ppKey, record);
@@ -1254,7 +1408,10 @@ export const parseGlobalPromotionWorkbook = (allSheets, fileName = '') => {
           rh_personnel: [],
           rh_emploi: [],
           financier: [],
-          engagement: []
+          engagement: [],
+          fiche_suivi: [],
+          formation: [],
+          associes: []
         };
         incubesMap.set(key, record);
         if (ppKey) incubesMap.set(ppKey, record);
@@ -1279,7 +1436,10 @@ export const parseGlobalPromotionWorkbook = (allSheets, fileName = '') => {
             rh_personnel: [],
             rh_emploi: [],
             financier: [],
-            engagement: []
+            engagement: [],
+            fiche_suivi: [],
+            formation: [],
+            associes: []
           };
           incubesMap.set(key, record);
           if (ppKey) incubesMap.set(ppKey, record);
@@ -1295,7 +1455,7 @@ export const parseGlobalPromotionWorkbook = (allSheets, fileName = '') => {
     if (fileName) {
       fallbackNom = fileName
         .replace(/\.(xlsx|xls|csv)$/i, '')
-        .replace(/[_\-]+/g, ' ')
+        .replace(/[_-]+/g, ' ')
         .replace(/\b(tableau|de|du|suivi|incube|incubes|cgs|ids)\b/gi, '')
         .replace(/\s{2,}/g, ' ')
         .trim();
@@ -1319,7 +1479,10 @@ export const parseGlobalPromotionWorkbook = (allSheets, fileName = '') => {
         rh_personnel: [],
         rh_emploi: [],
         financier: [],
-        engagement: []
+        engagement: [],
+        fiche_suivi: [],
+        formation: [],
+        associes: []
       };
       incubesMap.set(key, record);
     }
@@ -1376,9 +1539,18 @@ export const parseGlobalPromotionWorkbook = (allSheets, fileName = '') => {
     } else if (name.includes('finan') || name.includes('compta') || name.includes('tresor')) {
       const mapped = mapRowsToFields(rows, 'financier');
       mapped.forEach(r => associateRow(r, 'financier'));
-    } else if (name.includes('engag') || name.includes('presenc') || name.includes('suivi')) {
+    } else if (name.includes('engag') || name.includes('presenc')) {
       const mapped = mapRowsToFields(rows, 'engagement');
       mapped.forEach(r => associateRow(r, 'engagement'));
+    } else if (name.includes('suivi') || name.includes('fiche_technique') || name.includes('technique') || name.includes('entretien')) {
+      const mapped = mapRowsToFields(rows, 'fiche_technique');
+      mapped.forEach(r => associateRow(r, 'fiche_suivi'));
+    } else if (name.includes('format') || name.includes('atelier')) {
+      const mapped = mapRowsToFields(rows, 'formation');
+      mapped.forEach(r => associateRow(r, 'formation'));
+    } else if (name.includes('associe') || name.includes('partenaire')) {
+      const mapped = mapRowsToFields(rows, 'associes');
+      mapped.forEach(r => associateRow(r, 'associes'));
     } else {
       // Analyse heuristique des colonnes de la feuille
       const firstRow = rows[0] || {};
@@ -1401,10 +1573,30 @@ export const parseGlobalPromotionWorkbook = (allSheets, fileName = '') => {
       } else if (keys.some(k => k.includes('heures') || k.includes('tauxpresence') || k.includes('initiative'))) {
         const mapped = mapRowsToFields(rows, 'engagement');
         mapped.forEach(r => associateRow(r, 'engagement'));
+      } else if (keys.some(k => k.includes('avancement') || k.includes('anomalie') || k.includes('objetreunion') || k.includes('suivi'))) {
+        const mapped = mapRowsToFields(rows, 'fiche_technique');
+        mapped.forEach(r => associateRow(r, 'fiche_suivi'));
+      } else if (keys.some(k => k.includes('theme') || k.includes('formateur') || k.includes('attestation'))) {
+        const mapped = mapRowsToFields(rows, 'formation');
+        mapped.forEach(r => associateRow(r, 'formation'));
       }
     }
   }
 
+  // Lier les associés trouvés dans la feuille 10 au champ associes de l'incubé
+  const uniqueItems = Array.from(new Set(incubesMap.values()));
+  uniqueItems.forEach(item => {
+    if (item.associes && item.associes.length > 0 && (!item.incube.associes || item.incube.associes.length === 0)) {
+      item.incube.associes = item.associes.map(a => ({
+        nom: a.nom || a.nom_complet || '',
+        cin: a.cin || '',
+        fonction: a.fonction || a.role || '',
+        tel: a.tel || a.telephone || '',
+        part: a.part || a.part_capital || ''
+      }));
+    }
+  });
+
   // Renvoyer la liste dédoublonnée des incubés avec leurs détails
-  return Array.from(new Set(incubesMap.values()));
+  return uniqueItems;
 };

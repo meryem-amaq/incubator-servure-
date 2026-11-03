@@ -13,7 +13,10 @@ import {
   Calendar,
   Layers,
   CheckCircle,
-  FileSpreadsheet
+  FileSpreadsheet,
+  FileText,
+  GraduationCap,
+  UserCheck
 } from 'lucide-react';
 import { 
   readAllWorkbookSheets, 
@@ -62,7 +65,7 @@ export default function ExcelGlobalImportModal({ isOpen, onClose, onImportComple
       } else {
         setParsedIncubes(result);
         const totalDetails = result.reduce((sum, item) => 
-          sum + item.materiel.length + item.plan_action.length + item.rh_personnel.length + item.rh_emploi.length + item.financier.length + item.engagement.length, 0);
+          sum + item.materiel.length + item.plan_action.length + item.rh_personnel.length + item.rh_emploi.length + item.financier.length + item.engagement.length + (item.fiche_suivi?.length || 0) + (item.formation?.length || 0) + (item.associes?.length || 0), 0);
         toast.success(`${result.length} incubé(s) détecté(s) avec ${totalDetails} détail(s) associé(s) !`);
       }
     } catch (err) {
@@ -174,6 +177,42 @@ export default function ExcelGlobalImportModal({ isOpen, onClose, onImportComple
             }
           }
 
+          // 8. Fiches de Suivi & Entretiens
+          if (item.fiche_suivi && item.fiche_suivi.length > 0) {
+            const formattedSuivi = item.fiche_suivi.map(r => ({
+              numero_ordre: r.numero_ordre || '',
+              date_suivi: r.date_suivi || null,
+              objet_reunion: r.objet_reunion || r.objet || 'Point de suivi individuel',
+              statut_juridique: r.statut_juridique || inc.statut_juridique || '',
+              statut_avancement: r.statut_avancement || 'Normal',
+              anomalie_signalee: r.anomalie_signalee || '',
+              declaration_echec: r.declaration_echec || '',
+              observations: r.observations || ''
+            }));
+            try {
+              await api.post(`/incubes/${incubeId}/fiche-suivi/bulk`, formattedSuivi);
+            } catch (e) {
+              for (const it of formattedSuivi) await api.post(`/incubes/${incubeId}/fiche-suivi`, it);
+            }
+          }
+
+          // 9. Formations & Ateliers suivis
+          if (item.formation && item.formation.length > 0) {
+            const formattedForm = item.formation.map(r => ({
+              theme: r.theme || r.titre || 'Formation pédagogique',
+              formateur: r.formateur || '',
+              heures: parseFloat(r.heures) || 3,
+              date_formation: r.date_formation || null,
+              presence: r.presence || 'Présent',
+              attestation: String(r.attestation || '').toLowerCase() === 'oui' || r.attestation === true
+            }));
+            try {
+              await api.post(`/incubes/${incubeId}/formation/bulk`, formattedForm);
+            } catch (e) {
+              for (const it of formattedForm) await api.post(`/incubes/${incubeId}/formation`, it);
+            }
+          }
+
           successCount++;
         }
       } catch (err) {
@@ -270,7 +309,7 @@ export default function ExcelGlobalImportModal({ isOpen, onClose, onImportComple
 
         {/* Lien discret pour télécharger le modèle complet multi-onglets */}
         <div className="flex items-center justify-between text-xs px-1 text-slate-400 dark:text-dark-400">
-          <span>Format : Classeur multi-onglets (Incubés, Matériel, RH, Plan d'action, Finances, Engagement)</span>
+          <span>Format : Classeur multi-onglets (Incubés, Matériel, RH, Plan d'action, Finances, Engagement, Fiches de suivi, Formations, Associés)</span>
           <button
             type="button"
             onClick={exportGlobalPromotionTemplate}
@@ -347,6 +386,21 @@ export default function ExcelGlobalImportModal({ isOpen, onClose, onImportComple
                       {item.engagement.length > 0 && (
                         <span className="badge badge-gray text-[10px] py-0.5 px-2">
                           <Calendar size={10} className="mr-1 inline" /> {item.engagement.length} mois suiv.
+                        </span>
+                      )}
+                      {item.fiche_suivi && item.fiche_suivi.length > 0 && (
+                        <span className="badge text-[10px] py-0.5 px-2 bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
+                          <FileText size={10} className="mr-1 inline" /> {item.fiche_suivi.length} suivi(s)
+                        </span>
+                      )}
+                      {item.formation && item.formation.length > 0 && (
+                        <span className="badge text-[10px] py-0.5 px-2 bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                          <GraduationCap size={10} className="mr-1 inline" /> {item.formation.length} form.
+                        </span>
+                      )}
+                      {item.associes && item.associes.length > 0 && (
+                        <span className="badge text-[10px] py-0.5 px-2 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20">
+                          <UserCheck size={10} className="mr-1 inline" /> {item.associes.length} assoc.
                         </span>
                       )}
                       {item.materiel.length === 0 && item.plan_action.length === 0 && item.rh_personnel.length === 0 && item.financier.length === 0 && item.engagement.length === 0 && (

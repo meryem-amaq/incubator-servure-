@@ -13,7 +13,8 @@ import {
   DollarSign, 
   Calendar,
   Layers,
-  ArrowRight
+  ArrowRight,
+  GraduationCap
 } from 'lucide-react';
 import { readAllWorkbookSheets, parseFullIncubeWorkbook, exportFullIncubeTemplate } from '../../utils/excelHelper';
 import api from '../../api/axios';
@@ -226,6 +227,30 @@ export default function ExcelFullDossierModal({ isOpen, onClose, incubeId, incub
           successCount += fichesData.length;
         } catch (e) {
           errors.push("Fiche de Suivi");
+        }
+      }
+
+      // 9. Formations & Ateliers
+      if (parsedData.formation && parsedData.formation.length > 0) {
+        try {
+          const formList = parsedData.formation.map(r => ({
+            theme: r.theme || r.titre || 'Formation importée',
+            formateur: r.formateur || '',
+            heures: parseFloat(r.heures) || 3,
+            date_formation: r.date_formation || null,
+            presence: r.presence || 'Présent',
+            attestation: String(r.attestation || '').toLowerCase() === 'oui' || r.attestation === true
+          }));
+          try {
+            await api.post(`/incubes/${incubeId}/formation/bulk`, formList);
+          } catch (bulkErr) {
+            if (bulkErr.response?.status === 404) {
+              for (const it of formList) await api.post(`/incubes/${incubeId}/formation`, it);
+            } else throw bulkErr;
+          }
+          successCount += formList.length;
+        } catch (e) {
+          errors.push("Formations");
         }
       }
 
