@@ -1165,7 +1165,7 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                   </span>
                   <div className="flex flex-wrap items-center gap-1.5 font-medium text-[11px]">
                     <span className="px-2.5 py-0.5 rounded-lg bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20">
-                      Porteur : <strong>{tourniquetTeamData?.metrics?.totalHeuresPorteur || 0} h</strong>
+                      Incubé : <strong>{tourniquetTeamData?.metrics?.totalHeuresPorteur || 0} h</strong>
                     </span>
                     <span className="px-2.5 py-0.5 rounded-lg bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
                       Associés : <strong>{tourniquetTeamData?.metrics?.totalHeuresAssocies || 0} h</strong>
@@ -1199,9 +1199,9 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                           ? 'bg-blue-600 text-white shadow-xs'
                           : 'text-slate-600 dark:text-dark-300 hover:text-slate-900 dark:hover:text-white'
                       }`}
-                      title="Afficher uniquement les heures du porteur dans le tableau"
+                      title="Afficher uniquement les heures de l'incubé dans le tableau"
                     >
-                      Porteur
+                      Incubé
                     </button>
                   </div>
 
@@ -1282,7 +1282,7 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                       </th>
                       <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 text-center min-w-[200px]">
                         <div className="flex items-center justify-center gap-1.5">
-                          <span>Heures Totales / Mois ({tourniquetFilterMode === 'equipe' ? 'Équipe' : 'Porteur'})</span>
+                          <span>Heures Totales / Mois ({tourniquetFilterMode === 'equipe' ? 'Équipe' : 'Incubé'})</span>
                           <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                             🔒 ZKTeco Direct
                           </span>
@@ -1344,7 +1344,7 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                               </div>
                               {hasTeamContribution && (
                                 <div className="text-[10px] text-slate-500 dark:text-dark-400 font-medium">
-                                  Porteur: {pMonthH.toFixed(1)}h
+                                  Incubé: {pMonthH.toFixed(1)}h
                                   {aMonthH > 0 ? ` • Associés: +${aMonthH.toFixed(1)}h` : ''}
                                   {sMonthH > 0 ? ` • Salariés: +${sMonthH.toFixed(1)}h` : ''}
                                 </div>
