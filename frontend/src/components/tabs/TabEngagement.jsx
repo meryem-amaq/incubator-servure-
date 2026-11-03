@@ -15,6 +15,7 @@ import {
   ExternalLink,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   FileSpreadsheet,
   ArrowRight,
   QrCode,
@@ -40,6 +41,7 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
   const [syncingTourniquet, setSyncingTourniquet] = useState(false);
   const [tourniquetFilterMode, setTourniquetFilterMode] = useState('equipe'); // 'equipe' | 'porteur'
   const [tourniquetTeamData, setTourniquetTeamData] = useState(null);
+  const [isTeamDetailOpen, setIsTeamDetailOpen] = useState(false);
   const [activeEngagementTab, setActiveEngagementTab] = useState("tourniquets"); // "tourniquets", "formations", "ateliers" // "agenda" | "table"
   const [selectedAgendaMonth, setSelectedAgendaMonth] = useState(() => {
     const curMonthIdx = new Date().getMonth();
@@ -1152,20 +1154,30 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
         {/* ========================================================= */}
         {activeEngagementTab === 'tourniquets' && (
           <div className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between text-xs text-slate-500 dark:text-dark-400 px-1 gap-2">
-              <p>
-                🏛️ <strong>Présence physique aux locaux de l'incubateur</strong> • Base contractuelle : 15 h/semaine (soit 60 h/mois, 720 h/an).
-              </p>
+            {/* En-tête Unifié de Présence Physique */}
+            <div className="flex flex-wrap items-center justify-between text-xs text-slate-500 dark:text-dark-400 px-1 gap-2.5">
+              <div className="flex items-center gap-2">
+                <span className="text-base shrink-0">🏛️</span>
+                <div>
+                  <span className="font-bold text-slate-800 dark:text-dark-100">
+                    Présence physique aux locaux de l'incubateur
+                  </span>
+                  <span className="hidden sm:inline text-slate-400 dark:text-dark-400 ml-1.5">
+                    • Base contractuelle : 15 h/sem (60 h/mois, 720 h/an)
+                  </span>
+                </div>
+              </div>
+
               <div className="flex flex-wrap items-center gap-2">
-                {/* Filtre : Équipe Globale vs Porteur Seul */}
-                <div className="inline-flex items-center bg-slate-100 dark:bg-dark-800 p-0.5 rounded-lg border border-slate-200 dark:border-dark-700">
+                {/* Segmented Control : Équipe Globale vs Porteur Seul */}
+                <div className="inline-flex items-center bg-slate-100 dark:bg-dark-800 p-0.5 rounded-xl border border-slate-200 dark:border-dark-700">
                   <button
                     type="button"
                     onClick={() => setTourniquetFilterMode('equipe')}
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
                       tourniquetFilterMode === 'equipe'
                         ? 'bg-blue-600 text-white shadow-xs'
-                        : 'text-slate-600 dark:text-dark-300 hover:text-slate-900'
+                        : 'text-slate-600 dark:text-dark-300 hover:text-slate-900 dark:hover:text-white'
                     }`}
                     title="Cumuler les heures du Porteur, des Associés et des Salariés RH de la startup"
                   >
@@ -1174,10 +1186,10 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                   <button
                     type="button"
                     onClick={() => setTourniquetFilterMode('porteur')}
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
                       tourniquetFilterMode === 'porteur'
                         ? 'bg-blue-600 text-white shadow-xs'
-                        : 'text-slate-600 dark:text-dark-300 hover:text-slate-900'
+                        : 'text-slate-600 dark:text-dark-300 hover:text-slate-900 dark:hover:text-white'
                     }`}
                     title="Afficher uniquement les heures du Porteur de projet principal"
                   >
@@ -1185,63 +1197,101 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                   </button>
                 </div>
 
-                <span className="font-mono text-[11px] bg-slate-100 dark:bg-dark-800 px-2 py-0.5 rounded border border-slate-200 dark:border-dark-700">
-                  Badge Porteur : {incube?.badge_id ? `#${incube.badge_id}` : (incube?.matricule ? `Mat #${incube.matricule}` : 'Non affecté')}
+                <span className="font-mono text-xs bg-slate-100 dark:bg-dark-800 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-dark-700 text-slate-600 dark:text-dark-300">
+                  Badge Porteur : <strong className={incube?.badge_id || incube?.matricule ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}>
+                    {incube?.badge_id ? `#${incube.badge_id}` : (incube?.matricule ? `Mat #${incube.matricule}` : 'Non affecté')}
+                  </strong>
                 </span>
-                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                <span className="px-2.5 py-1 rounded-xl text-xs font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                   Total affiché ({annee}) : {stats.totalHeures} h
                 </span>
               </div>
             </div>
 
-            {/* Détail de la contribution par membre de l'équipe Startup (Porteur + Associés + Salariés RH) */}
+            {/* SOLUTION 2 : Volet Dépliable / Accordéon de la contribution de l'équipe */}
             {tourniquetTeamData?.teamBreakdown && tourniquetTeamData.teamBreakdown.length > 0 && (
-              <div className="p-3 rounded-xl bg-slate-50/90 dark:bg-dark-800/50 border border-slate-200/80 dark:border-dark-700/60 space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
-                  <span className="font-bold text-slate-700 dark:text-dark-200 flex items-center gap-1.5">
-                    <Users size={14} className="text-blue-500" />
-                    Contribution de l'équipe Startup ({tourniquetTeamData.incube?.teamMembersCount || 1} membre{(tourniquetTeamData.incube?.teamMembersCount || 1) > 1 ? 's' : ''} • {tourniquetTeamData.incube?.teamBadgeCount || 0} badgé{(tourniquetTeamData.incube?.teamBadgeCount || 0) > 1 ? 's' : ''}) :
-                  </span>
-                  <div className="flex flex-wrap items-center gap-2 font-semibold">
-                    <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20">
-                      👤 Porteur : {tourniquetTeamData.metrics?.totalHeuresPorteur || 0} h
+              <div className="rounded-xl border border-slate-200/80 dark:border-dark-700/60 bg-slate-50/90 dark:bg-dark-800/40 overflow-hidden shadow-2xs transition-all">
+                {/* Ligne d'en-tête de l'accordéon (Toujours visible et compacte) */}
+                <div className="p-2.5 sm:px-3.5 flex flex-wrap items-center justify-between gap-2.5">
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="font-bold text-slate-800 dark:text-dark-100 flex items-center gap-1.5">
+                      <Users size={15} className="text-blue-500" />
+                      Équipe Startup ({tourniquetTeamData.incube?.teamMembersCount || tourniquetTeamData.teamBreakdown.length} membre{(tourniquetTeamData.incube?.teamMembersCount || tourniquetTeamData.teamBreakdown.length) > 1 ? 's' : ''} • {tourniquetTeamData.incube?.teamBadgeCount || 0} badgé{(tourniquetTeamData.incube?.teamBadgeCount || 0) > 1 ? 's' : ''}) :
                     </span>
-                    <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
-                      🤝 Associés : {tourniquetTeamData.metrics?.totalHeuresAssocies || 0} h
-                    </span>
-                    <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
-                      💼 Salariés RH : {tourniquetTeamData.metrics?.totalHeuresSalaries || 0} h
-                    </span>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {tourniquetTeamData.teamBreakdown.map((member, mIdx) => (
-                    <div
-                      key={mIdx}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] border ${
-                        member.totalHours > 0
-                          ? 'bg-white dark:bg-dark-900 border-blue-200 dark:border-blue-800/60 text-slate-800 dark:text-dark-100 shadow-2xs'
-                          : 'bg-slate-100/70 dark:bg-dark-900/40 border-slate-200 dark:border-dark-700 text-slate-500 dark:text-dark-400'
-                      }`}
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full ${member.hasBadge ? (member.totalHours > 0 ? 'bg-emerald-500' : 'bg-blue-400') : 'bg-slate-300'}`} />
-                      <span className="font-bold">{member.name}</span>
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 dark:bg-dark-800 text-slate-500 dark:text-dark-400">
-                        {member.role}
+                    <div className="flex flex-wrap items-center gap-1.5 font-semibold text-[11px]">
+                      <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20">
+                        👤 Porteur : {tourniquetTeamData.metrics?.totalHeuresPorteur || 0} h
                       </span>
-                      {member.matricule || member.badge_id ? (
-                        <span className="font-mono text-[10px] text-slate-400">
-                          #{member.matricule || member.badge_id}
-                        </span>
-                      ) : (
-                        <span className="text-[10px] italic text-amber-600 dark:text-amber-400">Sans badge</span>
-                      )}
-                      <span className={`font-mono font-black ml-0.5 ${member.totalHours > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}>
-                        {member.totalHours}h
+                      <span className="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
+                        🤝 Associés : {tourniquetTeamData.metrics?.totalHeuresAssocies || 0} h
+                      </span>
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                        💼 Salariés RH : {tourniquetTeamData.metrics?.totalHeuresSalaries || 0} h
                       </span>
                     </div>
-                  ))}
+                  </div>
+
+                  {/* Bouton déplier / replier */}
+                  <button
+                    type="button"
+                    onClick={() => setIsTeamDetailOpen(!isTeamDetailOpen)}
+                    className="px-2.5 py-1 text-xs font-bold rounded-lg border border-slate-200 dark:border-dark-600 bg-white dark:bg-dark-900 hover:bg-slate-50 dark:hover:bg-dark-800 text-slate-700 dark:text-dark-200 flex items-center gap-1.5 shadow-2xs transition-all shrink-0 cursor-pointer"
+                    title={isTeamDetailOpen ? "Masquer la liste des collaborateurs" : "Afficher la liste des collaborateurs et leurs heures"}
+                  >
+                    <span>{isTeamDetailOpen ? 'Masquer membres' : `Voir les ${tourniquetTeamData.teamBreakdown.length} membres`}</span>
+                    <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 ${isTeamDetailOpen ? 'rotate-180' : ''}`} />
+                  </button>
                 </div>
+
+                {/* Volet Déroulant des membres (Visible uniquement si déplié) */}
+                {isTeamDetailOpen && (
+                  <div className="border-t border-slate-200/80 dark:border-dark-700/60 p-3 bg-white/60 dark:bg-dark-900/40 animate-in fade-in duration-150">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+                      {tourniquetTeamData.teamBreakdown.map((member, mIdx) => (
+                        <div
+                          key={mIdx}
+                          className={`p-2 rounded-lg border flex items-center justify-between gap-2 transition-all ${
+                            member.totalHours > 0
+                              ? 'bg-white dark:bg-dark-900 border-blue-200 dark:border-blue-800/60 shadow-2xs'
+                              : 'bg-slate-50/80 dark:bg-dark-800/40 border-slate-200/80 dark:border-dark-700/60'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${
+                              member.hasBadge 
+                                ? (member.totalHours > 0 ? 'bg-emerald-500' : 'bg-blue-400') 
+                                : 'bg-slate-300 dark:bg-dark-600'
+                            }`} />
+                            <div className="min-w-0 truncate">
+                              <p className="text-xs font-bold text-slate-800 dark:text-dark-100 truncate">
+                                {member.name}
+                              </p>
+                              <div className="flex items-center gap-1 text-[10px] text-slate-400 truncate">
+                                <span>{member.role || 'Collaborateur'}</span>
+                                <span>•</span>
+                                {member.matricule || member.badge_id ? (
+                                  <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                                    #{member.matricule || member.badge_id}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400">Sans badge</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <span className={`font-mono text-xs font-bold px-1.5 py-0.5 rounded shrink-0 ${
+                            member.totalHours > 0
+                              ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300'
+                              : 'text-slate-400 dark:text-dark-500'
+                          }`}>
+                            {member.totalHours}h
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
