@@ -931,10 +931,10 @@ exports.create = async (req, res) => {
           message: `Le badge RFID (${data.badge_id}) est déjà attribué à ${rfidCheck.conflictName} (${rfidCheck.conflictType} - ${rfidCheck.conflictEntity}).`
         });
       }
-    }
-
-    if (!data.matricule) {
-      data.matricule = await tourniquetService.getOrCreateMatriculeForBadge(data.badge_id, data.nom_incube);
+      data.matricule = await tourniquetService.getOrCreateMatriculeForBadge(data.badge_id, data.nom_incube, data.matricule);
+    } else {
+      data.badge_id = null;
+      data.matricule = null;
     }
 
     // --- Création de l'Incube avec user_id lié — tout dans la même transaction ---
@@ -1194,9 +1194,8 @@ exports.update = async (req, res) => {
           });
         }
       }
-      if (!incube.matricule && !data.matricule) {
-        data.matricule = await tourniquetService.getOrCreateMatriculeForBadge(data.badge_id, incube.nom_incube, incube.matricule);
-      }
+      // Obtenir ou vérifier le matricule physique correspondant sur les tourniquets
+      data.matricule = await tourniquetService.getOrCreateMatriculeForBadge(data.badge_id, incube.nom_incube, data.matricule || incube.matricule);
     } else if (data.badge_id === '' || data.badge_id === null) {
       data.badge_id = null;
     }

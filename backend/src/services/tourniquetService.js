@@ -1185,14 +1185,16 @@ async function resyncAllBadgeHoldersToTurnstiles() {
 /**
  * Récupère le matricule existant associé à un badge ou à un nom sur les tourniquets,
  * ou calcule le prochain matricule disponible pour éviter TOUTE COLLISION D'ID !
+ * Règle d'or : Les tourniquets physiques sont la source de vérité pour les matricules existants.
  */
 async function getOrCreateMatriculeForBadge(badgeId, personName = '', existingMatricule = null) {
-  if (existingMatricule && parseInt(existingMatricule, 10) > 0) {
-    return parseInt(existingMatricule, 10);
+  const cleanBadge = normalizeBadgeId(badgeId);
+  if (!cleanBadge) {
+    // Si aucun badge n'est fourni, ne pas inventer de matricule
+    return existingMatricule ? parseInt(existingMatricule, 10) : null;
   }
 
   const { TourniquetUser, Incube, RhDetail } = require('../models');
-  const cleanBadge = normalizeBadgeId(badgeId);
 
   const [allIncubes, allRhs, allTu] = await Promise.all([
     Incube.findAll({ raw: true }),
@@ -1200,53 +1202,23 @@ async function getOrCreateMatriculeForBadge(badgeId, personName = '', existingMa
     TourniquetUser.findAll({ raw: true })
   ]);
 
-  // Recenser tous les matricules déjà attribués en base pour interdire toute collision
-  const assignedMatricules = new Set([1, 3, 6, 100, 142, 143, 144, 145, 194, 205, 227]);
-  for (const inc of allIncubes) {
-    if (inc.matricule) {
-      if (cleanBadge && normalizeBadgeId(inc.badge_id) === cleanBadge) return parseInt(inc.matricule, 10);
-      assignedMatricules.add(parseInt(inc.matricule, 10));
-    }
-    let assoc = inc.associes;
-    if (typeof assoc === 'string') { try { assoc = JSON.parse(assoc); } catch {} }
-    if (Array.isArray(assoc)) {
-      for (const a of assoc) {
-        if (a?.matricule) {
-          if (cleanBadge && normalizeBadgeId(a.badge_id) === cleanBadge) return parseInt(a.matricule, 10);
-          assignedMatricules.add(parseInt(a.matricule, 10));
-        }
-      }
-    }
+  // 1. PRIORITÉ ABSOLUE : Vérifier si ce numéro de carte RFID existe déjà physiquement sur les tourniquets (TourniquetUser)
+  //    Ex: Badge 12962429 sur les bornes -> Matricule physique 141 (Meryem AMAQRAN)
+  const tuByCard = allTu.find(t =>
+    normalizeBadgeId(t.cardno) === cleanBadge &&
+    parseInt(t.badge_id, 10) > 0 &&
+    parseInt(t.badge_id, 10) < 5000
+  );
+  if (tuByCard) {
+    return parseInt(tuByCard.badge_id, 10);
   }
 
-  for (const rh of allRhs) {
-    if (rh.matricule) {
-      if (cleanBadge && normalizeBadgeId(rh.badge_id) === cleanBadge) return parseInt(rh.matricule, 10);
-      assignedMatricules.add(parseInt(rh.matricule, 10));
-    }
-  }
-
-  // 3. Si le numéro de carte RFID existe déjà physiquement sur les tourniquets (TourniquetUser)
-  //    et que ce matricule n'est pas déjà pris par un autre incubé/salarié en base :
-  if (cleanBadge) {
-    const tuByCard = allTu.find(t =>
-      normalizeBadgeId(t.cardno) === cleanBadge &&
-      parseInt(t.badge_id, 10) > 0 &&
-      parseInt(t.badge_id, 10) < 5000
-    );
-    if (tuByCard) {
-      const m = parseInt(tuByCard.badge_id, 10);
-      if (!assignedMatricules.has(m)) return m;
-    }
-  }
-
-  // 4. Si le nom correspond exactement à un usager déjà présent sur les tourniquets
-  //    UNIQUEMENT si cet emplacement n'appartient pas déjà à une autre carte ou un autre dossier en base
+  // 2. Si le nom de la personne correspond exactement à un usager déjà enregistré sur les tourniquets
   if (personName && personName.trim()) {
     const tuMatch = allTu.find(t => {
       const m = parseInt(t.badge_id, 10);
-      if (!(m > 0 && m < 5000) || assignedMatricules.has(m)) return false;
-      if (cleanBadge && t.cardno && normalizeBadgeId(t.cardno) !== cleanBadge) return false;
+      if (!(m > 0 && m < 5000)) return false;
+      if (t.cardno && normalizeBadgeId(t.cardno) !== cleanBadge) return false;
       return matchesPersonName(personName, t.name);
     });
     if (tuMatch) {
@@ -1254,7 +1226,34 @@ async function getOrCreateMatriculeForBadge(badgeId, personName = '', existingMa
     }
   }
 
-  // 5. Sinon, allouer un tout nouveau matricule libre après le dernier emplacement des bornes (> 253)
+  // 3. Vérifier si ce badge est déjà associé à un incubé, un associé ou un salarié en base
+  for (const inc of allIncubes) {
+    if (inc.matricule && normalizeBadgeId(inc.badge_id) === cleanBadge) {
+      return parseInt(inc.matricule, 10);
+    }
+    let assoc = inc.associes;
+    if (typeof assoc === 'string') { try { assoc = JSON.parse(assoc); } catch {} }
+    if (Array.isArray(assoc)) {
+      for (const a of assoc) {
+        if (a?.matricule && normalizeBadgeId(a.badge_id) === cleanBadge) {
+          return parseInt(a.matricule, 10);
+        }
+      }
+    }
+  }
+
+  for (const rh of allRhs) {
+    if (rh.matricule && normalizeBadgeId(rh.badge_id) === cleanBadge) {
+      return parseInt(rh.matricule, 10);
+    }
+  }
+
+  // 4. Si un matricule existant valide était déjà rattaché et n'entre pas en conflit
+  if (existingMatricule && parseInt(existingMatricule, 10) > 0) {
+    return parseInt(existingMatricule, 10);
+  }
+
+  // 5. Sinon, il s'agit d'un badge véritablement nouveau : allouer le prochain matricule libre après le dernier emplacement des bornes (> 253)
   return await getNextAvailableMatricule();
 }
 
