@@ -453,13 +453,14 @@ export default function GestionMateriel() {
   return (
     <div className="slide-up space-y-6 w-full pb-12">
       {/* EN-TÊTE DE PAGE AVEC BOUTON D'ACTION AJOUTER */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2.5 border-b border-slate-200 dark:border-dark-700/60">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2.5">
-            <Wrench className="text-amber-500" size={26} /> Inventaire & Gestion du Matériel
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-tight flex items-center gap-2.5">
+            <Wrench className="text-amber-500 shrink-0" size={22} />
+            <span>Inventaire & Gestion du Matériel</span>
           </h1>
-          <p className="text-xs text-slate-500 dark:text-dark-400 mt-1">
-            Gérez l'inventaire exact de chaque espace, suivez l'état opérationnel et signalez les pannes avec photos
+          <p className="text-xs text-slate-500 dark:text-dark-400 mt-0.5">
+            Gérez l'inventaire exact de chaque espace, suivez l'état opérationnel et signalez les pannes avec photos.
           </p>
         </div>
 
@@ -469,9 +470,10 @@ export default function GestionMateriel() {
             setNewEquipement(prev => ({ ...prev, salle: defaultSalle }));
             setIsAddModalOpen(true);
           }}
-          className="btn btn-primary text-xs font-bold py-2.5 px-4 flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 cursor-pointer self-start sm:self-auto"
+          className="btn btn-primary btn-sm text-xs font-bold py-2 px-3.5 rounded-xl flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-600/20 cursor-pointer self-start sm:self-auto shrink-0"
         >
-          <Plus size={16} /> Ajouter un Équipement
+          <Plus size={15} />
+          <span>Ajouter un Équipement</span>
         </button>
       </div>
 

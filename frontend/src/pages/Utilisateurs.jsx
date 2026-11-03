@@ -238,22 +238,24 @@ export default function Utilisateurs() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2.5 border-b border-slate-200 dark:border-dark-700/60">
         <div>
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="text-amber-500 dark:text-amber-400" size={22} />
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Gestion des Utilisateurs</h1>
+          <div className="flex items-center gap-2.5">
+            <ShieldCheck className="text-amber-500 dark:text-amber-400 shrink-0" size={22} />
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+              Gestion des Utilisateurs
+            </h1>
           </div>
-          <p className="text-sm text-slate-600 dark:text-dark-300 mt-1">
+          <p className="text-xs text-slate-500 dark:text-dark-400 mt-0.5">
             Gérez les comptes des accompagnateurs (Admins) et des superviseurs (Super Admins) de l'incubateur.
           </p>
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="btn btn-primary flex items-center gap-2 shadow-lg shadow-primary-500/25 shrink-0"
+          className="btn btn-primary btn-sm flex items-center gap-1.5 py-2 px-3.5 text-xs font-bold rounded-xl shadow-sm shadow-primary-500/25 shrink-0"
         >
-          <UserPlus size={18} />
-          Nouvel Accompagnateur
+          <UserPlus size={15} />
+          <span>Nouvel Accompagnateur</span>
         </button>
       </div>
 
