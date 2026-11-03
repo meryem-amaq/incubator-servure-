@@ -785,25 +785,35 @@ export default function Annuaire() {
       )}
 
       {/* Barre d'outils & Filtres */}
-      <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
-        <div className="flex flex-1 items-center gap-2.5 flex-wrap">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-dark-400" />
+      <div className="flex flex-col lg:flex-row gap-2.5 items-stretch lg:items-center justify-between">
+        <div className="flex items-center gap-2 flex-wrap lg:flex-nowrap min-w-0">
+          <div className="relative w-full sm:w-48 lg:w-44 xl:w-56 shrink-0">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-dark-400 pointer-events-none" />
             <input
               type="text"
-              className="input pl-10"
-              placeholder="Rechercher par nom, raison sociale, PP..."
+              className="input !pl-9 !py-2 !text-xs rounded-xl shadow-xs font-medium w-full"
+              placeholder="Rechercher nom, projet..."
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-dark-200"
+                title="Effacer la recherche"
+              >
+                <X size={13} />
+              </button>
+            )}
           </div>
 
           {/* Filtre Accompagnateur : Liste déroulante pour Super Admin / Bouton toggle pour Admin classique */}
           {isSuperAdmin ? (
-            <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex items-center gap-1 shrink-0">
               <div className="relative flex items-center">
-                <div className="absolute left-3 pointer-events-none text-primary-500 flex items-center">
-                  <UserCheck size={16} />
+                <div className="absolute left-2.5 pointer-events-none text-primary-500 flex items-center">
+                  <UserCheck size={14} />
                 </div>
                 <select
                   value={selectedAdminFilter}
@@ -816,7 +826,7 @@ export default function Annuaire() {
                       return next;
                     });
                   }}
-                  className={`input pl-9 pr-8 py-2 text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-all border ${
+                  className={`input pl-8 pr-7 py-2 text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-all border max-w-[185px] truncate ${
                     selectedAdminFilter !== 'all' || Boolean(accompagnateurFilterName)
                       ? 'border-primary-500 bg-primary-50/70 dark:bg-primary-950/40 text-primary-800 dark:text-primary-200 ring-2 ring-primary-500/20'
                       : 'border-slate-200 dark:border-dark-700 bg-white dark:bg-dark-900 text-slate-800 dark:text-dark-100'
@@ -846,19 +856,19 @@ export default function Annuaire() {
                       return next;
                     });
                   }}
-                  className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-slate-200 dark:border-dark-700 transition-colors"
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-slate-200 dark:border-dark-700 transition-colors"
                   title="Réinitialiser le filtre"
                 >
-                  <X size={15} />
+                  <X size={14} />
                 </button>
               )}
             </div>
           ) : (
-            <div className="flex items-center gap-1 bg-slate-100 dark:bg-dark-800 p-1 rounded-xl border border-slate-200 dark:border-dark-700/60 shrink-0 text-xs">
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-dark-800 p-0.5 rounded-xl border border-slate-200 dark:border-dark-700/60 shrink-0 text-xs">
               <button
                 type="button"
                 onClick={() => setFilterSuivis(false)}
-                className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
+                className={`px-2.5 py-1.5 rounded-lg font-bold transition-all ${
                   !filterSuivis
                     ? 'bg-white dark:bg-dark-900 text-primary-700 dark:text-primary-300 shadow-xs'
                     : 'text-slate-600 dark:text-dark-300 hover:text-slate-900 dark:hover:text-white'
@@ -870,7 +880,7 @@ export default function Annuaire() {
               <button
                 type="button"
                 onClick={() => setFilterSuivis(true)}
-                className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+                className={`px-2.5 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1 ${
                   filterSuivis
                     ? 'bg-primary-600 text-white shadow-xs'
                     : 'text-slate-600 dark:text-dark-300 hover:text-slate-900 dark:hover:text-white'
@@ -884,13 +894,13 @@ export default function Annuaire() {
 
           {/* Filtre Promotion */}
           <div className="relative flex items-center shrink-0">
-            <div className="absolute left-3 pointer-events-none text-primary-500 flex items-center">
-              <GraduationCap size={15} />
+            <div className="absolute left-2.5 pointer-events-none text-primary-500 flex items-center">
+              <GraduationCap size={14} />
             </div>
             <select
               value={selectedPromotionFilter}
               onChange={(e) => setSelectedPromotionFilter(e.target.value)}
-              className={`input pl-8 pr-7 py-2 text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-all border ${
+              className={`input pl-8 pr-7 py-2 text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-all border max-w-[155px] truncate ${
                 selectedPromotionFilter !== 'all'
                   ? 'border-primary-500 bg-primary-50/70 dark:bg-primary-950/40 text-primary-800 dark:text-primary-200 ring-2 ring-primary-500/20'
                   : 'border-slate-200 dark:border-dark-700 bg-white dark:bg-dark-900 text-slate-800 dark:text-dark-100'
@@ -907,15 +917,15 @@ export default function Annuaire() {
           </div>
 
           {/* Filtre État Plan d'Action */}
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1 shrink-0">
             <div className="relative flex items-center">
-              <div className="absolute left-3 pointer-events-none text-primary-500 flex items-center">
-                <ClipboardList size={15} />
+              <div className="absolute left-2.5 pointer-events-none text-primary-500 flex items-center">
+                <ClipboardList size={14} />
               </div>
               <select
                 value={selectedPlanStatus}
                 onChange={(e) => setSelectedPlanStatus(e.target.value)}
-                className={`input pl-8 pr-7 py-2 text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-all border ${
+                className={`input pl-8 pr-7 py-2 text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-all border max-w-[145px] truncate ${
                   selectedPlanStatus !== 'all'
                     ? 'border-primary-500 bg-primary-50/70 dark:bg-primary-950/40 text-primary-800 dark:text-primary-200 ring-2 ring-primary-500/20'
                     : 'border-slate-200 dark:border-dark-700 bg-white dark:bg-dark-900 text-slate-800 dark:text-dark-100'
@@ -923,43 +933,46 @@ export default function Annuaire() {
                 title="Filtrer par état du plan d'action"
               >
                 <option value="all">Tous les plans</option>
-                <option value="En cours">🔔 En cours ({planCounts.enCours})</option>
-                <option value="Atteint">✅ Atteint ({planCounts.atteint})</option>
-                <option value="Non atteint">❌ Non atteint ({planCounts.nonAtteint})</option>
+                <option value="En cours">En cours ({planCounts.enCours})</option>
+                <option value="Atteint">Atteint ({planCounts.atteint})</option>
+                <option value="Non atteint">Non atteint ({planCounts.nonAtteint})</option>
               </select>
             </div>
             {selectedPlanStatus !== 'all' && (
               <button
                 type="button"
                 onClick={() => setSelectedPlanStatus('all')}
-                className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-slate-200 dark:border-dark-700 transition-colors"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-slate-200 dark:border-dark-700 transition-colors"
                 title="Réinitialiser le filtre plan d'action"
               >
-                <X size={15} />
+                <X size={14} />
               </button>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+        {/* Boutons d'action */}
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
-            className="btn btn-secondary flex items-center gap-2 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 font-semibold"
+            className="btn btn-secondary btn-sm flex items-center gap-1.5 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 font-bold !py-2 !px-3 !text-xs rounded-xl shadow-xs whitespace-nowrap"
             onClick={() => setShowExcelModal(true)}
             title="Importer une liste complète d'incubés depuis un fichier Excel"
           >
-            <FileSpreadsheet size={16} className="text-emerald-500" />
+            <FileSpreadsheet size={15} className="text-emerald-500" />
             <span>Importer Excel</span>
           </button>
           <button 
-            className="btn btn-primary shrink-0" 
+            type="button"
+            className="btn btn-primary btn-sm flex items-center gap-1.5 font-bold !py-2 !px-3.5 !text-xs rounded-xl shadow-xs shrink-0 whitespace-nowrap" 
             onClick={() => {
               setPhotoFile(null);
               setPreviewUrl(null);
               setShowModal(true);
             }}
           >
-            <Plus size={16} /> Nouvel incubé
+            <Plus size={15} />
+            <span>Nouvel incubé</span>
           </button>
         </div>
       </div>
