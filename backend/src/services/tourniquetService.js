@@ -485,7 +485,37 @@ async function syncIncubeTourniquet(incubeId, annee = new Date().getFullYear()) 
     });
   });
 
-  const hasPorteurBadge = Boolean(porteurBadge || porteurMat);
+  // 2d. Enrichir chaque membre avec la correspondance bidirectionnelle dans tourniquet_users (matricule <-> cardno RFID + nom)
+  const allTu = await TourniquetUser.findAll({ raw: true });
+  for (const member of teamMembers) {
+    const matchedTus = allTu.filter(tu => {
+      const tuB = normalizeBadgeId(tu.badge_id);
+      const tuC = normalizeBadgeId(tu.cardno);
+      if ((tuB && member.matchBadges.has(tuB)) || (tuC && member.matchBadges.has(tuC))) {
+        return true;
+      }
+      if (member.nom && tu.name && matchesPersonName(tu.name, member.nom)) {
+        return true;
+      }
+      return false;
+    });
+    for (const tu of matchedTus) {
+      const tuB = normalizeBadgeId(tu.badge_id);
+      const tuC = normalizeBadgeId(tu.cardno);
+      if (tuB && !usedIds.has(tuB)) {
+        member.matchBadges.add(tuB);
+        usedIds.add(tuB);
+        if (!member.matricule) member.matricule = tuB;
+      }
+      if (tuC && !usedIds.has(tuC)) {
+        member.matchBadges.add(tuC);
+        usedIds.add(tuC);
+        if (!member.badge_id) member.badge_id = tuC;
+      }
+    }
+  }
+
+  const hasPorteurBadge = Boolean(teamMembers[0]?.matchBadges?.size > 0);
   const hasBadge = teamMembers.some(m => m.matchBadges.size > 0);
 
   // 3. Récupérer en une seule requête tous les pointages de toute l'équipe Startup

@@ -312,8 +312,12 @@ async function collectFromAllDevices() {
       if (cleanM && !badgeToUserMap.has(cleanM)) {
         badgeToUserMap.set(cleanM, inc.user_id || null);
       }
-      if (Array.isArray(inc.associes)) {
-        inc.associes.forEach(a => {
+      let assocList = inc.associes;
+      if (typeof assocList === 'string') {
+        try { assocList = JSON.parse(assocList); } catch { assocList = []; }
+      }
+      if (Array.isArray(assocList)) {
+        assocList.forEach(a => {
           const aB = a?.badge_id ? String(a.badge_id).trim().replace(/^0+(?=\d)/, '') : '';
           const aM = a?.matricule ? String(a.matricule).trim() : '';
           if (aB && aM) cardToMatriculeMap.set(aB, aM);
@@ -520,34 +524,74 @@ async function collectFromAllDevices() {
       setImmediate(async () => {
         try {
           const tourniquetService = require('./tourniquetService');
-          const affectedBadges = new Set(toInsert.map(s => String(s.raw_badge_id).trim().replace(/^0+(?=\d)/, '')));
+          const affectedBadges = new Set(
+            toInsert
+              .map(s => String(s.raw_badge_id || '').trim().replace(/^0+(?=\d)/, ''))
+              .filter(Boolean)
+          );
           const affectedUserIds = new Set(toInsert.map(s => s.user_id).filter(Boolean));
+          const affectedNames = [];
+
+          // Enrichir affectedBadges avec la correspondance bidirectionnelle (matricule <-> cardno RFID)
+          // et collecter les noms des porteurs de ces badges dans tourniquet_users
+          if (Array.isArray(tourniquetUsers)) {
+            tourniquetUsers.forEach(tu => {
+              const bId = String(tu.badge_id || '').trim().replace(/^0+(?=\d)/, '');
+              const cNo = String(tu.cardno || '').trim().replace(/^0+(?=\d)/, '');
+              if ((bId && affectedBadges.has(bId)) || (cNo && affectedBadges.has(cNo))) {
+                if (bId) affectedBadges.add(bId);
+                if (cNo) affectedBadges.add(cNo);
+                if (tu.name) affectedNames.push(tu.name);
+              }
+            });
+          }
+
+          const matchesAnyAffectedName = (personName) => {
+            if (!personName || affectedNames.length === 0) return false;
+            return affectedNames.some(tuName => matchesPersonName(tuName, personName));
+          };
 
           const affectedIncubes = incubes.filter(i => {
+            // 1. Porteur de projet principal
             const porteurBadge = i.badge_id ? String(i.badge_id).trim().replace(/^0+(?=\d)/, '') : '';
             const porteurMat = i.matricule ? String(i.matricule).trim().replace(/^0+(?=\d)/, '') : '';
             if ((porteurBadge && affectedBadges.has(porteurBadge)) ||
                 (porteurMat && affectedBadges.has(porteurMat)) ||
-                (i.user_id && affectedUserIds.has(i.user_id))) {
+                (i.user_id && affectedUserIds.has(i.user_id)) ||
+                matchesAnyAffectedName(i.nom_incube)) {
               return true;
             }
-            if (Array.isArray(i.associes)) {
-              const hasAssoc = i.associes.some(a => {
-                const aB = a?.badge_id ? String(a.badge_id).trim().replace(/^0+(?=\d)/, '') : '';
-                const aM = a?.matricule ? String(a.matricule).trim().replace(/^0+(?=\d)/, '') : '';
-                return (aB && affectedBadges.has(aB)) || (aM && affectedBadges.has(aM));
+
+            // 2. Associés de la startup (tableau ou chaîne JSON)
+            let assocList = i.associes;
+            if (typeof assocList === 'string') {
+              try { assocList = JSON.parse(assocList); } catch { assocList = []; }
+            }
+            if (Array.isArray(assocList)) {
+              const hasAssoc = assocList.some(a => {
+                if (!a) return false;
+                const aB = a.badge_id ? String(a.badge_id).trim().replace(/^0+(?=\d)/, '') : '';
+                const aM = a.matricule ? String(a.matricule).trim().replace(/^0+(?=\d)/, '') : '';
+                return (aB && affectedBadges.has(aB)) ||
+                       (aM && affectedBadges.has(aM)) ||
+                       matchesAnyAffectedName(a.nom);
               });
               if (hasAssoc) return true;
             }
+
+            // 3. Salariés & Stagiaires RH de la startup (rh_detail)
             if (Array.isArray(rhDetails)) {
               const hasRh = rhDetails.some(rh => {
                 if (Number(rh.incube_id) !== Number(i.id)) return false;
                 const rhB = rh.badge_id ? String(rh.badge_id).trim().replace(/^0+(?=\d)/, '') : '';
                 const rhM = rh.matricule ? String(rh.matricule).trim().replace(/^0+(?=\d)/, '') : '';
-                return (rhB && affectedBadges.has(rhB)) || (rhM && affectedBadges.has(rhM));
+                return (rhB && affectedBadges.has(rhB)) ||
+                       (rhM && affectedBadges.has(rhM)) ||
+                       matchesAnyAffectedName(rh.nom_complet);
               });
               if (hasRh) return true;
             }
+
             return false;
           });
 
@@ -556,7 +600,7 @@ async function collectFromAllDevices() {
             await tourniquetService.syncIncubeTourniquet(inc.id, currentYear).catch(() => {});
           }
           if (affectedIncubes.length > 0) {
-            console.log(`📊 Assiduité calculée et enregistrée automatiquement pour ${affectedIncubes.length} incubé(s).`);
+            console.log(`📊 Assiduité calculée et enregistrée automatiquement pour ${affectedIncubes.length} startup(s) (Porteur + Associés + Salariés RH).`);
           }
         } catch (errSync) {
           console.warn('⚠️ Erreur auto-sync suivi_engagement:', errSync.message);
