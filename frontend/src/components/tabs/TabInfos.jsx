@@ -789,20 +789,21 @@ export default function TabInfos({ incube, onUpdate }) {
           </div>
           
           <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-dark-700/60">
-            <table className="w-full text-left border-collapse min-w-[600px]">
+            <table className="w-full text-left border-collapse min-w-[750px]">
               <thead>
                 <tr className="bg-slate-50 dark:bg-dark-800/60 text-xs font-semibold text-slate-500 dark:text-dark-300 uppercase tracking-wider">
                   <th className="p-3 border-b border-slate-200 dark:border-dark-700/60">Nom & prénom</th>
                   <th className="p-3 border-b border-slate-200 dark:border-dark-700/60">CIN</th>
                   <th className="p-3 border-b border-slate-200 dark:border-dark-700/60">Fonction</th>
                   <th className="p-3 border-b border-slate-200 dark:border-dark-700/60">Tel</th>
+                  <th className="p-3 border-b border-slate-200 dark:border-dark-700/60">Badge & Accès Tourniquet</th>
                   <th className="p-3 border-b border-slate-200 dark:border-dark-700/60 w-12 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-dark-700/60">
                 {(!Array.isArray(form.associes) || form.associes.length === 0) ? (
                   <tr>
-                    <td colSpan="5" className="p-4 text-center text-sm text-slate-500 dark:text-dark-400 italic">
+                    <td colSpan="6" className="p-4 text-center text-sm text-slate-500 dark:text-dark-400 italic">
                       Aucun associé pour le moment
                     </td>
                   </tr>
@@ -840,6 +841,21 @@ export default function TabInfos({ incube, onUpdate }) {
                           onChange={(e) => handleAssocieChange(idx, 'tel', e.target.value)}
                           placeholder="Tel"
                         />
+                      </td>
+                      <td className="p-2">
+                        {(associe.badge_id || associe.matricule) ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 whitespace-nowrap">
+                            <ShieldCheck size={14} className="text-emerald-500 shrink-0" />
+                            <span>
+                              Badge #{associe.badge_id || '—'}
+                              {associe.matricule ? ` (Matricule #${associe.matricule})` : ''}
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-100 text-slate-500 dark:bg-dark-800 dark:text-dark-400 border border-slate-200 dark:border-dark-700 whitespace-nowrap">
+                            Sans badge (à configurer dans Badges & Accès)
+                          </span>
+                        )}
                       </td>
                       <td className="p-2 text-center">
                         <button

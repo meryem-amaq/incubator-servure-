@@ -1105,6 +1105,60 @@ exports.update = async (req, res) => {
       }
     }
 
+    // Fusion intelligente (Smart Merge) des associés :
+    // Conserver obligatoirement badge_id et matricule des associés existants (reconnus par CIN ou par nom)
+    if (Array.isArray(data.associes)) {
+      let existingAssocies = incube.associes;
+      if (typeof existingAssocies === 'string') {
+        try { existingAssocies = JSON.parse(existingAssocies); } catch (e) { existingAssocies = []; }
+      }
+      if (!Array.isArray(existingAssocies)) existingAssocies = [];
+
+      const normStr = (v) => String(v || '').trim().toLowerCase();
+
+      data.associes = data.associes.map((newAssoc, idx) => {
+        if (!newAssoc || typeof newAssoc !== 'object') return newAssoc;
+        const newCin = normStr(newAssoc.cin);
+        const newNom = normStr(newAssoc.nom);
+
+        // Rechercher l'associé existant par CIN ou par Nom (ou à défaut au même index si un badge y était déjà rattaché)
+        let oldMatch = existingAssocies.find(old => {
+          if (!old || typeof old !== 'object') return false;
+          const oldCin = normStr(old.cin);
+          const oldNom = normStr(old.nom);
+          if (newCin && oldCin && newCin === oldCin) return true;
+          if (newNom && oldNom && newNom === oldNom) return true;
+          return false;
+        });
+
+        if (!oldMatch && existingAssocies[idx] && (existingAssocies[idx].badge_id || existingAssocies[idx].matricule)) {
+          // Si l'utilisateur a corrigé à la fois l'orthographe du nom et le CIN sur la même ligne
+          const otherMatched = data.associes.some((other, oIdx) => {
+            if (oIdx === idx || !other) return false;
+            const oCin = normStr(other.cin);
+            const oNom = normStr(other.nom);
+            const targetCin = normStr(existingAssocies[idx].cin);
+            const targetNom = normStr(existingAssocies[idx].nom);
+            return (oCin && targetCin && oCin === targetCin) || (oNom && targetNom && oNom === targetNom);
+          });
+          if (!otherMatched) {
+            oldMatch = existingAssocies[idx];
+          }
+        }
+
+        const merged = { ...newAssoc };
+        if (oldMatch) {
+          if (!merged.badge_id && oldMatch.badge_id) {
+            merged.badge_id = oldMatch.badge_id;
+          }
+          if (!merged.matricule && oldMatch.matricule) {
+            merged.matricule = oldMatch.matricule;
+          }
+        }
+        return merged;
+      });
+    }
+
     if (data.admin_id === '' || data.admin_id === 'null' || data.admin_id === undefined || data.admin_id === null) {
       delete data.admin_id;
     } else {
