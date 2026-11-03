@@ -14,8 +14,8 @@ function normalizeDateString(dateInput) {
   if (s.includes('/')) {
     const p = s.split('/');
     if (p.length === 3) {
-      return p[0].length === 4 
-        ? `${p[0]}-${p[1].padStart(2, '0')}-${p[2].padStart(2, '0')}` 
+      return p[0].length === 4
+        ? `${p[0]}-${p[1].padStart(2, '0')}-${p[2].padStart(2, '0')}`
         : `${p[2]}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`;
     }
   }

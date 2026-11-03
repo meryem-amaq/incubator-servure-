@@ -806,28 +806,28 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
 
   return (
     <div className="space-y-6 slide-up w-full">
-      {/* 1. Cartes de statistiques (KPI) EN HAUT DE PAGE */}
-      <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-4 relative z-10">
+      {/* 1. Cartes de statistiques (KPI) EN HAUT DE PAGE — Alignées sur une seule ligne avec hauteur harmonieuse */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 relative z-10">
         
-        {/* CARTE 1 : Présence & Assiduité aux Horaires (Semaine, Mois, Année) */}
-        <div className="card p-4 border border-slate-200 dark:border-dark-700/60 flex flex-col justify-between gap-3 overflow-hidden">
+        {/* CARTE 1 : Présence & Assiduité aux Horaires */}
+        <div className="card p-3.5 sm:p-4 border border-slate-200 dark:border-dark-700/60 flex flex-col justify-between gap-2.5 overflow-hidden shadow-sm hover:border-blue-400/50 transition-all">
           <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-11 h-11 rounded-2xl bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
-                <Clock size={22} />
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
+                <Clock size={20} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] text-slate-500 dark:text-dark-400 font-bold uppercase tracking-wider truncate">
+                <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-dark-400 font-bold uppercase tracking-wider truncate">
                   Présence Heures (Obj: 15h/sem)
                 </p>
-                <div className="flex items-baseline gap-1.5 mt-0.5">
-                  <span className="text-2xl font-black text-slate-900 dark:text-dark-100">{stats.moyenneHebdo}</span>
-                  {stats.moyenneHebdo !== '—' && <span className="text-xs font-bold text-slate-400">h / sem</span>}
+                <div className="flex items-baseline gap-1 mt-0.5">
+                  <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-dark-100">{stats.moyenneHebdo}</span>
+                  {stats.moyenneHebdo !== '—' && <span className="text-[11px] font-bold text-slate-400">h / sem</span>}
                 </div>
               </div>
             </div>
             {stats.tauxHebdo !== '—' && (
-              <span className={`px-2.5 py-1 rounded-lg text-xs font-black border shrink-0 ${
+              <span className={`px-2 py-0.5 rounded-lg text-xs font-black border shrink-0 ${
                 stats.tauxHebdo >= 100 
                   ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30 dark:text-emerald-400'
                   : 'bg-amber-500/10 text-amber-600 border-amber-500/30 dark:text-amber-400'
@@ -837,90 +837,80 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
             )}
           </div>
 
-          {/* Décomposition détaillée : Semaine • Mois • Année */}
-          {stats.moyenneMensuelle !== '—' ? (
-            <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 dark:border-dark-700/60 text-center">
-              <div className="bg-slate-50 dark:bg-dark-900/50 p-1.5 rounded-lg">
-                <p className="text-[10px] text-slate-400 font-semibold uppercase">Semaine</p>
-                <p className="text-xs font-black text-slate-800 dark:text-dark-200">{stats.moyenneHebdo}h / 15h</p>
-                <p className="text-[9px] font-bold text-blue-600 dark:text-blue-400">{stats.tauxHebdo}%</p>
-              </div>
-              <div className="bg-slate-50 dark:bg-dark-900/50 p-1.5 rounded-lg">
-                <p className="text-[10px] text-slate-400 font-semibold uppercase">Mois</p>
-                <p className="text-xs font-black text-slate-800 dark:text-dark-200">{stats.moyenneMensuelle}h / 60h</p>
-                <p className="text-[9px] font-bold text-blue-600 dark:text-blue-400">{stats.tauxMois}%</p>
-              </div>
-              <div className="bg-slate-50 dark:bg-dark-900/50 p-1.5 rounded-lg">
-                <p className="text-[10px] text-slate-400 font-semibold uppercase">Année</p>
-                <p className="text-xs font-black text-slate-800 dark:text-dark-200">{stats.totalHeures}h / 720h</p>
-                <p className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400">{stats.tauxAnnuelCumule}% ({stats.countHeuresMois} m.)</p>
-              </div>
-            </div>
-          ) : (
-            <p className="text-[11px] text-slate-400 italic">Aucune heure saisie pour {annee}</p>
-          )}
+          <div className="pt-2 border-t border-slate-100 dark:border-dark-700/60 flex items-center justify-between text-xs gap-1">
+            {stats.moyenneMensuelle !== '—' ? (
+              <>
+                <span className="text-slate-500 dark:text-dark-400 text-[11px] truncate">Mois : <strong>{stats.moyenneMensuelle}h</strong></span>
+                <span className="font-bold text-slate-800 dark:text-dark-200 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-md text-[11px] shrink-0">
+                  Total : {stats.totalHeures}h ({stats.tauxAnnuelCumule}%)
+                </span>
+              </>
+            ) : (
+              <span className="text-[11px] text-slate-400 italic truncate">Aucune heure saisie pour {annee}</span>
+            )}
+          </div>
         </div>
 
-        {/* CARTE 2 : Formations Obligatoires (Modules officiels IDS) */}
-        <div className="card p-4 border border-slate-200 dark:border-dark-700/60 flex flex-col justify-between gap-3 overflow-hidden">
+        {/* CARTE 2 : Formations Obligatoires */}
+        <div className="card p-3.5 sm:p-4 border border-slate-200 dark:border-dark-700/60 flex flex-col justify-between gap-2.5 overflow-hidden shadow-sm hover:border-emerald-400/50 transition-all">
           <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
-                <GraduationCap size={22} />
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+                <GraduationCap size={20} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] text-slate-500 dark:text-dark-400 font-bold uppercase tracking-wider truncate">
+                <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-dark-400 font-bold uppercase tracking-wider truncate">
                   Formations Obligatoires
                 </p>
-                <div className="flex items-baseline gap-1.5 mt-0.5 flex-wrap">
-                  <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                <div className="flex items-baseline gap-1 mt-0.5 flex-wrap">
+                  <span className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">
                     {stats.tauxFormationsReel}%
                   </span>
                   <span className="text-[10px] font-semibold text-slate-400 whitespace-nowrap">
-                    ({stats.assistesSurRequis} sur {stats.baseRequisCount} requis)
+                    ({stats.assistesSurRequis}/{stats.baseRequisCount} requis)
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 shrink-0">
-              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 whitespace-nowrap">
+            <div className="flex items-center gap-1 shrink-0">
+              <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 whitespace-nowrap">
                 {trackName}
               </span>
               <button
                 onClick={handleSyncAllFormationsFromEvents}
-                className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold flex items-center gap-1 transition-all shrink-0"
+                className="p-1 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold flex items-center gap-0.5 transition-all shrink-0"
                 title="Calculer et synchroniser automatiquement depuis les feuilles de présence des formations obligatoires"
               >
-                <Sparkles size={12} /> Sync
+                <Sparkles size={11} /> Sync
               </button>
             </div>
           </div>
 
           <div className="pt-2 border-t border-slate-100 dark:border-dark-700/60 flex items-center justify-between text-xs gap-1">
-            <span className="text-slate-500 dark:text-dark-400 text-[11px] truncate">Obligatoires {annee} ({trackName}) :</span>
+            <span className="text-slate-500 dark:text-dark-400 text-[11px] truncate">Obligatoires {annee} :</span>
             <span className="font-bold text-slate-800 dark:text-dark-200 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 rounded-md text-[11px] shrink-0">
-              {stats.totalAssistesAnnee} sur {stats.totalAteliersAnnee} séances ({stats.tauxFormationsReel}%)
+              {stats.totalAssistesAnnee} / {stats.totalAteliersAnnee} séances ({stats.tauxFormationsReel}%)
             </span>
           </div>
         </div>
 
-        {/* CARTE 3 : Ateliers Pratiques (Bénéficiaire & Animateur) */}
-        <div className="card p-4 border border-slate-200 dark:border-dark-700/60 flex flex-col justify-between gap-3 overflow-hidden">
+        {/* CARTE 3 : Ateliers Collectifs */}
+        <div className="card p-3.5 sm:p-4 border border-slate-200 dark:border-dark-700/60 flex flex-col justify-between gap-2.5 overflow-hidden shadow-sm hover:border-cyan-400/50 transition-all">
           <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-11 h-11 rounded-2xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center shrink-0">
-                <Users size={22} />
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <div className="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center shrink-0">
+                <Users size={20} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] text-slate-500 dark:text-dark-400 font-bold uppercase tracking-wider truncate">
+                <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-dark-400 font-bold uppercase tracking-wider truncate">
                   Ateliers Collectifs
                 </p>
-                <div className="flex items-baseline gap-1.5 mt-0.5 flex-wrap">
-                  <span className="text-2xl font-black text-slate-900 dark:text-dark-100">
+                <div className="flex items-baseline gap-1 mt-0.5 flex-wrap">
+                  <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-dark-100">
                     {Number(stats.totalHeuresAteliersSuivies || 0).toFixed(0)}h
                   </span>
-                  <span className="text-xs font-semibold text-slate-400 whitespace-nowrap">
+                  <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
                     ({stats.totalNbAteliersSuivis || 0} suivi{stats.totalNbAteliersSuivis > 1 ? 's' : ''})
                   </span>
                 </div>
@@ -930,62 +920,55 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
             <button
               onClick={() => handleSyncAteliers(false)}
               disabled={syncingAteliers}
-              className="p-1.5 rounded-lg bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-400 hover:bg-cyan-100 border border-cyan-200 dark:border-cyan-800 text-[10px] font-bold flex items-center gap-1 transition-all shrink-0"
+              className="p-1 rounded-md bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-400 hover:bg-cyan-100 border border-cyan-200 dark:border-cyan-800 text-[10px] font-bold flex items-center gap-0.5 transition-all shrink-0"
               title="Synchroniser les présences d'ateliers et animations"
             >
-              <RefreshCw size={12} className={syncingAteliers ? "animate-spin" : ""} /> Sync Ateliers
+              <RefreshCw size={11} className={syncingAteliers ? "animate-spin" : ""} /> Sync
             </button>
           </div>
 
           <div className="pt-2 border-t border-slate-100 dark:border-dark-700/60 flex items-center justify-between text-xs gap-1">
-            <span className="text-slate-500 dark:text-dark-400 text-[11px] truncate">Rôle Animateur (Pair-à-pair) :</span>
+            <span className="text-slate-500 dark:text-dark-400 text-[11px] truncate">Rôle Animateur :</span>
             {Number(stats.totalNbAteliersAnimes) > 0 ? (
               <span className="font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-md text-[11px] flex items-center gap-1 shrink-0">
-                🎤 {stats.totalNbAteliersAnimes} atelier{stats.totalNbAteliersAnimes > 1 ? 's' : ''} ({stats.totalHeuresAteliersAnimes}h)
+                🎤 {stats.totalNbAteliersAnimes} ({stats.totalHeuresAteliersAnimes}h)
               </span>
             ) : (
-              <span className="text-[11px] text-slate-400 shrink-0">0 atelier animé</span>
+              <span className="text-[11px] text-slate-400 shrink-0 font-medium">0 atelier animé</span>
             )}
           </div>
         </div>
 
         {/* CARTE 4 : Mois de Présence & Initiatives */}
-        <div className="card p-4 border border-slate-200 dark:border-dark-700/60 flex flex-col justify-between gap-3 overflow-hidden">
+        <div className="card p-3.5 sm:p-4 border border-slate-200 dark:border-dark-700/60 flex flex-col justify-between gap-2.5 overflow-hidden shadow-sm hover:border-amber-400/50 transition-all">
           <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-11 h-11 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
-                <Sparkles size={22} />
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
+                <Sparkles size={20} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] text-slate-500 dark:text-dark-400 font-bold uppercase tracking-wider truncate">
+                <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-dark-400 font-bold uppercase tracking-wider truncate">
                   Mois de Présence
                 </p>
-                <div className="flex items-baseline gap-1.5 mt-0.5 flex-wrap">
-                  <span className="text-2xl font-black text-slate-900 dark:text-dark-100">{stats.countMoisRemplis}</span>
-                  <span className="text-xs font-semibold text-slate-400 whitespace-nowrap"> / 12 mois</span>
+                <div className="flex items-baseline gap-1 mt-0.5 flex-wrap">
+                  <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-dark-100">{stats.countMoisRemplis}</span>
+                  <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap"> / 12 mois</span>
                 </div>
               </div>
             </div>
-            <span className="px-2.5 py-1 rounded-lg text-xs font-black border bg-amber-500/10 text-amber-600 border-amber-500/30 dark:text-amber-400 shrink-0">
+            <span className="px-2 py-0.5 rounded-lg text-xs font-black border bg-amber-500/10 text-amber-600 border-amber-500/30 dark:text-amber-400 shrink-0">
               {Math.round((stats.countMoisRemplis / 12) * 100)}%
             </span>
           </div>
-          <div className="pt-2 border-t border-slate-100 dark:border-dark-700/60 flex flex-col gap-1.5 text-xs">
-            <div className="flex items-center justify-between gap-1.5">
-              <span className="text-slate-500 dark:text-dark-400 text-[11px] shrink-0">Mois actifs :</span>
-              <span 
-                className="font-bold text-slate-800 dark:text-dark-200 bg-amber-50 dark:bg-amber-900/30 px-2 py-0.5 rounded-md text-[11px] truncate text-right flex-1 min-w-0"
-                title={stats.moisPresents.length > 0 ? stats.moisPresents.join(', ') : 'Aucun mois avec heures enregistrées'}
-              >
-                {stats.moisPresents.length > 0 ? stats.moisPresents.join(', ') : 'Aucune présence enregistrée'}
-              </span>
-            </div>
-            {stats.totalInitiatives > 0 && (
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-slate-400">Initiatives déclarées :</span>
-                <span className="font-semibold text-slate-600 dark:text-dark-300">{stats.totalInitiatives} mois actif(s)</span>
-              </div>
-            )}
+
+          <div className="pt-2 border-t border-slate-100 dark:border-dark-700/60 flex items-center justify-between text-xs gap-1">
+            <span className="text-slate-500 dark:text-dark-400 text-[11px] shrink-0">Mois actifs :</span>
+            <span 
+              className="font-bold text-slate-800 dark:text-dark-200 bg-amber-50 dark:bg-amber-900/30 px-2 py-0.5 rounded-md text-[11px] truncate text-right flex-1 min-w-0"
+              title={stats.moisPresents.length > 0 ? stats.moisPresents.join(', ') : 'Aucun mois avec heures enregistrées'}
+            >
+              {stats.moisPresents.length > 0 ? `${stats.countMoisRemplis} mois validé(s)` : 'Aucune présence enregistrée'}
+            </span>
           </div>
         </div>
       </div>
