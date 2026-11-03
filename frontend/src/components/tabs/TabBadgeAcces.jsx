@@ -16,8 +16,6 @@ import {
   Clock,
   Sparkles,
   RotateCcw,
-  Wifi,
-  Zap,
   Search,
   UserCheck,
   Building,
@@ -290,122 +288,6 @@ export default function TabBadgeAcces({ incube, onUpdate, onNavigateToRH }) {
 
   return (
     <div className="space-y-6">
-      {/* 1. EN-TÊTE & EXPLICATION DU FLUX CONTRÔLE D'ACCÈS */}
-      <div className="p-4 sm:p-5 bg-gradient-to-r from-navy-900 via-primary-900 to-navy-950 text-white rounded-2xl shadow-lg border border-primary-500/20">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-xs flex items-center justify-center text-primary-300 border border-white/10 shrink-0">
-              <Radio size={26} className="animate-pulse" />
-            </div>
-            <div>
-              <h2 className="text-lg font-black tracking-tight flex items-center gap-2">
-                Gestion des Badges RFID & Contrôle d'Accès ZKTeco
-              </h2>
-              <p className="text-xs text-slate-300 mt-0.5">
-                Diffusion instantanée sur les <span className="font-bold text-amber-300">7 Tourniquets F18</span> dès le scan ou l'enregistrement d'une carte.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 text-xs flex-wrap">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
-              <Wifi size={13} className="text-emerald-400" /> 7 Bornes F18 Réseau Actives
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
-              <Zap size={13} className="text-amber-400" /> Mode Lecteur USB Plug & Play
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowVerifyModal(!showVerifyModal)}
-              className="btn btn-sm bg-white/15 hover:bg-white/25 text-white border-white/20 flex items-center gap-1.5 font-bold transition-all"
-            >
-              <Search size={14} />
-              Vérifier un Badge
-            </button>
-            <button
-              type="button"
-              onClick={handleAutoLinkBadges}
-              disabled={autoLinking}
-              className="btn btn-sm bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1.5 shadow-sm transition-all"
-              title="Relie en 1 clic les cartes physiques déjà existantes sur les bornes aux salariés et associés"
-            >
-              <RefreshCw size={13} className={autoLinking ? 'animate-spin' : ''} />
-              {autoLinking ? 'Liaison en cours...' : 'Lier Badges Existants (1-Clic)'}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* PANNEAU DE VÉRIFICATION INSTANTANÉE DE BADGE RFID */}
-      {showVerifyModal && (
-        <div className="p-4 sm:p-5 rounded-2xl bg-amber-50/70 dark:bg-dark-800 border-2 border-amber-400/60 dark:border-amber-600/60 shadow-md space-y-4 animate-fade-in">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <ShieldCheck size={20} className="text-amber-600 dark:text-amber-400" />
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Vérificateur d'État de Badge RFID
-              </h3>
-            </div>
-            <button 
-              type="button" 
-              onClick={() => { setShowVerifyModal(false); setVerifyResult(null); }}
-              className="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-white font-bold"
-            >
-              Fermer ✕
-            </button>
-          </div>
-
-          <form onSubmit={handleVerifyBadge} className="flex flex-col sm:flex-row gap-2.5">
-            <input
-              type="text"
-              value={verifyBadgeInput}
-              onChange={(e) => setVerifyBadgeInput(e.target.value)}
-              placeholder="Passez une carte sur le lecteur USB ou tapez le numéro (ex: 8520147)..."
-              className="input flex-1 font-mono font-bold text-sm bg-white dark:bg-dark-900 border-amber-300"
-              autoFocus
-            />
-            <button
-              type="submit"
-              disabled={verifyingBadge || !verifyBadgeInput.trim()}
-              className="btn btn-primary flex items-center justify-center gap-2 text-xs font-bold"
-            >
-              <Search size={14} className={verifyingBadge ? 'animate-spin' : ''} />
-              {verifyingBadge ? 'Vérification...' : 'Tester le Badge'}
-            </button>
-          </form>
-
-          {verifyResult && (
-            <div className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
-              verifyResult.isAvailable 
-                ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-300 text-emerald-900 dark:text-emerald-200' 
-                : 'bg-rose-50 dark:bg-rose-950/30 border-rose-300 text-rose-900 dark:text-rose-200'
-            }`}>
-              <div className="flex items-center justify-between font-bold">
-                <span className="flex items-center gap-1.5">
-                  {verifyResult.isAvailable ? <CheckCircle2 size={16} className="text-emerald-600" /> : <AlertCircle size={16} className="text-rose-600" />}
-                  <span>{verifyResult.isAvailable ? 'Badge Libre & Prêt à être attribué' : 'Badge déjà attribué'}</span>
-                </span>
-                <span className="font-mono text-[11px]">Badge #{verifyResult.badge_id}</span>
-              </div>
-
-              {verifyResult.assignedTo && (
-                <div className="pt-2 border-t border-rose-200 dark:border-rose-900/60 space-y-1">
-                  <div><strong>Attribué à :</strong> {verifyResult.assignedTo.nom} ({verifyResult.assignedTo.type})</div>
-                  {verifyResult.assignedTo.entite && <div><strong>Startup / Structure :</strong> {verifyResult.assignedTo.entite}</div>}
-                  {verifyResult.assignedTo.matricule && <div><strong>Matricule machine F18 :</strong> #{verifyResult.assignedTo.matricule}</div>}
-                </div>
-              )}
-
-              {verifyResult.tourniquetInfo && (
-                <div className="pt-1.5 text-[11px] text-slate-600 dark:text-slate-400">
-                  <strong>Mémoire tourniquets F18 :</strong> Enregistré sous ID #{verifyResult.tourniquetInfo.machineId} (« {verifyResult.tourniquetInfo.nameOnDevice} » - {verifyResult.tourniquetInfo.type})
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* 2. SECTION ÉTAPE 1 : BADGE RFID DU PORTEUR DE PROJET (INCUBÉ) */}
       <div className="card p-5 sm:p-6 border border-slate-200 dark:border-dark-700/60 shadow-sm space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200 dark:border-dark-700/60">
@@ -572,7 +454,7 @@ export default function TabBadgeAcces({ incube, onUpdate, onNavigateToRH }) {
 
       {/* 3. SECTION ÉTAPE 2 : ASSOCIÉS & CO-FONDATEURS (SEPARÉ DES SALARIÉS RH) */}
       <div className="card p-5 sm:p-6 border border-slate-200 dark:border-dark-700/60 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-dark-700/60">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-dark-700/60">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
               <UserCheck size={22} />
@@ -587,10 +469,106 @@ export default function TabBadgeAcces({ incube, onUpdate, onNavigateToRH }) {
               </h3>
             </div>
           </div>
-          <div className="text-xs text-slate-500 dark:text-dark-400 font-semibold">
-            Startup : <strong className="text-slate-900 dark:text-white">{incube?.raison_sociale || incube?.nom_incube}</strong>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="text-xs text-slate-500 dark:text-dark-400 font-semibold mr-1">
+              Startup : <strong className="text-slate-900 dark:text-white">{incube?.raison_sociale || incube?.nom_incube}</strong>
+            </div>
+
+            {/* Bouton Vérifier un Badge */}
+            <button
+              type="button"
+              onClick={() => setShowVerifyModal(!showVerifyModal)}
+              className="btn btn-secondary btn-sm flex items-center gap-1.5 font-bold text-xs border border-slate-200 dark:border-dark-700 bg-white dark:bg-dark-800 text-slate-700 dark:text-slate-200 hover:border-amber-400 shadow-xs cursor-pointer py-1.5 px-3 rounded-xl transition"
+            >
+              <Search size={14} className="text-amber-500" />
+              <span>Vérifier un Badge</span>
+            </button>
+
+            {/* Bouton Lier Badges Existants (1-Clic) */}
+            <button
+              type="button"
+              onClick={handleAutoLinkBadges}
+              disabled={autoLinking}
+              className="btn btn-sm bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1.5 shadow-sm text-xs py-1.5 px-3 rounded-xl cursor-pointer transition"
+              title="Relie en 1 clic les cartes physiques déjà existantes sur les bornes aux salariés et associés"
+            >
+              <RefreshCw size={13} className={autoLinking ? 'animate-spin' : ''} />
+              <span>{autoLinking ? 'Liaison en cours...' : 'Lier Badges Existants (1-Clic)'}</span>
+            </button>
           </div>
         </div>
+
+        {/* PANNEAU DE VÉRIFICATION INSTANTANÉE DE BADGE RFID (Ouvrable depuis le bouton) */}
+        {/* PANNEAU DE VÉRIFICATION INSTANTANÉE DE BADGE RFID */}
+      {showVerifyModal && (
+        <div className="p-4 sm:p-5 rounded-2xl bg-amber-50/70 dark:bg-dark-800 border-2 border-amber-400/60 dark:border-amber-600/60 shadow-md space-y-4 animate-fade-in">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <ShieldCheck size={20} className="text-amber-600 dark:text-amber-400" />
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                Vérificateur d'État de Badge RFID
+              </h3>
+            </div>
+            <button 
+              type="button" 
+              onClick={() => { setShowVerifyModal(false); setVerifyResult(null); }}
+              className="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-white font-bold"
+            >
+              Fermer ✕
+            </button>
+          </div>
+
+          <form onSubmit={handleVerifyBadge} className="flex flex-col sm:flex-row gap-2.5">
+            <input
+              type="text"
+              value={verifyBadgeInput}
+              onChange={(e) => setVerifyBadgeInput(e.target.value)}
+              placeholder="Passez une carte sur le lecteur USB ou tapez le numéro (ex: 8520147)..."
+              className="input flex-1 font-mono font-bold text-sm bg-white dark:bg-dark-900 border-amber-300"
+              autoFocus
+            />
+            <button
+              type="submit"
+              disabled={verifyingBadge || !verifyBadgeInput.trim()}
+              className="btn btn-primary flex items-center justify-center gap-2 text-xs font-bold"
+            >
+              <Search size={14} className={verifyingBadge ? 'animate-spin' : ''} />
+              {verifyingBadge ? 'Vérification...' : 'Tester le Badge'}
+            </button>
+          </form>
+
+          {verifyResult && (
+            <div className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
+              verifyResult.isAvailable 
+                ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-300 text-emerald-900 dark:text-emerald-200' 
+                : 'bg-rose-50 dark:bg-rose-950/30 border-rose-300 text-rose-900 dark:text-rose-200'
+            }`}>
+              <div className="flex items-center justify-between font-bold">
+                <span className="flex items-center gap-1.5">
+                  {verifyResult.isAvailable ? <CheckCircle2 size={16} className="text-emerald-600" /> : <AlertCircle size={16} className="text-rose-600" />}
+                  <span>{verifyResult.isAvailable ? 'Badge Libre & Prêt à être attribué' : 'Badge déjà attribué'}</span>
+                </span>
+                <span className="font-mono text-[11px]">Badge #{verifyResult.badge_id}</span>
+              </div>
+
+              {verifyResult.assignedTo && (
+                <div className="pt-2 border-t border-rose-200 dark:border-rose-900/60 space-y-1">
+                  <div><strong>Attribué à :</strong> {verifyResult.assignedTo.nom} ({verifyResult.assignedTo.type})</div>
+                  {verifyResult.assignedTo.entite && <div><strong>Startup / Structure :</strong> {verifyResult.assignedTo.entite}</div>}
+                  {verifyResult.assignedTo.matricule && <div><strong>Matricule machine F18 :</strong> #{verifyResult.assignedTo.matricule}</div>}
+                </div>
+              )}
+
+              {verifyResult.tourniquetInfo && (
+                <div className="pt-1.5 text-[11px] text-slate-600 dark:text-slate-400">
+                  <strong>Mémoire tourniquets F18 :</strong> Enregistré sous ID #{verifyResult.tourniquetInfo.machineId} (« {verifyResult.tourniquetInfo.nameOnDevice} » - {verifyResult.tourniquetInfo.type})
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
         <p className="text-xs text-slate-500 dark:text-dark-400">
           Les associés sont reconnus automatiquement par les tourniquets avec le rôle <strong>Incubé</strong> et le nom de leur startup. Enregistrer ou modifier leur badge met à jour les 7 bornes physiques F18 en temps réel.
