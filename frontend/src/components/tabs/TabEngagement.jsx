@@ -1047,33 +1047,33 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
       {/* STRUCTURE EN 3 PARTIES SÉPARÉES D'ENGAGEMENT (NAVIGATION PAR ONGLETS)     */}
       {/* ========================================================================= */}
       <div className="space-y-4">
-        {/* BARRE D'ONGLETS NAVIGATION 3 PARTIES */}
-        <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-200 dark:border-dark-700/60 pb-3">
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 min-w-0">
+        {/* BARRE D'ONGLETS NAVIGATION 3 PARTIES — ALIGNÉE SUR UNE SEULE LIGNE */}
+        <div className="flex items-center justify-between gap-2 border-b border-slate-200 dark:border-dark-700/60 pb-2.5 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               type="button"
               onClick={() => setActiveEngagementTab('tourniquets')}
-              className={`px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border shadow-xs ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border shadow-xs whitespace-nowrap ${
                 activeEngagementTab === 'tourniquets'
                   ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/20'
                   : 'bg-white dark:bg-dark-900 border-slate-200 dark:border-dark-700 text-slate-700 dark:text-dark-200 hover:bg-slate-50 dark:hover:bg-dark-800'
               }`}
             >
-              <Clock size={15} className={activeEngagementTab === 'tourniquets' ? 'text-white' : 'text-blue-500'} />
-              <span>Partie 1 : Présence Centre (Tourniquets)</span>
+              <Clock size={14} className={activeEngagementTab === 'tourniquets' ? 'text-white' : 'text-blue-500'} />
+              <span>Partie 1 : Tourniquets</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveEngagementTab('formations')}
-              className={`px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border shadow-xs ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border shadow-xs whitespace-nowrap ${
                 activeEngagementTab === 'formations'
                   ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-500/20'
                   : 'bg-white dark:bg-dark-900 border-slate-200 dark:border-dark-700 text-slate-700 dark:text-dark-200 hover:bg-slate-50 dark:hover:bg-dark-800'
               }`}
             >
-              <GraduationCap size={15} className={activeEngagementTab === 'formations' ? 'text-white' : 'text-emerald-500'} />
-              <span>Partie 2 : Formations Obligatoires</span>
+              <GraduationCap size={14} className={activeEngagementTab === 'formations' ? 'text-white' : 'text-emerald-500'} />
+              <span>Partie 2 : Formations</span>
               <span className={`text-[10px] px-1.5 py-0.2 rounded font-black ${
                 activeEngagementTab === 'formations' ? 'bg-white/20 text-white' : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
               }`}>
@@ -1084,13 +1084,13 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
             <button
               type="button"
               onClick={() => setActiveEngagementTab('ateliers')}
-              className={`px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border shadow-xs ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border shadow-xs whitespace-nowrap ${
                 activeEngagementTab === 'ateliers'
                   ? 'bg-amber-600 text-white border-amber-600 shadow-md shadow-amber-500/20'
                   : 'bg-white dark:bg-dark-900 border-slate-200 dark:border-dark-700 text-slate-700 dark:text-dark-200 hover:bg-slate-50 dark:hover:bg-dark-800'
               }`}
             >
-              <Users size={15} className={activeEngagementTab === 'ateliers' ? 'text-white' : 'text-amber-500'} />
+              <Users size={14} className={activeEngagementTab === 'ateliers' ? 'text-white' : 'text-amber-500'} />
               <span>Partie 3 : Ateliers & Événements</span>
               {(Number(stats.totalNbAteliersSuivis) > 0 || Number(stats.totalNbAteliersAnimes) > 0) && (
                 <span className={`text-[10px] px-1.5 py-0.2 rounded font-black ${
@@ -1102,47 +1102,51 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
             </button>
           </div>
 
-          {/* Actions contextuelles selon l'onglet actif */}
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Actions contextuelles selon l'onglet actif — Alignées sur la même ligne */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-2">
             {activeEngagementTab === 'tourniquets' && (
               <button
                 type="button"
                 onClick={() => handleSyncTourniquet(false)}
                 disabled={syncingTourniquet}
-                className="btn btn-secondary btn-xs font-bold text-blue-600 inline-flex items-center gap-1.5 border-blue-200 dark:border-blue-900"
+                className="btn btn-secondary btn-xs font-bold text-blue-600 inline-flex items-center gap-1.5 border-blue-200 dark:border-blue-900 whitespace-nowrap"
                 title="Actualiser les pointages réels des tourniquets physiques"
               >
-                <RefreshCw size={13} className={syncingTourniquet ? "animate-spin" : ""} /> Sync Tourniquets
+                <RefreshCw size={13} className={syncingTourniquet ? "animate-spin" : ""} />
+                <span>Sync Tourniquets</span>
               </button>
             )}
             {activeEngagementTab === 'formations' && (
               <button
                 type="button"
                 onClick={handleSyncAllFormationsFromEvents}
-                className="btn btn-secondary btn-xs font-bold text-emerald-600 inline-flex items-center gap-1.5 border-emerald-200 dark:border-emerald-900"
+                className="btn btn-secondary btn-xs font-bold text-emerald-600 inline-flex items-center gap-1.5 border-emerald-200 dark:border-emerald-900 whitespace-nowrap"
                 title="Recalculer l'assiduité depuis les feuilles d'émargement"
               >
-                <Sparkles size={13} /> Sync Formations
+                <Sparkles size={13} />
+                <span>Sync Formations</span>
               </button>
             )}
             {activeEngagementTab === 'ateliers' && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => handleSyncAteliers(false)}
                   disabled={syncingAteliers}
-                  className="btn btn-secondary btn-xs font-bold text-amber-600 inline-flex items-center gap-1.5 border-amber-200 dark:border-amber-900"
+                  className="btn btn-secondary btn-xs font-bold text-amber-600 inline-flex items-center gap-1.5 border-amber-200 dark:border-amber-900 whitespace-nowrap"
                   title="Synchroniser les présences d'ateliers et rôles d'animateur"
                 >
-                  <RefreshCw size={13} className={syncingAteliers ? "animate-spin" : ""} /> Sync Ateliers
+                  <RefreshCw size={13} className={syncingAteliers ? "animate-spin" : ""} />
+                  <span>Sync Ateliers</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => navigate('/evenements')}
-                  className="btn btn-secondary btn-xs text-slate-600 dark:text-dark-300 inline-flex items-center gap-1"
+                  className="btn btn-secondary btn-xs text-slate-600 dark:text-dark-300 inline-flex items-center gap-1 border-slate-200 dark:border-dark-700 whitespace-nowrap"
                   title="Ouvrir la page des Événements et Ateliers"
                 >
-                  <ExternalLink size={12} /> Gérer Événements
+                  <ExternalLink size={12} />
+                  <span>Gérer Événements</span>
                 </button>
               </div>
             )}
