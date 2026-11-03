@@ -135,26 +135,6 @@ export default function ControleAcces() {
   // Données retournées par le backend
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [syncingClocks, setSyncingClocks] = useState(false);
-  const [importingFromBornes, setImportingFromBornes] = useState(false);
-
-  const handleImportFromTourniquets = async () => {
-    setImportingFromBornes(true);
-    const toastId = toast.loading('Lecture des badges et utilisateurs depuis les 7 tourniquets...');
-    try {
-      const res = await api.post('/presence/superadmin/import-from-tourniquets');
-      if (res.data?.success) {
-        toast.success(res.data.message || 'Importation terminée avec succès !', { id: toastId, duration: 5000 });
-        await fetchDashboardData(false);
-      } else {
-        toast.error(res.data?.message || "Erreur lors de l'importation", { id: toastId });
-      }
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Échec de communication avec les tourniquets", { id: toastId });
-    } finally {
-      setImportingFromBornes(false);
-    }
-  };
   const [dashboardData, setDashboardData] = useState({
     total_presents_sur_site: 0,
     total_usagers_journee: 0,
@@ -323,25 +303,6 @@ export default function ControleAcces() {
     toast.success(`Fichier ${filename} exporté`);
   };
 
-  const handleSyncClocks = async () => {
-    setSyncingClocks(true);
-    const toastId = toast.loading('Synchronisation des horloges des 7 bornes sur GMT+0...');
-    try {
-      const res = await api.post('/presence/superadmin/sync-clocks');
-      if (res.data?.success) {
-        const { successCount, totalDevices } = res.data.data;
-        toast.success(`✓ ${successCount}/${totalDevices} bornes ZKTeco synchronisées sur l'heure locale GMT+0 !`, { id: toastId });
-        await fetchDashboardData(false);
-      } else {
-        toast.error('Erreur lors de la synchronisation des horloges', { id: toastId });
-      }
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Échec de communication avec les bornes', { id: toastId });
-    } finally {
-      setSyncingClocks(false);
-    }
-  };
-
   const isToday = selectedDate === getTodayDateString();
 
   return (
@@ -358,50 +319,16 @@ export default function ControleAcces() {
           </p>
         </div>
 
-        {/* Contrôles d'actualisation et export */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Badge Fuseau Horaire GMT+0 */}
-          <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-dark-700/60 text-slate-700 dark:text-dark-200 text-xs font-bold border border-slate-200 dark:border-dark-600/60" title="Plateforme synchronisée sur le fuseau horaire local GMT+0">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>GMT+0 (Heure Locale)</span>
-          </div>
-
-          {/* Bouton Importer Badges depuis les Tourniquets (SuperAdmin) */}
-          {(user?.role === 'super_admin' || user?.role === 'admin') && (
-            <button
-              type="button"
-              onClick={handleImportFromTourniquets}
-              disabled={importingFromBornes}
-              className="btn btn-secondary btn-sm flex items-center gap-1.5 border-primary-500/40 text-primary-700 dark:text-primary-300 hover:bg-primary-500/10 font-bold"
-              title="Récupérer et lier automatiquement tous les badges enregistrés dans les bornes ZKTeco aux incubés et au personnel"
-            >
-              <Users size={14} className={importingFromBornes ? 'animate-spin text-primary-500' : 'text-primary-500'} />
-              <span>{importingFromBornes ? 'Import en cours...' : 'Importer Badges Bornes'}</span>
-            </button>
-          )}
-
-          {/* Bouton Synchroniser Horloges Bornes (SuperAdmin) */}
-          {(user?.role === 'super_admin' || user?.role === 'admin') && (
-            <button
-              type="button"
-              onClick={handleSyncClocks}
-              disabled={syncingClocks}
-              className="btn btn-secondary btn-sm flex items-center gap-1.5 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 font-bold"
-              title="Ajuster et synchroniser les horloges internes des 7 tourniquets sur l'heure exacte locale GMT+0"
-            >
-              <Clock size={14} className={syncingClocks ? 'animate-spin text-emerald-500' : 'text-emerald-500'} />
-              <span>{syncingClocks ? 'Synchro en cours...' : 'Synchroniser Horloges'}</span>
-            </button>
-          )}
-
+        {/* Contrôles d'actualisation et export parfaitement alignés sur une seule ligne */}
+        <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-auto">
           {/* Toggle Auto-Refresh */}
           <button
             type="button"
             onClick={() => setAutoRefresh(!autoRefresh)}
-            className={`btn btn-sm ${
+            className={`btn btn-sm flex items-center gap-1.5 ${
               autoRefresh 
                 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20' 
-                : 'btn-secondary'
+                : 'btn-secondary text-slate-500 dark:text-dark-400'
             }`}
             title="Activer ou désactiver l'actualisation automatique toutes les 30 secondes"
           >
@@ -414,7 +341,7 @@ export default function ControleAcces() {
             type="button"
             onClick={() => fetchDashboardData(false)}
             disabled={refreshing}
-            className="btn btn-secondary btn-sm"
+            className="btn btn-secondary btn-sm flex items-center gap-1.5"
             title="Actualiser les pointages maintenant"
           >
             <RefreshCw size={14} className={refreshing ? 'animate-spin text-primary-500' : ''} />
@@ -425,7 +352,7 @@ export default function ControleAcces() {
           <button
             type="button"
             onClick={handleExportCSV}
-            className="btn btn-primary btn-sm"
+            className="btn btn-primary btn-sm flex items-center gap-1.5 shadow-xs"
             title="Télécharger les données en CSV"
           >
             <Download size={14} />
