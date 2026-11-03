@@ -154,6 +154,8 @@ export default function Formations() {
 
   // Grand sélecteur : 'pre-creation' | 'post-creation'
   const [selectedParcours, setSelectedParcours] = useState('pre-creation');
+  const [activeTab, setActiveTab] = useState('pre-creation'); // 'pre-creation' | 'post-creation' | 'modules'
+  const [moduleFilterParcours, setModuleFilterParcours] = useState('all'); // 'all' | 'pre-creation' | 'post-creation'
 
   // 1. Référentiel des modules persistant dans localStorage
   const [modulesMap, setModulesMap] = useState(() => {
@@ -417,6 +419,50 @@ export default function Formations() {
       parcoursType: selectedParcours
     }));
   }, [modulesMap, selectedParcours]);
+
+  const preCreationCount = useMemo(() => {
+    return rawAteliers.filter(f => {
+      let meta = {};
+      try { meta = JSON.parse(f.description || '{}'); } catch (e) {}
+      const titreLower = (f.titre || '').toLowerCase().trim();
+      return (
+        meta.typeParcours === 'pre-creation' ||
+        titreLower.startsWith('[pré-création]') ||
+        titreLower.startsWith('[pre-creation]')
+      );
+    }).length;
+  }, [rawAteliers]);
+
+  const postCreationCount = useMemo(() => {
+    return rawAteliers.filter(f => {
+      let meta = {};
+      try { meta = JSON.parse(f.description || '{}'); } catch (e) {}
+      const titreLower = (f.titre || '').toLowerCase().trim();
+      return (
+        meta.typeParcours === 'post-creation' ||
+        titreLower.startsWith('[post-création]') ||
+        titreLower.startsWith('[post-creation]')
+      );
+    }).length;
+  }, [rawAteliers]);
+
+  const allModulesList = useMemo(() => {
+    const pre = (modulesMap['pre-creation'] || []).map(m => ({ ...m, parcoursType: 'pre-creation' }));
+    const post = (modulesMap['post-creation'] || []).map(m => ({ ...m, parcoursType: 'post-creation' }));
+    let list = [...pre, ...post];
+    if (moduleFilterParcours !== 'all') {
+      list = list.filter(m => m.parcoursType === moduleFilterParcours);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(m => 
+        (m.code || '').toLowerCase().includes(q) ||
+        (m.name || '').toLowerCase().includes(q) ||
+        (m.points || []).some(pt => pt.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }, [modulesMap, moduleFilterParcours, searchQuery]);
 
   // Déterminer le code et nom du module de manière robuste
   const inferModuleInfo = (formation, meta) => {
@@ -834,182 +880,376 @@ export default function Formations() {
     <div className="slide-up space-y-6 w-full pb-16">
       
       {/* =========================================================================
-          1. HEADER PRINCIPAL AVEC SÉLECTEUR DE PARCOURS (PRÉ vs POST)
+          1. HEADER PRINCIPAL ÉPURÉ (SANS GRAND CADRE ENCOMBRANT)
           ========================================================================= */}
-      <div className="p-6 bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700/60 rounded-3xl shadow-sm space-y-5">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-13 h-13 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-slate-950 shadow-lg shadow-amber-500/20 shrink-0 font-black">
-              <GraduationCap size={28} />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-                Formations & Parcours Pédagogiques
-              </h1>
-              <p className="text-sm text-slate-600 dark:text-dark-300 mt-1">
-                Organisation séparée des sessions, formateurs, collaborateurs et émargements
-              </p>
-            </div>
-          </div>
-
-          {/* Boutons d'action pour le parcours actif */}
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <button
-              type="button"
-              onClick={() => handleOpenAddModule()}
-              className="btn btn-secondary btn-sm flex items-center gap-2 border border-slate-200 dark:border-dark-700 bg-white dark:bg-dark-800 hover:border-amber-500/50 text-slate-800 dark:text-slate-100 font-bold py-2.5 px-4 rounded-xl cursor-pointer shadow-xs"
-              title="Ajouter un module pédagogique officiel"
-            >
-              <BookOpen size={16} className="text-amber-500" />
-              <span>Nouveau Module</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleOpenAddFormation()}
-              className="btn btn-primary btn-sm flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/20 py-2.5 px-4 rounded-xl cursor-pointer"
-            >
-              <Plus size={16} className="stroke-[3]" />
-              <span>Ajouter une Formation</span>
-            </button>
-          </div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
+            <GraduationCap className="text-amber-500 shrink-0" size={28} />
+            <span>Formations & Parcours Pédagogiques</span>
+          </h1>
+          <p className="text-sm text-slate-600 dark:text-dark-300 mt-1">
+            Organisation des sessions, formateurs, collaborateurs et suivi des émargements QR code
+          </p>
         </div>
 
-        {/* =========================================================================
-            LES 2 GRANDS PARCOURS BIEN DISTINCTS (PRÉ-CRÉATION vs POST-CRÉATION)
-            ========================================================================= */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2 border-t border-slate-100 dark:border-dark-800">
-          
-          {/* Bloc 1 : PRÉ-CRÉATION */}
+        {/* Boutons d'action principaux */}
+        <div className="flex items-center gap-2.5 flex-wrap">
           <button
             type="button"
-            onClick={() => setSelectedParcours('pre-creation')}
-            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between ${
-              selectedParcours === 'pre-creation'
-                ? 'bg-blue-500/15 border-blue-500 text-blue-950 dark:text-blue-200 ring-2 ring-blue-500/20 shadow-sm'
-                : 'bg-slate-50 dark:bg-dark-800/60 border-slate-200 dark:border-dark-700 text-slate-600 dark:text-slate-300 hover:border-blue-400/50'
-            }`}
+            onClick={() => handleOpenAddModule(selectedParcours)}
+            className="btn btn-secondary btn-sm flex items-center gap-2 border border-slate-200 dark:border-dark-700 bg-white dark:bg-dark-800 hover:border-amber-500/50 text-slate-800 dark:text-slate-100 font-bold py-2.5 px-4 rounded-xl cursor-pointer shadow-xs transition"
+            title="Ajouter un module pédagogique officiel"
           >
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${
-                selectedParcours === 'pre-creation' ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-200 dark:bg-dark-700 text-slate-600'
-              }`}>
-                <Lightbulb size={20} />
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold tracking-wider text-blue-600 dark:text-blue-400 block">
-                  Idéation & Cadrage
-                </span>
-                <h3 className="text-sm font-black text-slate-900 dark:text-white">
-                  1. Parcours Pré-Création
-                </h3>
-              </div>
-            </div>
-
-            <div className="text-right">
-              <span className="text-xs font-black px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-700 dark:text-blue-300">
-                {rawAteliers.filter(f => (f.titre + ' ' + (f.description || '')).toLowerCase().includes('pré') || (f.titre + ' ' + (f.description || '')).toLowerCase().includes('bmc')).length} session(s)
-              </span>
-            </div>
+            <BookOpen size={16} className="text-amber-500" />
+            <span>Nouveau Module</span>
           </button>
 
-          {/* Bloc 2 : POST-CRÉATION */}
           <button
             type="button"
-            onClick={() => setSelectedParcours('post-creation')}
-            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between ${
-              selectedParcours === 'post-creation'
-                ? 'bg-amber-500/15 border-amber-500 text-amber-950 dark:text-amber-200 ring-2 ring-amber-500/20 shadow-sm'
-                : 'bg-slate-50 dark:bg-dark-800/60 border-slate-200 dark:border-dark-700 text-slate-600 dark:text-slate-300 hover:border-amber-400/50'
-            }`}
+            onClick={() => handleOpenAddFormation()}
+            className="btn btn-primary btn-sm flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/20 py-2.5 px-4 rounded-xl cursor-pointer transition"
           >
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${
-                selectedParcours === 'post-creation' ? 'bg-amber-500 text-slate-950 shadow-sm' : 'bg-slate-200 dark:bg-dark-700 text-slate-600'
-              }`}>
-                <Building size={20} />
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold tracking-wider text-amber-600 dark:text-amber-400 block">
-                  Entreprises Lancées
-                </span>
-                <h3 className="text-sm font-black text-slate-900 dark:text-white">
-                  2. Parcours Post-Création
-                </h3>
-              </div>
-            </div>
-
-            <div className="text-right">
-              <span className="text-xs font-black px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300">
-                {rawAteliers.filter(f => (f.titre + ' ' + (f.description || '')).toLowerCase().includes('post') || (f.titre + ' ' + (f.description || '')).toLowerCase().includes('gfc')).length} session(s)
-              </span>
-            </div>
+            <Plus size={16} className="stroke-[3]" />
+            <span>Ajouter une Formation</span>
           </button>
-
         </div>
       </div>
 
       {/* =========================================================================
-          1.5. RÉFÉRENTIEL DES MODULES PÉDAGOGIQUES (PRÉ & POST CRÉATION)
+          2. BARRE D'ONGLETS COMPACTE (PRÉ-CRÉATION | POST-CRÉATION | CATALOGUE)
           ========================================================================= */}
-      <div className="p-6 bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700/60 rounded-3xl shadow-sm space-y-4">
-        {/* En-tête de la section des modules */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold ${
-              selectedParcours === 'pre-creation'
-                ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
-                : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+      <div className="bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700/80 rounded-2xl p-2.5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+        {/* Onglets Pills */}
+        <div className="inline-flex p-1 bg-slate-100 dark:bg-dark-800/80 rounded-xl gap-1">
+          {/* 1. Pré-Création */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('pre-creation');
+              setSelectedParcours('pre-creation');
+            }}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+              activeTab === 'pre-creation'
+                ? 'bg-white dark:bg-dark-900 text-slate-900 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0"></span>
+            <span>1. Pré-Création</span>
+            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
+              activeTab === 'pre-creation'
+                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                : 'bg-slate-200 dark:bg-dark-700 text-slate-700 dark:text-slate-300'
             }`}>
-              <BookOpen size={20} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-white uppercase tracking-wider">
-                  Modules Pédagogiques Officiels
-                </h2>
-                <span className={`px-2.5 py-0.5 rounded-full text-xs font-black ${
-                  selectedParcours === 'pre-creation'
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
-                    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
-                }`}>
-                  {displayedModulesList.length} module{displayedModulesList.length > 1 ? 's' : ''}
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-dark-400 mt-0.5">
-                Référentiel des compétences, durées estimées et ateliers de cadrage
-              </p>
-            </div>
-          </div>
+              {preCreationCount} session{preCreationCount > 1 ? 's' : ''}
+            </span>
+          </button>
 
-          <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
-            {/* Bouton Ajouter un Module */}
-            <button
-              type="button"
-              onClick={() => handleOpenAddModule(selectedParcours)}
-              className="btn btn-secondary btn-sm flex items-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-bold bg-white dark:bg-dark-800 border border-slate-200 dark:border-dark-700 hover:border-amber-500/50 text-slate-800 dark:text-slate-100 cursor-pointer shadow-xs"
-              title="Ajouter un module personnalisé"
-            >
-              <Plus size={14} className="text-amber-500" />
-              <span>Ajouter un Module</span>
-            </button>
+          {/* 2. Post-Création */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('post-creation');
+              setSelectedParcours('post-creation');
+            }}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+              activeTab === 'post-creation'
+                ? 'bg-white dark:bg-dark-900 text-slate-900 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+            <span>2. Post-Création</span>
+            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
+              activeTab === 'post-creation'
+                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                : 'bg-slate-200 dark:bg-dark-700 text-slate-700 dark:text-slate-300'
+            }`}>
+              {postCreationCount} session{postCreationCount > 1 ? 's' : ''}
+            </span>
+          </button>
 
-            {/* Bouton réduire / développer */}
-            <button
-              type="button"
-              onClick={() => setModulesSectionExpanded(prev => !prev)}
-              className="p-1.5 rounded-xl border border-slate-200 dark:border-dark-700 text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-dark-800 transition-colors cursor-pointer"
-              title={modulesSectionExpanded ? 'Réduire la liste des modules' : 'Afficher la liste des modules'}
-            >
-              {modulesSectionExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-            </button>
-          </div>
+          <div className="w-px h-5 bg-slate-200 dark:bg-dark-700 self-center mx-1" />
+
+          {/* 3. Catalogue des Modules */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('modules')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+              activeTab === 'modules'
+                ? 'bg-white dark:bg-dark-900 text-slate-900 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <BookOpen size={14} className="text-amber-500 shrink-0" />
+            <span>Catalogue des Modules</span>
+            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
+              activeTab === 'modules'
+                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                : 'bg-slate-200 dark:bg-dark-700 text-slate-700 dark:text-slate-300'
+            }`}>
+              {allModulesList.length}
+            </span>
+          </button>
         </div>
 
-        {/* Grille des modules pédagogiques */}
-        {modulesSectionExpanded && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 pt-2">
-            {displayedModulesList.map((m, mIdx) => {
+        {/* Recherche rapide */}
+        <div className="relative w-full md:w-72">
+          <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder={activeTab === 'modules' ? "Filtrer les modules..." : "Rechercher formation, formateur..."}
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="input !py-2 !pl-9 !text-xs w-full bg-slate-50 dark:bg-dark-800 border-slate-200 dark:border-dark-700 rounded-xl focus:bg-white dark:focus:bg-dark-900"
+          />
+        </div>
+      </div>
+
+      {/* =========================================================================
+          3. CONTENU : VUE TABLEAU ÉPURÉE POUR LES FORMATIONS (PRÉ ET POST CRÉATION)
+          ========================================================================= */}
+      {activeTab !== 'modules' && (
+        <div className="bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700/80 rounded-2xl shadow-xs overflow-hidden animate-fade-in">
+          {loadingFormations ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-amber-500" />
+            </div>
+          ) : currentParcoursFormations.length === 0 ? (
+            <div className="p-12 text-center space-y-3">
+              <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-600 mx-auto flex items-center justify-center">
+                <GraduationCap size={28} />
+              </div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                Aucune formation de {activeTab === 'pre-creation' ? 'Pré-Création' : 'Post-Création'} enregistrée
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-dark-400 max-w-sm mx-auto">
+                Programmez une session pour les porteurs de projets en {activeTab === 'pre-creation' ? 'Pré-Création' : 'Post-Création'}.
+              </p>
+              <button
+                type="button"
+                onClick={() => handleOpenAddFormation()}
+                className="btn btn-primary btn-sm inline-flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black py-2 px-4 rounded-xl cursor-pointer"
+              >
+                <Plus size={15} /> Programmer une formation
+              </button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 dark:border-dark-800 text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[11px] font-bold bg-slate-50/50 dark:bg-dark-800/40">
+                    <th className="py-3.5 px-4">Date & Horaires</th>
+                    <th className="py-3.5 px-4">Formation / Module</th>
+                    <th className="py-3.5 px-4">Intervenants</th>
+                    <th className="py-3.5 px-4 text-center">Inscrits / Émargements</th>
+                    <th className="py-3.5 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-dark-800">
+                  {currentParcoursFormations.map(formation => {
+                    let meta = {};
+                    try { meta = JSON.parse(formation.description || '{}'); } catch (e) { meta = {}; }
+
+                    const moduleInfo = inferModuleInfo(formation, meta);
+                    const collaborateur = meta.collaborateur || formation.intervenant || 'Ayoub Elbouchikhi (Coach IDS)';
+                    const formateur = formation.formateur || meta.formateur || 'M. Khalid (Expert Formateur)';
+                    const invitesCount = Array.isArray(meta.invitesIds) ? meta.invitesIds.length : allIncubes.length;
+                    const isPreCreation = activeTab === 'pre-creation';
+
+                    return (
+                      <tr key={formation.id} className="hover:bg-slate-50/80 dark:hover:bg-dark-800/60 transition group">
+                        {/* Date & Heure */}
+                        <td className="py-4 px-4 align-top whitespace-nowrap">
+                          <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                            <Calendar size={13} className="text-emerald-600 shrink-0" />
+                            <span>{formation.date ? new Date(formation.date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : 'Date non définie'}</span>
+                          </div>
+                          <div className="text-slate-500 dark:text-dark-300 text-[11px] flex items-center gap-1 mt-1 font-mono">
+                            <Clock size={11} className="text-slate-400" />
+                            <span>{formation.heureDebut || '09:30'} - {formation.heureFin || '12:30'}</span>
+                            <span className="text-slate-400">({formation.duree || '3h00'})</span>
+                          </div>
+                          {meta.salle && (
+                            <div className="text-[11px] text-slate-500 dark:text-dark-400 flex items-center gap-1 mt-1">
+                              <MapPin size={11} className="text-slate-400" />
+                              <span className="truncate max-w-[130px]">{meta.salle}</span>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Formation & Module */}
+                        <td className="py-4 px-4 align-top">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${
+                              isPreCreation
+                                ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20'
+                                : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20'
+                            }`}>
+                              [{moduleInfo.code}]
+                            </span>
+                            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                              {moduleInfo.name}
+                            </span>
+                          </div>
+                          {formation.titre && formation.titre !== moduleInfo.name && (
+                            <div className="font-semibold text-xs text-slate-900 dark:text-white">
+                              {formation.titre}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Intervenants */}
+                        <td className="py-4 px-4 align-top">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
+                              <User size={13} className="text-amber-500 shrink-0" />
+                              <span className="font-bold">{formateur}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-slate-500 dark:text-dark-300 text-[11px]">
+                              <UserCheck size={13} className="text-blue-500 shrink-0" />
+                              <span>{collaborateur}</span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Inscrits / Émargements */}
+                        <td className="py-4 px-4 align-top text-center">
+                          <button
+                            type="button"
+                            onClick={() => setParticipantsModalItem({ formation, meta })}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-dark-700 hover:border-amber-500/50 bg-slate-50 dark:bg-dark-800 text-slate-800 dark:text-slate-100 font-bold hover:bg-white dark:hover:bg-dark-700 transition cursor-pointer shadow-xs text-xs"
+                            title="Voir la liste des participants et émargements"
+                          >
+                            <Users size={13} className="text-amber-500" />
+                            <span>{invitesCount} inscrits</span>
+                          </button>
+                        </td>
+
+                        {/* Actions */}
+                        <td className="py-4 px-4 align-top text-right">
+                          <div className="inline-flex items-center gap-1.5 flex-wrap justify-end">
+                            {/* Bouton QR Code */}
+                            <button
+                              type="button"
+                              onClick={() => setQrModalItem(formation)}
+                              className="p-2 rounded-xl border border-slate-200 dark:border-dark-700 hover:border-amber-400 bg-white dark:bg-dark-800 text-slate-700 dark:text-slate-300 hover:text-amber-600 shadow-2xs transition cursor-pointer"
+                              title="Afficher le QR code officiel pour émarger"
+                            >
+                              <QrCode size={15} />
+                            </button>
+
+                            {/* Bouton Fiche A4 Présence */}
+                            <button
+                              type="button"
+                              onClick={() => setPrintModalFormation(formation)}
+                              className="p-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow-2xs transition cursor-pointer"
+                              title="Imprimer la feuille d'émargement officielle A4"
+                            >
+                              <Printer size={15} />
+                            </button>
+
+                            {/* Bouton Modifier */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditFormation(formation, meta)}
+                              className="p-2 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition cursor-pointer"
+                              title="Modifier cette session"
+                            >
+                              <Pencil size={15} />
+                            </button>
+
+                            {/* Bouton Supprimer */}
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteFormation(formation.id)}
+                              className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition cursor-pointer"
+                              title="Supprimer cette formation"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* =========================================================================
+          4. CONTENU : CATALOGUE DES MODULES PÉDAGOGIQUES
+          ========================================================================= */}
+      {activeTab === 'modules' && (
+        <div className="bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700/80 rounded-2xl shadow-xs p-6 space-y-5 animate-fade-in">
+          {/* En-tête du catalogue avec filtre de parcours et bouton Nouveau Module */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-dark-800">
+            <div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <BookOpen className="text-amber-500" size={18} />
+                <span>Référentiel des Modules Pédagogiques Officiels</span>
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-dark-400 mt-0.5">
+                Programmes, durées estimées et modules disponibles pour planification
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Filtre interne : Tous, Pré-Création, Post-Création */}
+              <div className="inline-flex p-1 bg-slate-100 dark:bg-dark-800 rounded-xl text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setModuleFilterParcours('all')}
+                  className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                    moduleFilterParcours === 'all'
+                      ? 'bg-white dark:bg-dark-900 text-slate-900 dark:text-white shadow-xs font-bold'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                >
+                  Tous ({(modulesMap['pre-creation']?.length || 0) + (modulesMap['post-creation']?.length || 0)})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModuleFilterParcours('pre-creation')}
+                  className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                    moduleFilterParcours === 'pre-creation'
+                      ? 'bg-white dark:bg-dark-900 text-blue-700 dark:text-blue-300 shadow-xs font-bold'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                >
+                  Pré-Création ({modulesMap['pre-creation']?.length || 0})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModuleFilterParcours('post-creation')}
+                  className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                    moduleFilterParcours === 'post-creation'
+                      ? 'bg-white dark:bg-dark-900 text-amber-700 dark:text-amber-300 shadow-xs font-bold'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                >
+                  Post-Création ({modulesMap['post-creation']?.length || 0})
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleOpenAddModule(selectedParcours)}
+                className="btn btn-primary btn-sm flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-black py-2 px-3.5 rounded-xl cursor-pointer shadow-xs text-xs"
+              >
+                <Plus size={14} className="stroke-[3]" />
+                <span>Ajouter un Module</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Grille épurée des modules */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {allModulesList.map((m, mIdx) => {
               const isPreCreation = m.parcoursType === 'pre-creation';
               const sessionCount = rawAteliers.filter(f => {
                 const matchCode = (f.titre || '').includes(m.code) || (f.description || '').includes(m.code);
@@ -1019,11 +1259,10 @@ export default function Formations() {
               return (
                 <div
                   key={`${m.parcoursType}-${m.code}-${mIdx}`}
-                  className="bg-slate-50/70 dark:bg-dark-800/50 rounded-2xl border border-slate-200/80 dark:border-dark-700/70 p-4 flex flex-col justify-between hover:shadow-md transition-all hover:border-primary-500/40 group relative"
+                  className="bg-slate-50/70 dark:bg-dark-800/50 rounded-2xl border border-slate-200/80 dark:border-dark-700/70 p-4 flex flex-col justify-between hover:shadow-md transition-all hover:border-amber-500/50 group"
                 >
                   <div>
-                    {/* Header de la carte : Code, Durée, Badge parcours si "Tous" */}
-                    <div className="flex items-center justify-between gap-2 mb-2.5">
+                    <div className="flex items-center justify-between gap-2 mb-2">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className={`px-2 py-0.5 rounded-lg text-xs font-black tracking-wide border ${
                           isPreCreation
@@ -1042,7 +1281,7 @@ export default function Formations() {
                           <button
                             type="button"
                             onClick={() => handleDeleteModule(m.code, m.parcoursType)}
-                            className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                            className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition cursor-pointer"
                             title="Supprimer ce module personnalisé"
                           >
                             <Trash2 size={12} />
@@ -1051,12 +1290,10 @@ export default function Formations() {
                       </div>
                     </div>
 
-                    {/* Intitulé complet */}
-                    <h3 className="font-black text-sm text-slate-900 dark:text-white leading-snug mb-2">
+                    <h3 className="font-bold text-sm text-slate-900 dark:text-white leading-snug mb-2">
                       {m.name}
                     </h3>
 
-                    {/* Liste des points clés du programme */}
                     {Array.isArray(m.points) && m.points.length > 0 && (
                       <ul className="space-y-1 mb-3 text-xs text-slate-600 dark:text-dark-300">
                         {m.points.map((pt, pIdx) => (
@@ -1071,10 +1308,9 @@ export default function Formations() {
                     )}
                   </div>
 
-                  {/* Footer : Compteur de sessions programmées + Bouton Planifier */}
                   <div className="pt-2.5 border-t border-slate-200/60 dark:border-dark-700/60 flex items-center justify-between gap-2 mt-auto">
                     <span className="text-[10px] font-bold text-slate-400">
-                      {sessionCount} session{sessionCount > 1 ? 's' : ''} réalisée{sessionCount > 1 ? 's' : ''}
+                      {sessionCount} session{sessionCount > 1 ? 's' : ''}
                     </span>
                     <button
                       type="button"
@@ -1090,224 +1326,9 @@ export default function Formations() {
               );
             })}
           </div>
-        )}
-      </div>
-
-      {/* =========================================================================
-          2. EN-TÊTE DE LA LISTE DES FORMATIONS & RECHERCHE
-          ========================================================================= */}
-      <div className="flex items-center justify-between border-b border-slate-200 dark:border-dark-700/80 pb-3 gap-3 flex-wrap">
-        <div className="flex items-center gap-2.5">
-          <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold ${
-            selectedParcours === 'pre-creation' ? 'bg-blue-500/15 text-blue-600' : 'bg-amber-500/15 text-amber-600'
-          }`}>
-            <Calendar size={16} />
-          </div>
-          <div>
-            <h2 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
-              <span>Formations programmées • {selectedParcours === 'pre-creation' ? 'Parcours Pré-Création' : 'Parcours Post-Création'}</span>
-              <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-dark-800 text-slate-700 dark:text-slate-300 text-xs font-black">
-                {currentParcoursFormations.length}
-              </span>
-            </h2>
-            <p className="text-[11px] text-slate-400">Sessions dispensées, formateurs référents et émargements par QR code</p>
-          </div>
         </div>
+      )}
 
-        {/* Barre de recherche rapide */}
-        <div className="relative w-full sm:w-72">
-          <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Filtrer les formations..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="input !py-1.5 !pl-9 !text-xs w-full bg-white dark:bg-dark-800 rounded-xl"
-          />
-        </div>
-      </div>
-
-      {/* =========================================================================
-          3. LISTE DES FORMATIONS SANS DOUBLONS
-          ========================================================================= */}
-      <div className="space-y-4 animate-fade-in">
-        {loadingFormations ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-amber-500" />
-            </div>
-          ) : currentParcoursFormations.length === 0 ? (
-            <div className="card p-12 text-center border-dashed border-2 border-slate-200 dark:border-dark-700 bg-white/50 dark:bg-dark-900/50 rounded-3xl space-y-3">
-              <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-600 mx-auto flex items-center justify-center">
-                <GraduationCap size={28} />
-              </div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                Aucune formation de {selectedParcours === 'pre-creation' ? 'Pré-Création' : 'Post-Création'} enregistrée
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-dark-400 max-w-sm mx-auto">
-                Programmez une session pour les porteurs de projets en {selectedParcours === 'pre-creation' ? 'Pré-Création' : 'Post-Création'}.
-              </p>
-              <button
-                type="button"
-                onClick={() => handleOpenAddFormation()}
-                className="btn btn-primary btn-sm inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-2 px-4 rounded-xl"
-              >
-                <Plus size={15} /> Programmer une formation
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {currentParcoursFormations.map(formation => {
-                let meta = {};
-                try {
-                  meta = JSON.parse(formation.description || '{}');
-                } catch (e) {
-                  meta = {};
-                }
-
-                const moduleInfo = inferModuleInfo(formation, meta);
-                const collaborateur = meta.collaborateur || formation.intervenant || 'Ayoub Elbouchikhi (Coach IDS)';
-                const formateur = formation.formateur || meta.formateur || 'M. Khalid (Expert Formateur)';
-                const invitesCount = Array.isArray(meta.invitesIds) ? meta.invitesIds.length : allIncubes.length;
-
-                return (
-                  <div
-                    key={formation.id}
-                    className="card p-5 bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700/70 hover:border-amber-500/50 dark:hover:border-amber-500/50 rounded-3xl shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4 group"
-                  >
-                    {/* 1. TYPE DE MODULE & PARCOURS */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className={`text-[11px] font-black uppercase tracking-wider px-2.5 py-1 rounded-xl border flex items-center gap-1.5 ${
-                          selectedParcours === 'pre-creation' 
-                            ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20' 
-                            : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20'
-                        }`}>
-                          <BookOpen size={12} className={selectedParcours === 'pre-creation' ? 'text-blue-500' : 'text-amber-500'} />
-                          <span>Type de module : <strong>{moduleInfo.code}</strong></span>
-                        </span>
-
-                        <span className="text-[10px] font-bold text-slate-500 dark:text-dark-300 bg-slate-100 dark:bg-dark-800 px-2 py-0.5 rounded-lg flex items-center gap-1">
-                          <Clock size={11} /> {formation.duree || '3h00'}
-                        </span>
-                      </div>
-
-                      <div>
-                        <h3 className="font-black text-sm text-slate-900 dark:text-white leading-snug">
-                          {moduleInfo.name}
-                        </h3>
-                        {formation.titre && formation.titre !== moduleInfo.name && (
-                          <p className="text-[11px] text-slate-500 dark:text-dark-400 line-clamp-1 mt-0.5 font-medium">
-                            {formation.titre}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* 2, 3 & 4. LE FORMATEUR, COLLABORATEUR, DATE ET HORAIRE */}
-                    <div className="p-3.5 bg-slate-50/80 dark:bg-dark-800/50 rounded-2xl border border-slate-100 dark:border-dark-800/80 space-y-2.5 text-xs">
-                      {/* 2. Le Formateur */}
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-                          <User size={14} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <span className="text-[10px] uppercase font-bold text-slate-400 block leading-tight">Le Formateur</span>
-                          <strong className="text-slate-900 dark:text-white font-black truncate block text-xs">
-                            {formateur}
-                          </strong>
-                        </div>
-                      </div>
-
-                      {/* 3. Collaborateur IDS */}
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-                          <UserCheck size={14} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <span className="text-[10px] uppercase font-bold text-slate-400 block leading-tight">Collaborateur</span>
-                          <strong className="text-slate-900 dark:text-white font-black truncate block text-xs">
-                            {collaborateur}
-                          </strong>
-                        </div>
-                      </div>
-
-                      {/* 4. La Date et l'Horaire */}
-                      <div className="flex items-center gap-2.5 pt-2 border-t border-slate-200/60 dark:border-dark-700/60">
-                        <div className="w-7 h-7 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                          <Calendar size={14} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <span className="text-[10px] uppercase font-bold text-slate-400 block leading-tight">La date et l'horaire</span>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <strong className="text-slate-900 dark:text-white font-black text-xs">
-                              {formation.date ? new Date(formation.date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : 'Date non définie'}
-                            </strong>
-                            <span className="text-emerald-600 dark:text-emerald-400 font-mono text-[11px] font-bold">
-                              ({formation.heureDebut || '09:30'} - {formation.heureFin || '12:30'})
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Lieu / Salle */}
-                      {meta.salle && (
-                        <div className="flex items-center gap-2 text-[11px] text-slate-500 pl-1">
-                          <MapPin size={12} className="text-slate-400 shrink-0" />
-                          <span className="truncate">{meta.salle}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 5 & 6. BOUTON LISTE DES INCUBÉS PARTICIPANTS & LE QR CODE POUR FAIRE ÉMARGER */}
-                    <div className="pt-2 space-y-2 border-t border-slate-100 dark:border-dark-800/80">
-                      {/* 5. Un bouton pour ouvrir la liste des incubés participants */}
-                      <button
-                        type="button"
-                        onClick={() => setParticipantsModalItem({ formation, meta })}
-                        className="btn btn-secondary btn-sm w-full py-2.5 text-xs flex items-center justify-center gap-2 font-bold hover:border-primary-500/50 cursor-pointer rounded-xl border border-slate-200 dark:border-dark-700 bg-white dark:bg-dark-800 shadow-xs"
-                        title="Ouvrir la liste des incubés participants"
-                      >
-                        <Users size={14} className="text-primary-500" />
-                        <span>Liste des incubés participants ({invitesCount})</span>
-                      </button>
-
-                      {/* 6. Le QR code pour faire émarger les participants */}
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setQrModalItem(formation)}
-                          className="btn btn-primary btn-sm flex-1 py-2.5 text-xs flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black cursor-pointer rounded-xl shadow-md shadow-amber-500/10"
-                          title="Le QR code pour faire émarger les participants"
-                        >
-                          <QrCode size={15} />
-                          <span>QR code pour faire émarger</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEditFormation(formation, meta)}
-                          className="p-2.5 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors cursor-pointer border border-transparent hover:border-blue-200 dark:hover:border-blue-900/40"
-                          title="Modifier la session de formation"
-                        >
-                          <Pencil size={15} />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteFormation(formation.id)}
-                          className="p-2.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer border border-transparent hover:border-rose-200 dark:hover:border-rose-900/40"
-                          title="Supprimer la session"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
 
       {/* =========================================================================
           MODAL 1 : PROGRAMMER UNE FORMATION (AVEC LES 6 ÉLÉMENTS CLÉS)
