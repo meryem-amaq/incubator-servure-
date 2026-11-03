@@ -387,18 +387,76 @@ export const generateGlobalPVDocument = (incube, rows = [], signatureImage = nul
 
   let currentY = doc.lastAutoTable.finalY || 67;
 
-  // Vérifier s'il reste assez de place pour la Section 3 et la Section 4 (~75mm requis)
-  if (currentY + 70 > pageHeight) {
+  // ==========================================
+  // SECTION 3 : RESSOURCES HUMAINES & ÉQUIPE DU PROJET
+  // ==========================================
+  if (currentY + 50 > pageHeight) {
     doc.addPage();
     currentY = 16;
   } else {
     currentY += 8;
   }
 
+  drawSectionHeader("3. RESSOURCES HUMAINES & ÉQUIPE DU PROJET", currentY);
+
+  const rawPersonnel = Array.isArray(incube?.personnel) ? incube.personnel : [];
+  const rhCols = [
+    { header: 'N°', dataKey: 'num' },
+    { header: 'Nom complet du collaborateur', dataKey: 'nom' },
+    { header: 'Poste / Fonction', dataKey: 'poste' },
+    { header: 'Nature du contrat', dataKey: 'contrat' },
+    { header: 'Catégorie', dataKey: 'cat' },
+    { header: 'Date embauche', dataKey: 'debut' },
+    { header: 'Date fin', dataKey: 'fin' },
+    { header: 'Rémunération (MAD)', dataKey: 'salaire' }
+  ];
+
+  const rhData = rawPersonnel.length === 0
+    ? [['—', 'Aucun personnel salarié ou stagiaire déclaré à ce jour (équipe restreinte au porteur de projet).', '—', '—', '—', '—', '—', '—']]
+    : rawPersonnel.map((r, idx) => [
+        String(idx + 1),
+        r.nom_complet || '—',
+        r.poste || 'Salarié',
+        r.nature_contrat || 'CDI',
+        r.type_personnel || (r.nature_contrat === 'CDI' ? 'Personnel permanent' : 'Personnel temporaire'),
+        formatDateFr(r.date_embauche),
+        r.date_fin ? formatDateFr(r.date_fin) : '—',
+        r.salaire_mensuel && Number(r.salaire_mensuel) > 0 ? `${Number(r.salaire_mensuel).toLocaleString('fr-FR')} MAD` : '—'
+      ]);
+
+  autoTable(doc, {
+    startY: currentY + 3.5,
+    head: [rhCols.map(c => c.header)],
+    body: rhData,
+    styles: { fontSize: 7.5, cellPadding: 2.5, textColor: [51, 65, 85], valign: 'middle' },
+    headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.8, cellPadding: 3 },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    columnStyles: {
+      0: { cellWidth: 12, halign: 'center' },
+      1: { cellWidth: 62 },
+      2: { cellWidth: 46 },
+      3: { cellWidth: 28, halign: 'center', fontStyle: 'bold' },
+      4: { cellWidth: 38, halign: 'center' },
+      5: { cellWidth: 28, halign: 'center' },
+      6: { cellWidth: 26, halign: 'center' },
+      7: { cellWidth: 'auto', halign: 'right' }
+    },
+    margin: { left: marginX, right: marginX }
+  });
+
+  currentY = doc.lastAutoTable.finalY || currentY + 20;
+
   // ==========================================
-  // SECTION 3 : CONSTATATIONS, ANOMALIES & RECOMMANDATIONS
+  // SECTION 4 : CONSTATATIONS, ANOMALIES & RECOMMANDATIONS
   // ==========================================
-  drawSectionHeader("3. CONSTATATIONS, ANOMALIES & RECOMMANDATIONS", currentY);
+  if (currentY + 50 > pageHeight) {
+    doc.addPage();
+    currentY = 16;
+  } else {
+    currentY += 8;
+  }
+
+  drawSectionHeader("4. CONSTATATIONS, ANOMALIES & RECOMMANDATIONS", currentY);
 
   const cardY = currentY + 4;
   const cardWidth = (contentWidth - 14) / 3; // ~85mm par carte
@@ -477,14 +535,14 @@ export const generateGlobalPVDocument = (incube, rows = [], signatureImage = nul
   currentY = cardY + cardHeight + 8;
 
   // ==========================================
-  // SECTION 4 : VALIDATION ET ÉMARGEMENT
+  // SECTION 5 : VALIDATION ET ÉMARGEMENT
   // ==========================================
   if (currentY + 45 > pageHeight) {
     doc.addPage();
     currentY = 16;
   }
 
-  drawSectionHeader("4. VALIDATION ET ÉMARGEMENT", currentY);
+  drawSectionHeader("5. VALIDATION ET ÉMARGEMENT", currentY);
 
   doc.setFontSize(8);
   doc.setFont("helvetica", "italic");
@@ -1111,14 +1169,71 @@ export const generateQuarterlyPVDocument = (incube, options = {}, signatureImage
   currentY = doc.lastAutoTable.finalY + 7;
 
   // ==========================================
-  // 5. SYNTHÈSE, RECOMMANDATIONS & DÉCISION
+  // 5. RESSOURCES HUMAINES & CRÉATION D'EMPLOIS
   // ==========================================
   if (currentY + 45 > pageHeight) {
     doc.addPage();
     currentY = 16;
   }
 
-  drawSectionHeader("5. AVIS DE L'ACCOMPAGNATEUR & RECOMMANDATIONS POUR LE TRIMESTRE SUIVANT", currentY);
+  drawSectionHeader("5. RESSOURCES HUMAINES & CRÉATION D'EMPLOIS", currentY);
+
+  const rawPersonnel = Array.isArray(incube?.personnel) ? incube.personnel : (options.personnel || []);
+  const rhCols = [
+    { header: 'N°', dataKey: 'num' },
+    { header: 'Nom complet du collaborateur', dataKey: 'nom' },
+    { header: 'Poste / Fonction', dataKey: 'poste' },
+    { header: 'Nature du contrat', dataKey: 'contrat' },
+    { header: 'Catégorie', dataKey: 'cat' },
+    { header: 'Date embauche', dataKey: 'debut' },
+    { header: 'Date fin', dataKey: 'fin' },
+    { header: 'Rémunération (MAD)', dataKey: 'salaire' }
+  ];
+
+  const rhData = rawPersonnel.length === 0
+    ? [['—', 'Aucun personnel salarié ou stagiaire déclaré à ce jour pour ce trimestre.', '—', '—', '—', '—', '—', '—']]
+    : rawPersonnel.map((r, idx) => [
+        String(idx + 1),
+        r.nom_complet || '—',
+        r.poste || 'Salarié',
+        r.nature_contrat || 'CDI',
+        r.type_personnel || (r.nature_contrat === 'CDI' ? 'Personnel permanent' : 'Personnel temporaire'),
+        formatDateFr(r.date_embauche),
+        r.date_fin ? formatDateFr(r.date_fin) : '—',
+        r.salaire_mensuel && Number(r.salaire_mensuel) > 0 ? `${Number(r.salaire_mensuel).toLocaleString('fr-FR')} MAD` : '—'
+      ]);
+
+  autoTable(doc, {
+    startY: currentY + 3.5,
+    head: [rhCols.map(c => c.header)],
+    body: rhData,
+    styles: { fontSize: 7.5, cellPadding: 2.5, textColor: [51, 65, 85], valign: 'middle' },
+    headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.8, cellPadding: 3 },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    columnStyles: {
+      0: { cellWidth: 12, halign: 'center' },
+      1: { cellWidth: 62 },
+      2: { cellWidth: 46 },
+      3: { cellWidth: 28, halign: 'center', fontStyle: 'bold' },
+      4: { cellWidth: 38, halign: 'center' },
+      5: { cellWidth: 28, halign: 'center' },
+      6: { cellWidth: 26, halign: 'center' },
+      7: { cellWidth: 'auto', halign: 'right' }
+    },
+    margin: { left: marginX, right: marginX }
+  });
+
+  currentY = doc.lastAutoTable.finalY + 7;
+
+  // ==========================================
+  // 6. SYNTHÈSE, RECOMMANDATIONS & DÉCISION
+  // ==========================================
+  if (currentY + 45 > pageHeight) {
+    doc.addPage();
+    currentY = 16;
+  }
+
+  drawSectionHeader("6. AVIS DE L'ACCOMPAGNATEUR & RECOMMANDATIONS POUR LE TRIMESTRE SUIVANT", currentY);
 
   const cardY = currentY + 3.5;
   const cardWidth = (contentWidth - 14) / 3;
@@ -1160,14 +1275,14 @@ export const generateQuarterlyPVDocument = (incube, options = {}, signatureImage
   currentY = cardY + cardHeight + 7;
 
   // ==========================================
-  // 6. VALIDATION ET ÉMARGEMENT (SIGNATURES)
+  // 7. VALIDATION ET ÉMARGEMENT (SIGNATURES)
   // ==========================================
   if (currentY + 45 > pageHeight) {
     doc.addPage();
     currentY = 16;
   }
 
-  drawSectionHeader("6. ÉMARGEMENT & DOUBLE SIGNATURE OFFICIELLE", currentY);
+  drawSectionHeader("7. ÉMARGEMENT & DOUBLE SIGNATURE OFFICIELLE", currentY);
 
   doc.setFontSize(7.5);
   doc.setFont("helvetica", "italic");
