@@ -76,7 +76,11 @@ function matchesPersonName(nameA, nameB) {
 
   let matchedCount = 0;
   for (const wa of sigA) {
-    const hasMatch = sigB.some(wb => similarity(wa, wb) >= 0.75);
+    const hasMatch = sigB.some(wb => {
+      if (similarity(wa, wb) >= 0.70) return true;
+      if (wa.length === wb.length && wa.split('').sort().join('') === wb.split('').sort().join('')) return true;
+      return false;
+    });
     if (hasMatch) matchedCount++;
   }
 
@@ -239,6 +243,7 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
           name: knownAdmin.nom,
           category: 'Administration',
           email: knownAdmin.email,
+          subtitle: knownAdmin.email,
           photo: uMatch ? uMatch.photo_url : null,
           userId: uMatch ? uMatch.id : null,
           badgeId: scan.raw_badge_id
@@ -249,12 +254,12 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
       const directInc = rawBadge ? incubeByBadge.get(rawBadge) : null;
       if (directInc) {
         const u = directInc.user_id ? userById.get(directInc.user_id) : null;
-        const startupName = directInc.raison_sociale ? ` (${directInc.raison_sociale})` : '';
         return {
           personKey: `incube_${directInc.id}`,
-          name: `${directInc.nom_incube}${startupName}`,
+          name: directInc.nom_incube,
           category: 'Incube',
           email: directInc.email || u?.email || null,
+          subtitle: directInc.email || (directInc.raison_sociale ? `Porteur • ${directInc.raison_sociale}` : null),
           photo: directInc.photo_path || u?.photo_url || null,
           userId: directInc.user_id || null,
           badgeId: scan.raw_badge_id
@@ -267,9 +272,10 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
         const startupName = matchedAssoc.incube.raison_sociale || matchedAssoc.incube.nom_incube || 'Startup';
         return {
           personKey: `assoc_${matchedAssoc.incube.id}_${cleanWord(matchedAssoc.associe.nom)}`,
-          name: `${matchedAssoc.associe.nom} [Associé - ${startupName}]`,
+          name: matchedAssoc.associe.nom,
           category: 'Incube',
           email: matchedAssoc.associe.email || matchedAssoc.incube.email || null,
+          subtitle: matchedAssoc.associe.email || `Associé • ${startupName}`,
           photo: null,
           userId: matchedAssoc.incube.user_id || null,
           badgeId: scan.raw_badge_id
@@ -280,12 +286,13 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
       const matchedRh = rawBadge ? rhByBadge.get(rawBadge) : null;
       if (matchedRh) {
         const startupName = matchedRh.incube?.raison_sociale || matchedRh.incube?.nom_incube || 'Startup';
-        const roleLabel = matchedRh.poste || 'Salarié';
+        const roleLabel = (matchedRh.poste && matchedRh.poste.trim()) || 'Salarié';
         return {
           personKey: `rh_${matchedRh.id}`,
-          name: `${matchedRh.nom_complet} [${roleLabel} - ${startupName}]`,
+          name: matchedRh.nom_complet,
           category: 'Incube',
-          email: null,
+          email: matchedRh.email || null,
+          subtitle: `${roleLabel} • ${startupName}`,
           photo: null,
           userId: matchedRh.incube?.user_id || null,
           badgeId: scan.raw_badge_id
@@ -341,25 +348,30 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
       let name = '';
       let category = 'Autre';
       let email = null;
+      let subtitle = null;
       let photo = null;
 
       if (inc) {
         // Priorité 1 : Incubé reconnu (affiche nom_incube officiel et raison sociale)
-        const startupName = inc.raison_sociale ? ` (${inc.raison_sociale})` : '';
         personKey = `incube_${inc.id}`;
-        name = `${inc.nom_incube}${startupName}`;
+        name = inc.nom_incube;
         email = inc.email || u?.email || null;
+        subtitle = inc.email || (inc.raison_sociale ? `Porteur • ${inc.raison_sociale}` : null);
         photo = inc.photo_path || u?.photo_url || null;
         category = 'Incube';
       } else if (assocFromTu) {
         const startupName = assocFromTu.incube.raison_sociale || assocFromTu.incube.nom_incube || 'Startup';
         personKey = `assoc_${assocFromTu.incube.id}_${cleanWord(assocFromTu.associe.nom)}`;
-        name = `${assocFromTu.associe.nom} [Associé - ${startupName}]`;
+        name = assocFromTu.associe.nom;
+        email = assocFromTu.associe.email || null;
+        subtitle = `Associé • ${startupName}`;
         category = 'Incube';
       } else if (rhFromTu) {
         const startupName = rhFromTu.incube?.raison_sociale || rhFromTu.incube?.nom_incube || 'Startup';
         personKey = `rh_${rhFromTu.id}`;
-        name = `${rhFromTu.nom_complet} [${rhFromTu.poste || 'Salarié'} - ${startupName}]`;
+        name = rhFromTu.nom_complet;
+        email = rhFromTu.email || null;
+        subtitle = `${(rhFromTu.poste && rhFromTu.poste.trim()) || 'Salarié'} • ${startupName}`;
         category = 'Incube';
       } else if (u) {
         // Priorité 2 : Compte utilisateur (Administration, Staff, Consultant...)
@@ -368,6 +380,7 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
         personKey = `user_${u.id}`;
         name = `${u.prenom || ''} ${u.nom || ''}`.trim() || tu?.name || 'Utilisateur';
         email = u.email;
+        subtitle = u.email;
         photo = u.photo_url;
         category = isStaff ? 'Administration' : (u.type === 'Administration' ? 'Administration' : 'Incube');
       } else if (tu) {
@@ -391,6 +404,7 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
         name,
         category,
         email,
+        subtitle,
         photo,
         userId: u ? u.id : (inc?.user_id || null),
         badgeId: scan.raw_badge_id
@@ -455,6 +469,7 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
           name: personInfo.name,
           type: personInfo.category,
           email: personInfo.email,
+          subtitle: personInfo.subtitle,
           photo_url: personInfo.photo,
           derniere_entree: lastScan.time,
           heure_entree: heureStr,
@@ -492,6 +507,8 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
         user_id: personInfo.userId,
         name: personInfo.name,
         type: personInfo.category,
+        email: personInfo.email,
+        subtitle: personInfo.subtitle,
         mouvement: scan.type, // 'IN' ou 'OUT'
         device_ip: scan.device_ip
       };
@@ -503,7 +520,9 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
       if (searchFilter) {
         const n = (item.name || '').toLowerCase();
         const b = String(item.badge_id || '').toLowerCase();
-        if (!n.includes(searchFilter) && !b.includes(searchFilter)) return false;
+        const s = (item.subtitle || '').toLowerCase();
+        const e = (item.email || '').toLowerCase();
+        if (!n.includes(searchFilter) && !b.includes(searchFilter) && !s.includes(searchFilter) && !e.includes(searchFilter)) return false;
       }
       return true;
     }

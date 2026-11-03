@@ -198,7 +198,9 @@ export default function ControleAcces() {
         const q = searchQuery.toLowerCase().trim();
         const n = (item.name || '').toLowerCase();
         const b = String(item.badge_id || '').toLowerCase();
-        if (!n.includes(q) && !b.includes(q)) return false;
+        const s = (item.subtitle || '').toLowerCase();
+        const e = (item.email || '').toLowerCase();
+        if (!n.includes(q) && !b.includes(q) && !s.includes(q) && !e.includes(q)) return false;
       }
       return true;
     });
@@ -217,7 +219,9 @@ export default function ControleAcces() {
         const q = searchQuery.toLowerCase().trim();
         const n = (item.name || '').toLowerCase();
         const b = String(item.badge_id || '').toLowerCase();
-        if (!n.includes(q) && !b.includes(q)) return false;
+        const s = (item.subtitle || '').toLowerCase();
+        const e = (item.email || '').toLowerCase();
+        if (!n.includes(q) && !b.includes(q) && !s.includes(q) && !e.includes(q)) return false;
       }
       return true;
     });
@@ -841,9 +845,9 @@ export default function ControleAcces() {
                                 <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
                                   {item.name}
                                 </p>
-                                {item.email && (
+                                {(item.email || item.subtitle) && (
                                   <p className="text-xs text-slate-400 truncate">
-                                    {item.email}
+                                    {item.email || item.subtitle}
                                   </p>
                                 )}
                               </div>
@@ -996,6 +1000,11 @@ export default function ControleAcces() {
                             <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
                               {scan.name}
                             </p>
+                            {(scan.subtitle || scan.email) && (
+                              <p className="text-xs text-slate-400 truncate">
+                                {scan.subtitle || scan.email}
+                              </p>
+                            )}
                           </td>
 
                           {/* Catégorie */}
