@@ -20,8 +20,7 @@ import {
   HelpCircle,
   HardHat,
   Sparkles,
-  Wifi,
-  PieChart
+  Wifi
 } from 'lucide-react';
 import api, { getPhotoUrl } from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -528,99 +527,6 @@ export default function ControleAcces() {
             </div>
           );
         })}
-      </div>
-
-      {/* 2.5 SECTION VISUELLE : RÉPARTITION DES RÔLES & DES FLUX */}
-      <div className="card p-4 sm:p-5 bg-white dark:bg-dark-800/90 border border-slate-200 dark:border-dark-700/70 shadow-sm rounded-2xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2.5">
-            <span className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-              <PieChart size={18} />
-            </span>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                  Répartition des Rôles & Passages
-                </h3>
-                {(dashboardData.total_usagers_journee || 0) > 0 && (
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-dark-700 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-dark-600">
-                    {dashboardData.total_usagers_journee} usager{(dashboardData.total_usagers_journee || 0) > 1 ? 's' : ''} unique{(dashboardData.total_usagers_journee || 0) > 1 ? 's' : ''}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-slate-500 dark:text-dark-400">
-                Distribution globale des usagers identifiés par les tourniquets pour la journée sélectionnée
-              </p>
-            </div>
-          </div>
-
-          {dashboardData.repartition_roles && dashboardData.repartition_roles.length > 0 && (
-            <span className="text-[11px] text-slate-400 dark:text-dark-400 self-end sm:self-auto italic">
-              Cliquez sur un rôle pour filtrer le tableau
-            </span>
-          )}
-        </div>
-
-        {/* Barre segmentée proportionnelle */}
-        {(dashboardData.total_usagers_journee || 0) > 0 && dashboardData.repartition_roles && dashboardData.repartition_roles.length > 0 ? (
-          <div className="space-y-3">
-            <div className="h-3.5 w-full bg-slate-100 dark:bg-dark-700/70 rounded-full overflow-hidden flex shadow-inner p-0.5 gap-0.5">
-              {dashboardData.repartition_roles.map((item) => {
-                const style = CATEGORY_STYLES[item.categorie] || CATEGORY_STYLES.Autre;
-                const isSelected = selectedType === item.categorie;
-                return (
-                  <div
-                    key={item.categorie}
-                    style={{ width: `${Math.max(item.pourcentage, 3)}%` }}
-                    onClick={() => setSelectedType(isSelected ? 'Tous' : item.categorie)}
-                    className={`h-full ${style.barBg || 'bg-slate-400'} rounded-sm transition-all duration-200 cursor-pointer hover:opacity-80 hover:scale-y-110 relative`}
-                    title={`${item.label || item.categorie}: ${item.countJournee} usager(s) (${item.pourcentage}%) • ${item.countPresents} actuellement sur site`}
-                  />
-                );
-              })}
-            </div>
-
-            {/* Badges de chaque rôle avec nombre et pourcentage */}
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              {dashboardData.repartition_roles.map((item) => {
-                const style = CATEGORY_STYLES[item.categorie] || CATEGORY_STYLES.Autre;
-                const isSelected = selectedType === item.categorie;
-                const IconComponent = style.icon || Users;
-
-                return (
-                  <button
-                    key={item.categorie}
-                    onClick={() => setSelectedType(isSelected ? 'Tous' : item.categorie)}
-                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border ${
-                      isSelected
-                        ? `${style.badge} ring-2 ring-amber-500 shadow-sm scale-105`
-                        : 'bg-slate-50 dark:bg-dark-900/60 text-slate-700 dark:text-slate-300 border-slate-200/80 dark:border-dark-700/70 hover:border-slate-300 dark:hover:border-dark-600'
-                    }`}
-                  >
-                    <span className={`w-2 h-2 rounded-full ${style.barBg || 'bg-slate-400'}`} />
-                    <IconComponent size={14} className={style.text} />
-                    <span>{item.label || item.categorie}</span>
-                    <span className="font-bold text-slate-900 dark:text-white">
-                      {item.countJournee}
-                    </span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-black/5 dark:bg-white/10 font-mono text-slate-600 dark:text-slate-400">
-                      {item.pourcentage}%
-                    </span>
-                    {item.countPresents > 0 && (
-                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-                        • {item.countPresents} sur site
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ) : (
-          <div className="py-4 px-4 rounded-xl bg-slate-50 dark:bg-dark-900/40 text-center text-xs text-slate-500 dark:text-dark-400 border border-slate-200/60 dark:border-dark-700/40">
-            {loading ? 'Calcul de la répartition en cours...' : 'Aucun passage enregistré pour cette date.'}
-          </div>
-        )}
       </div>
 
       {/* 3. BARRE DE FILTRES ET RECHERCHE */}
