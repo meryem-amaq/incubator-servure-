@@ -397,9 +397,11 @@ function calculateEngagementMetrics(monthlyHours, options = {}) {
 }
 
 /**
- * Synchronise les pointages pour un incubé spécifique et met à jour suivi_engagement
+ * Synchronise les pointages pour une startup (Porteur + Associés + Salariés RH)
+ * et met à jour suivi_engagement avec les heures cumulées de toute l'équipe startup.
  */
 async function syncIncubeTourniquet(incubeId, annee = new Date().getFullYear()) {
+  const { RhDetail } = require('../models');
   const incube = await Incube.findByPk(incubeId);
   if (!incube) {
     throw new Error(`Incubé #${incubeId} introuvable`);
@@ -411,40 +413,180 @@ async function syncIncubeTourniquet(incubeId, annee = new Date().getFullYear()) 
     collectFromAllDevices().catch(() => {});
   } catch (e) {}
 
-  // 2. Trouver l'identifiant badge de l'incubé
+  // 2. Identifier tous les membres de l'équipe Startup (Porteur + Associés + Salariés RH)
   const badgeId = await findBadgeForIncube(incube);
-  const hasBadge = Boolean(badgeId || incube.matricule);
+  const porteurBadge = normalizeBadgeId(badgeId);
+  const porteurMat = incube.matricule ? String(incube.matricule).trim() : null;
 
-  // 3. Récupérer les pointages en BDD (recherche par badge RFID, matricule machine ou user_id)
-  const whereClause = {
-    [Op.or]: []
-  };
+  const teamMembers = [];
+  const usedIds = new Set();
 
-  if (badgeId) {
-    whereClause[Op.or].push({ raw_badge_id: String(badgeId).trim() });
+  // 2a. Porteur principal
+  const porteurKeys = new Set();
+  if (porteurBadge) { porteurKeys.add(porteurBadge); usedIds.add(porteurBadge); }
+  if (porteurMat) { porteurKeys.add(porteurMat); usedIds.add(porteurMat); }
+
+  teamMembers.push({
+    key: `porteur_${incube.id}`,
+    nom: incube.nom_incube,
+    role: 'Porteur de Projet',
+    type: 'porteur',
+    badge_id: porteurBadge || null,
+    matricule: porteurMat || null,
+    user_id: incube.user_id || null,
+    matchBadges: porteurKeys
+  });
+
+  // 2b. Associés de la startup (incube.associes)
+  let associesList = incube.associes;
+  if (typeof associesList === 'string') {
+    try { associesList = JSON.parse(associesList); } catch { associesList = []; }
   }
-  if (incube.matricule) {
-    whereClause[Op.or].push({ raw_badge_id: String(incube.matricule).trim() });
+  if (Array.isArray(associesList)) {
+    associesList.forEach((a, idx) => {
+      if (!a || !a.nom) return;
+      const aBadge = normalizeBadgeId(a.badge_id);
+      const aMat = a.matricule ? String(a.matricule).trim() : null;
+      const aKeys = new Set();
+      if (aBadge && !usedIds.has(aBadge)) { aKeys.add(aBadge); usedIds.add(aBadge); }
+      if (aMat && !usedIds.has(aMat)) { aKeys.add(aMat); usedIds.add(aMat); }
+      teamMembers.push({
+        key: `associe_${idx}_${a.nom}`,
+        nom: a.nom,
+        role: a.fonction || 'Associé',
+        type: 'associe',
+        badge_id: aBadge || null,
+        matricule: aMat || null,
+        user_id: null,
+        matchBadges: aKeys
+      });
+    });
+  }
+
+  // 2c. Salariés & Stagiaires RH de la startup (rh_detail)
+  const rhList = await RhDetail.findAll({ where: { incube_id: incube.id } });
+  rhList.forEach(rh => {
+    // Éviter de compter deux fois le porteur s'il figure aussi dans rh_detail
+    if (matchesPersonName(rh.nom_complet, incube.nom_incube)) return;
+    const rBadge = normalizeBadgeId(rh.badge_id);
+    const rMat = rh.matricule ? String(rh.matricule).trim() : null;
+    const rKeys = new Set();
+    if (rBadge && !usedIds.has(rBadge)) { rKeys.add(rBadge); usedIds.add(rBadge); }
+    if (rMat && !usedIds.has(rMat)) { rKeys.add(rMat); usedIds.add(rMat); }
+    teamMembers.push({
+      key: `rh_${rh.id}`,
+      nom: rh.nom_complet,
+      role: rh.poste || rh.type_personnel || 'Salarié',
+      type: 'salarie',
+      badge_id: rBadge || null,
+      matricule: rMat || null,
+      user_id: null,
+      matchBadges: rKeys
+    });
+  });
+
+  const hasPorteurBadge = Boolean(porteurBadge || porteurMat);
+  const hasBadge = teamMembers.some(m => m.matchBadges.size > 0);
+
+  // 3. Récupérer en une seule requête tous les pointages de toute l'équipe Startup
+  const allBadgeIdentifiers = Array.from(usedIds);
+  const whereClause = { [Op.or]: [] };
+  if (allBadgeIdentifiers.length > 0) {
+    whereClause[Op.or].push({ raw_badge_id: { [Op.in]: allBadgeIdentifiers } });
   }
   if (incube.user_id) {
     whereClause[Op.or].push({ user_id: incube.user_id });
   }
 
-  let scans = [];
+  let allScans = [];
   if (whereClause[Op.or].length > 0) {
-    scans = await Attendance.findAll({
+    allScans = await Attendance.findAll({
       where: whereClause,
       order: [['time', 'ASC']]
     });
   }
 
-  // 4. Traitement du signal et calcul des heures mensuelles
-  const { monthlyHours, totalHours, daysPresent, totalValidScans } = processScansToMonthlyHours(scans, annee);
-  const metrics = calculateEngagementMetrics(monthlyHours, { hasBadge, annee });
+  // 4. Calculer les heures individuellement par membre (pour un appairage Entrée/Sortie exact par personne)
+  //    puis additionner les heures pour l'équipe globale et par catégorie
+  const equipeMonthlyHours = {};
+  const porteurMonthlyHours = {};
+  const associesMonthlyHours = {};
+  const salariesMonthlyHours = {};
+  MOIS_NOMS.forEach(m => {
+    equipeMonthlyHours[m] = 0;
+    porteurMonthlyHours[m] = 0;
+    associesMonthlyHours[m] = 0;
+    salariesMonthlyHours[m] = 0;
+  });
 
-  // 5. Mettre à jour la table suivi_engagement de façon strictement protectrice
-  // RÈGLE : Si l'incubé n'a pas de badge ou n'a aucun scan pour cette année, on ne touche JAMAIS aux données déjà enregistrées !
-  if (scans.length > 0) {
+  const allTeamDaysSet = new Set();
+  let equipeTotalValidScans = 0;
+  const teamBreakdown = [];
+
+  for (const member of teamMembers) {
+    const memberScans = allScans.filter(s => {
+      const rb = normalizeBadgeId(s.raw_badge_id);
+      if (rb && member.matchBadges.has(rb)) return true;
+      if (member.user_id && s.user_id === member.user_id) return true;
+      return false;
+    });
+
+    const memberRes = processScansToMonthlyHours(memberScans, annee);
+    equipeTotalValidScans += memberRes.totalValidScans;
+
+    // Collecter les jours distincts de présence de l'équipe sur l'année
+    for (const s of memberScans) {
+      const d = new Date(s.time);
+      if (d.getFullYear() === Number(annee)) {
+        allTeamDaysSet.add(d.toISOString().split('T')[0]);
+      }
+    }
+
+    MOIS_NOMS.forEach(m => {
+      const h = memberRes.monthlyHours[m] || 0;
+      equipeMonthlyHours[m] = Math.round((equipeMonthlyHours[m] + h) * 10) / 10;
+      if (member.type === 'porteur') {
+        porteurMonthlyHours[m] = Math.round((porteurMonthlyHours[m] + h) * 10) / 10;
+      } else if (member.type === 'associe') {
+        associesMonthlyHours[m] = Math.round((associesMonthlyHours[m] + h) * 10) / 10;
+      } else if (member.type === 'salarie') {
+        salariesMonthlyHours[m] = Math.round((salariesMonthlyHours[m] + h) * 10) / 10;
+      }
+    });
+
+    teamBreakdown.push({
+      name: member.nom,
+      nom: member.nom,
+      role: member.role,
+      type: member.type,
+      badge_id: member.badge_id,
+      matricule: member.matricule,
+      hasBadge: member.matchBadges.size > 0,
+      totalHours: memberRes.totalHours,
+      daysPresent: memberRes.daysPresent,
+      totalValidScans: memberRes.totalValidScans,
+      monthlyHours: memberRes.monthlyHours
+    });
+  }
+
+  const monthlyHours = equipeMonthlyHours;
+  const daysPresent = allTeamDaysSet.size;
+  const totalValidScans = equipeTotalValidScans;
+  const totalHeuresPorteur = Math.round(Object.values(porteurMonthlyHours).reduce((a, b) => a + b, 0) * 10) / 10;
+  const totalHeuresAssocies = Math.round(Object.values(associesMonthlyHours).reduce((a, b) => a + b, 0) * 10) / 10;
+  const totalHeuresSalaries = Math.round(Object.values(salariesMonthlyHours).reduce((a, b) => a + b, 0) * 10) / 10;
+  const baseMetrics = calculateEngagementMetrics(equipeMonthlyHours, { hasBadge, annee });
+  const metrics = {
+    ...baseMetrics,
+    totalHeuresPorteur,
+    totalHeuresAssocies,
+    totalHeuresSalaries
+  };
+  const porteurMetrics = calculateEngagementMetrics(porteurMonthlyHours, { hasBadge: hasPorteurBadge, annee });
+  const teamBadgeCount = teamBreakdown.filter(m => m.hasBadge).length;
+
+  // 5. Mettre à jour la table suivi_engagement avec les heures cumulées de l'équipe Startup
+  if (allScans.length > 0) {
     const existingRows = await SuiviEngagement.findAll({
       where: {
         incube_id: incube.id,
@@ -458,7 +600,6 @@ async function syncIncubeTourniquet(incubeId, annee = new Date().getFullYear()) 
       const engagementRow = rowsByMonth.get(m);
 
       if (engagementRow) {
-        // Ne mettre à jour que si des heures positives réelles ont été mesurées et diffèrent
         if (heures > 0 && engagementRow.moyenne_heures_presence !== heures) {
           engagementRow.moyenne_heures_presence = heures;
           await engagementRow.save();
@@ -481,12 +622,22 @@ async function syncIncubeTourniquet(incubeId, annee = new Date().getFullYear()) 
     incube: {
       id: incube.id,
       nom_incube: incube.nom_incube,
+      raison_sociale: incube.raison_sociale,
       badge_id: badgeId || null,
-      hasBadge
+      matricule: incube.matricule || null,
+      hasBadge,
+      teamMembersCount: teamBreakdown.length,
+      teamBadgeCount
     },
     annee: Number(annee),
-    monthlyHours,
+    monthlyHours: equipeMonthlyHours,
+    equipeMonthlyHours,
+    porteurMonthlyHours,
+    associesMonthlyHours,
+    salariesMonthlyHours,
     metrics,
+    porteurMetrics,
+    teamBreakdown,
     daysPresent,
     totalValidScans
   };

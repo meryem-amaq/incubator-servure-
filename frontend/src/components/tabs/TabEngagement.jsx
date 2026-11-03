@@ -38,13 +38,15 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
   const [savingAll, setSavingAll] = useState(false);
   const [savingRowIdx, setSavingRowIdx] = useState(null);
   const [syncingTourniquet, setSyncingTourniquet] = useState(false);
+  const [tourniquetFilterMode, setTourniquetFilterMode] = useState('equipe'); // 'equipe' | 'porteur'
+  const [tourniquetTeamData, setTourniquetTeamData] = useState(null);
   const [activeEngagementTab, setActiveEngagementTab] = useState("tourniquets"); // "tourniquets", "formations", "ateliers" // "agenda" | "table"
   const [selectedAgendaMonth, setSelectedAgendaMonth] = useState(() => {
     const curMonthIdx = new Date().getMonth();
     return MOIS[curMonthIdx] || MOIS[0];
   }); // "tourniquets", "formations", "ateliers"
 
-  // Synchroniser automatiquement les pointages réels des tourniquets physiques ZKTeco
+  // Synchroniser automatiquement les pointages réels des tourniquets physiques ZKTeco (Porteur + Associés + Salariés RH)
   const handleSyncTourniquet = async (isSilent = false) => {
     const targetId = incubeId || incube?.id;
     if (!targetId) {
@@ -55,6 +57,7 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
     try {
       const res = await api.get(`/incubes/${targetId}/sync-tourniquet?annee=${annee}`);
       const { monthlyHours, metrics, incube: incInfo } = res.data;
+      setTourniquetTeamData(res.data);
 
       if (monthlyHours) {
         setMonths(prev => {
@@ -75,8 +78,12 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
         });
 
         if (!isSilent) {
-          const badgeTxt = incInfo?.badge_id ? ` (Badge #${incInfo.badge_id})` : ' (⚠️ Sans badge)';
-          toast.success(`Pointages tourniquets vérifiés${badgeTxt} ! Total certifié : ${metrics?.totalHeures || 0}h`, { duration: 4000 });
+          const badgeCount = incInfo?.teamBadgeCount || (incInfo?.badge_id ? 1 : 0);
+          const badgeTxt = badgeCount > 0 ? ` (${badgeCount} membre${badgeCount > 1 ? 's' : ''} badgé${badgeCount > 1 ? 's' : ''})` : ' (⚠️ Sans badge)';
+          toast.success(
+            `Pointages tourniquets vérifiés${badgeTxt} ! Équipe : ${metrics?.totalHeures || 0}h (Porteur : ${metrics?.totalHeuresPorteur || 0}h, Associés : ${metrics?.totalHeuresAssocies || 0}h, Salariés : ${metrics?.totalHeuresSalaries || 0}h)`,
+            { duration: 4500 }
+          );
         }
       }
     } catch (err) {
@@ -700,9 +707,19 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
 
     MOIS.forEach((m) => {
       const d = months[m];
-      const valHours = (d.moyenne_heures_presence !== '' && d.moyenne_heures_presence !== null && !isNaN(d.moyenne_heures_presence))
+      let valHours = (d.moyenne_heures_presence !== '' && d.moyenne_heures_presence !== null && !isNaN(d.moyenne_heures_presence))
         ? parseFloat(d.moyenne_heures_presence)
         : null;
+
+      // Appliquer le filtre « Porteur seul » vs « Équipe globale » si les données tourniquets détaillées sont chargées
+      if (tourniquetFilterMode === 'porteur' && tourniquetTeamData?.porteurMonthlyHours) {
+        const porteurH = Number(tourniquetTeamData.porteurMonthlyHours[m] || 0);
+        valHours = porteurH > 0 ? porteurH : null;
+      } else if (tourniquetFilterMode === 'equipe' && tourniquetTeamData?.equipeMonthlyHours) {
+        const equipeH = Number(tourniquetTeamData.equipeMonthlyHours[m] || 0);
+        if (equipeH > 0) valHours = equipeH;
+      }
+
       const hasHours = valHours !== null && valHours > 0;
       const hasInitiatives = d.initiatives && d.initiatives.trim();
 
@@ -785,7 +802,7 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
       totalHeuresAteliersAnimes: ateliersStats?.totals?.heures_ateliers_animes || 0,
       totalNbAteliersAnimes: ateliersStats?.totals?.nb_ateliers_animes || 0
     };
-  }, [months, workshops, allPresences, incubeId, incube, annee, ateliersStats]);
+  }, [months, workshops, allPresences, incubeId, incube, annee, ateliersStats, tourniquetFilterMode, tourniquetTeamData]);
 
   return (
     <div className="space-y-6 slide-up w-full">
@@ -1028,14 +1045,14 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
         </div>
       </div>
 
-      {/* Avertissement informatif si l'incubé n'a pas de badge ZKTeco attribué */}
-      {!incube?.badge_id && (
+      {/* Avertissement informatif si aucun membre de la startup (ni porteur, ni associé, ni salarié) n'a de badge ZKTeco */}
+      {!incube?.badge_id && !incube?.matricule && !(tourniquetTeamData?.incube?.hasBadge) && (
         <div className="flex items-center gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs shadow-sm">
           <AlertCircle size={18} className="text-amber-500 shrink-0" />
           <div className="flex-1">
-            <span className="font-bold">Aucun badge tourniquet n'est attribué à cet incubé ({incube?.nom_incube || '—'}).</span>
+            <span className="font-bold">Aucun badge tourniquet n'est attribué à cette startup ({incube?.nom_incube || '—'}).</span>
             <span className="block sm:inline sm:ml-1 text-slate-600 dark:text-dark-300">
-              Les heures de présence seront enregistrées automatiquement dès qu'un badge physique ZKTeco lui sera affecté dans l'onglet <em>« Infos Générales »</em>.
+              Les heures de présence (Porteur + Associés + Salariés RH) seront enregistrées automatiquement dès qu'un badge physique ZKTeco sera affecté dans <em>« Infos Générales »</em> ou <em>« Ressources Humaines »</em>.
             </span>
           </div>
         </div>
@@ -1156,15 +1173,94 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
               <p>
                 🏛️ <strong>Présence physique aux locaux de l'incubateur</strong> • Base contractuelle : 15 h/semaine (soit 60 h/mois, 720 h/an).
               </p>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Filtre : Équipe Globale vs Porteur Seul */}
+                <div className="inline-flex items-center bg-slate-100 dark:bg-dark-800 p-0.5 rounded-lg border border-slate-200 dark:border-dark-700">
+                  <button
+                    type="button"
+                    onClick={() => setTourniquetFilterMode('equipe')}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+                      tourniquetFilterMode === 'equipe'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-dark-300 hover:text-slate-900'
+                    }`}
+                    title="Cumuler les heures du Porteur, des Associés et des Salariés RH de la startup"
+                  >
+                    👥 Équipe Globale ({tourniquetTeamData?.metrics?.totalHeures ?? stats.totalHeures}h)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTourniquetFilterMode('porteur')}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+                      tourniquetFilterMode === 'porteur'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-dark-300 hover:text-slate-900'
+                    }`}
+                    title="Afficher uniquement les heures du Porteur de projet principal"
+                  >
+                    👤 Porteur Seul ({tourniquetTeamData?.metrics?.totalHeuresPorteur ?? stats.totalHeures}h)
+                  </button>
+                </div>
+
                 <span className="font-mono text-[11px] bg-slate-100 dark:bg-dark-800 px-2 py-0.5 rounded border border-slate-200 dark:border-dark-700">
-                  Badge : {incube?.badge_id ? `#${incube.badge_id}` : 'Non affecté'}
+                  Badge Porteur : {incube?.badge_id ? `#${incube.badge_id}` : (incube?.matricule ? `Mat #${incube.matricule}` : 'Non affecté')}
                 </span>
                 <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                  Total {annee} : {stats.totalHeures} h
+                  Total affiché ({annee}) : {stats.totalHeures} h
                 </span>
               </div>
             </div>
+
+            {/* Détail de la contribution par membre de l'équipe Startup (Porteur + Associés + Salariés RH) */}
+            {tourniquetTeamData?.teamBreakdown && tourniquetTeamData.teamBreakdown.length > 0 && (
+              <div className="p-3 rounded-xl bg-slate-50/90 dark:bg-dark-800/50 border border-slate-200/80 dark:border-dark-700/60 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                  <span className="font-bold text-slate-700 dark:text-dark-200 flex items-center gap-1.5">
+                    <Users size={14} className="text-blue-500" />
+                    Contribution de l'équipe Startup ({tourniquetTeamData.incube?.teamMembersCount || 1} membre{(tourniquetTeamData.incube?.teamMembersCount || 1) > 1 ? 's' : ''} • {tourniquetTeamData.incube?.teamBadgeCount || 0} badgé{(tourniquetTeamData.incube?.teamBadgeCount || 0) > 1 ? 's' : ''}) :
+                  </span>
+                  <div className="flex flex-wrap items-center gap-2 font-semibold">
+                    <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20">
+                      👤 Porteur : {tourniquetTeamData.metrics?.totalHeuresPorteur || 0} h
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
+                      🤝 Associés : {tourniquetTeamData.metrics?.totalHeuresAssocies || 0} h
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                      💼 Salariés RH : {tourniquetTeamData.metrics?.totalHeuresSalaries || 0} h
+                    </span>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {tourniquetTeamData.teamBreakdown.map((member, mIdx) => (
+                    <div
+                      key={mIdx}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] border ${
+                        member.totalHours > 0
+                          ? 'bg-white dark:bg-dark-900 border-blue-200 dark:border-blue-800/60 text-slate-800 dark:text-dark-100 shadow-2xs'
+                          : 'bg-slate-100/70 dark:bg-dark-900/40 border-slate-200 dark:border-dark-700 text-slate-500 dark:text-dark-400'
+                      }`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${member.hasBadge ? (member.totalHours > 0 ? 'bg-emerald-500' : 'bg-blue-400') : 'bg-slate-300'}`} />
+                      <span className="font-bold">{member.name}</span>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 dark:bg-dark-800 text-slate-500 dark:text-dark-400">
+                        {member.role}
+                      </span>
+                      {member.matricule || member.badge_id ? (
+                        <span className="font-mono text-[10px] text-slate-400">
+                          #{member.matricule || member.badge_id}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] italic text-amber-600 dark:text-amber-400">Sans badge</span>
+                      )}
+                      <span className={`font-mono font-black ml-0.5 ${member.totalHours > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}>
+                        {member.totalHours}h
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="card overflow-hidden border border-slate-200 dark:border-dark-700/60 shadow-sm p-0">
               <div className="overflow-x-auto">
@@ -1176,7 +1272,7 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                       </th>
                       <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 text-center min-w-[200px]">
                         <div className="flex items-center justify-center gap-1.5">
-                          <span>Heures Totales / Mois</span>
+                          <span>Heures Totales / Mois ({tourniquetFilterMode === 'equipe' ? 'Équipe' : 'Porteur'})</span>
                           <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                             🔒 ZKTeco Direct
                           </span>
@@ -1201,11 +1297,24 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                       const item = months[m] || {};
                       const rowBg = idx % 2 === 0 ? 'bg-white dark:bg-dark-900/60' : 'bg-slate-50/60 dark:bg-dark-800/40';
 
-                      const valPresence = item.moyenne_heures_presence !== '' && !isNaN(item.moyenne_heures_presence) ? parseFloat(item.moyenne_heures_presence) : null;
+                      let valPresence = item.moyenne_heures_presence !== '' && !isNaN(item.moyenne_heures_presence) ? parseFloat(item.moyenne_heures_presence) : null;
+                      if (tourniquetFilterMode === 'porteur' && tourniquetTeamData?.porteurMonthlyHours) {
+                        const pH = Number(tourniquetTeamData.porteurMonthlyHours[m] || 0);
+                        valPresence = pH > 0 ? pH : null;
+                      } else if (tourniquetFilterMode === 'equipe' && tourniquetTeamData?.equipeMonthlyHours) {
+                        const eqH = Number(tourniquetTeamData.equipeMonthlyHours[m] || 0);
+                        if (eqH > 0) valPresence = eqH;
+                      }
+
+                      const pMonthH = Number(tourniquetTeamData?.porteurMonthlyHours?.[m] || 0);
+                      const aMonthH = Number(tourniquetTeamData?.associesMonthlyHours?.[m] || 0);
+                      const sMonthH = Number(tourniquetTeamData?.salariesMonthlyHours?.[m] || 0);
+                      const hasTeamContribution = tourniquetFilterMode === 'equipe' && (aMonthH > 0 || sMonthH > 0);
+
                       const hebdoHeures = valPresence !== null ? (valPresence / 4).toFixed(1) : null;
                       const moisTaux = valPresence !== null ? Math.round((valPresence / OBJECTIF_MOIS) * 100) : null;
                       const isFutureMonth = annee === currentYear && idx > new Date().getMonth();
-                      const hasBadge = Boolean(incube?.badge_id);
+                      const hasBadge = Boolean(incube?.badge_id || incube?.matricule || tourniquetTeamData?.incube?.hasBadge);
 
                       return (
                         <tr key={m} className={`${rowBg} hover:bg-slate-100/60 dark:hover:bg-dark-700/30 transition-colors`}>
@@ -1216,11 +1325,20 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                           </td>
 
                           <td className="p-3 text-center">
-                            <div className="inline-flex items-center justify-center gap-1.5 px-3 py-1 bg-slate-100/90 dark:bg-dark-800/90 border border-slate-200/80 dark:border-dark-700/80 rounded-md font-mono">
-                              <span className="text-xs font-black text-slate-900 dark:text-white">
-                                {valPresence !== null ? Number(valPresence).toFixed(1) : (isFutureMonth ? '—' : '0.0')}
-                              </span>
-                              <span className="text-[11px] text-slate-500 font-semibold">h / mois</span>
+                            <div className="inline-flex flex-col items-center justify-center gap-0.5">
+                              <div className="inline-flex items-center justify-center gap-1.5 px-3 py-1 bg-slate-100/90 dark:bg-dark-800/90 border border-slate-200/80 dark:border-dark-700/80 rounded-md font-mono">
+                                <span className="text-xs font-black text-slate-900 dark:text-white">
+                                  {valPresence !== null ? Number(valPresence).toFixed(1) : (isFutureMonth ? '—' : '0.0')}
+                                </span>
+                                <span className="text-[11px] text-slate-500 font-semibold">h / mois</span>
+                              </div>
+                              {hasTeamContribution && (
+                                <div className="text-[10px] text-slate-500 dark:text-dark-400 font-medium">
+                                  Porteur: {pMonthH.toFixed(1)}h
+                                  {aMonthH > 0 ? ` • Associés: +${aMonthH.toFixed(1)}h` : ''}
+                                  {sMonthH > 0 ? ` • Salariés: +${sMonthH.toFixed(1)}h` : ''}
+                                </div>
+                              )}
                             </div>
                           </td>
 

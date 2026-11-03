@@ -520,13 +520,36 @@ async function collectFromAllDevices() {
       setImmediate(async () => {
         try {
           const tourniquetService = require('./tourniquetService');
-          const affectedBadges = new Set(toInsert.map(s => String(s.raw_badge_id).trim()));
+          const affectedBadges = new Set(toInsert.map(s => String(s.raw_badge_id).trim().replace(/^0+(?=\d)/, '')));
           const affectedUserIds = new Set(toInsert.map(s => s.user_id).filter(Boolean));
 
-          const affectedIncubes = incubes.filter(i => 
-            (i.badge_id && affectedBadges.has(String(i.badge_id).trim())) ||
-            (i.user_id && affectedUserIds.has(i.user_id))
-          );
+          const affectedIncubes = incubes.filter(i => {
+            const porteurBadge = i.badge_id ? String(i.badge_id).trim().replace(/^0+(?=\d)/, '') : '';
+            const porteurMat = i.matricule ? String(i.matricule).trim().replace(/^0+(?=\d)/, '') : '';
+            if ((porteurBadge && affectedBadges.has(porteurBadge)) ||
+                (porteurMat && affectedBadges.has(porteurMat)) ||
+                (i.user_id && affectedUserIds.has(i.user_id))) {
+              return true;
+            }
+            if (Array.isArray(i.associes)) {
+              const hasAssoc = i.associes.some(a => {
+                const aB = a?.badge_id ? String(a.badge_id).trim().replace(/^0+(?=\d)/, '') : '';
+                const aM = a?.matricule ? String(a.matricule).trim().replace(/^0+(?=\d)/, '') : '';
+                return (aB && affectedBadges.has(aB)) || (aM && affectedBadges.has(aM));
+              });
+              if (hasAssoc) return true;
+            }
+            if (Array.isArray(rhDetails)) {
+              const hasRh = rhDetails.some(rh => {
+                if (Number(rh.incube_id) !== Number(i.id)) return false;
+                const rhB = rh.badge_id ? String(rh.badge_id).trim().replace(/^0+(?=\d)/, '') : '';
+                const rhM = rh.matricule ? String(rh.matricule).trim().replace(/^0+(?=\d)/, '') : '';
+                return (rhB && affectedBadges.has(rhB)) || (rhM && affectedBadges.has(rhM));
+              });
+              if (hasRh) return true;
+            }
+            return false;
+          });
 
           const currentYear = new Date().getFullYear();
           for (const inc of affectedIncubes) {
