@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const { User, Incube } = require('../models');
 const emailService = require('../services/emailService');
+const { syncWhitelistCloud } = require('./incubeController');
 
 // GET /api/users — Liste de tous les utilisateurs avec nombre d'incubés
 exports.getAll = async (req, res) => {
@@ -141,6 +142,11 @@ exports.create = async (req, res) => {
       actif: true,
     });
 
+    // Synchronisation instantanée de la liste blanche vers le Cloud
+    if (typeof syncWhitelistCloud === 'function') {
+      syncWhitelistCloud().catch(err => console.warn('⚠️ [Whitelist] Erreur sync auto création user:', err.message));
+    }
+
     res.status(201).json({
       id: newUser.id,
       nom: newUser.nom,
@@ -197,6 +203,11 @@ exports.update = async (req, res) => {
 
     await user.save();
 
+    // Synchronisation instantanée de la liste blanche vers le Cloud
+    if (typeof syncWhitelistCloud === 'function') {
+      syncWhitelistCloud().catch(err => console.warn('⚠️ [Whitelist] Erreur sync auto update user:', err.message));
+    }
+
     res.json({
       id: user.id,
       nom: user.nom,
@@ -224,6 +235,12 @@ exports.delete = async (req, res) => {
     }
 
     await user.destroy();
+
+    // Synchronisation instantanée de la liste blanche vers le Cloud
+    if (typeof syncWhitelistCloud === 'function') {
+      syncWhitelistCloud().catch(err => console.warn('⚠️ [Whitelist] Erreur sync auto suppression user:', err.message));
+    }
+
     res.json({ message: 'Utilisateur supprimé avec succès' });
   } catch (err) {
     res.status(500).json({ message: 'Erreur lors de la suppression', error: err.message });

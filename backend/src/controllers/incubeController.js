@@ -19,10 +19,11 @@ const syncWhitelistCloud = async () => {
         pp_numero: i.pp_numero || 'INCUBE' 
       }));
 
-    // 2. Récupérer tous les administrateurs, accompagnateurs, super_admins et consultants
+    // 2. Récupérer tous les administrateurs, accompagnateurs, super_admins et consultants (actifs)
     const staffUsers = await User.findAll({
       where: {
-        role: { [Op.in]: ['super_admin', 'admin', 'administrateur', 'accompagnateur', 'consultant'] }
+        role: { [Op.in]: ['super_admin', 'admin', 'administrateur', 'accompagnateur', 'gestionnaire', 'consultant'] },
+        actif: true
       },
       attributes: ['email', 'role']
     });

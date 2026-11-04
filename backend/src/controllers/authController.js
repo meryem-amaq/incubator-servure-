@@ -102,6 +102,13 @@ exports.register = async (req, res) => {
     const hash = await bcrypt.hash(mot_de_passe, 12);
     const user = await User.create({ nom, prenom, email, mot_de_passe: hash, role });
 
+    try {
+      const { syncWhitelistCloud } = require('./incubeController');
+      if (typeof syncWhitelistCloud === 'function') {
+        syncWhitelistCloud().catch(err => console.warn('⚠️ [Whitelist] Erreur sync auto register:', err.message));
+      }
+    } catch (_) {}
+
     res.status(201).json({
       message: 'Utilisateur créé',
       user: { id: user.id, nom: user.nom, prenom: user.prenom, email: user.email, telephone: user.telephone, role: user.role, photo_url: user.photo_url },
