@@ -886,10 +886,10 @@ export default function Formations() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
             <GraduationCap className="text-amber-500 shrink-0" size={28} />
-            <span>Formations & Parcours Pédagogiques</span>
+            <span>Formations Pré/Post-Création</span>
           </h1>
           <p className="text-sm text-slate-600 dark:text-dark-300 mt-1">
-            Organisation des sessions, formateurs, collaborateurs et suivi des émargements QR code
+            Organisation des parcours Pré-Création & Post-Création, formateurs, collaborateurs et suivi des émargements QR code
           </p>
         </div>
 
@@ -1191,7 +1191,7 @@ export default function Formations() {
             <div>
               <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <BookOpen className="text-amber-500" size={18} />
-                <span>Référentiel des Modules Pédagogiques Officiels</span>
+                <span>Référentiel des Modules Officiels (Pré/Post-Création)</span>
               </h2>
               <p className="text-xs text-slate-500 dark:text-dark-400 mt-0.5">
                 Programmes, durées estimées et modules disponibles pour planification

@@ -49,9 +49,9 @@ const ESPACES = [
   },
   { 
     id: 'studio', 
-    nom: 'Studio Média / Photo', 
+    nom: 'Studio IDS', 
     desc: 'Plateau tournage, Caméras 4K, Micros studio & Podcasting',
-    salles: ['Studio Média']
+    salles: ['Studio IDS']
   },
   { 
     id: 'salle_reunion', 
@@ -713,6 +713,7 @@ export default function GestionEspaces() {
     if (selectedSousSalleFilter !== 'all') {
       if (r.salleSpecifique) {
         if (selectedSousSalleFilter === 'Salle 3' && r.salleSpecifique === 'Salle de formation') return true;
+        if (selectedSousSalleFilter === 'Studio IDS' && (r.salleSpecifique === 'Studio Média' || r.salleSpecifique === 'Studio IDS')) return true;
         return r.salleSpecifique === selectedSousSalleFilter;
       }
       const currentEsp = ESPACES.find(e => e.id === selectedEspace);

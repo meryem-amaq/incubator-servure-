@@ -250,7 +250,7 @@ export default function Sidebar({
           <NavLink 
             to="/formations" 
             onClick={onMobileClose}
-            title={!isExpanded ? 'Formations' : undefined}
+            title={!isExpanded ? 'Formations Pré/Post-Création' : undefined}
             className={({ isActive }) => 
               `flex items-center px-3 py-3 rounded-xl transition-all duration-200 ${
                 isActive 
@@ -260,7 +260,7 @@ export default function Sidebar({
             }
           >
             <GraduationCap size={20} className="shrink-0 text-amber-400" />
-            {isExpanded && <span className="ml-3 font-medium text-sm truncate">Formations</span>}
+            {isExpanded && <span className="ml-3 font-medium text-sm truncate">Formations Pré/Post-Création</span>}
           </NavLink>
 
           <NavLink 

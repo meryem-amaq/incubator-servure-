@@ -1067,7 +1067,7 @@ export default function DashboardPdfStage({ stats, impactStats, activeTab = 'eco
               <div style={{ height: '320px', position: 'relative' }}>
                 <Doughnut
                   data={{
-                    labels: ['Fablab (3D & CNC)', 'Studio Média', 'Salles de Réunion'],
+                    labels: ['Fablab (3D & CNC)', 'Studio IDS', 'Salles de Réunion'],
                     datasets: [
                       {
                         data: [

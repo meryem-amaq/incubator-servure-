@@ -173,7 +173,7 @@ export default function RapportsActivite() {
   const espacesChartData = useMemo(() => {
     const res = previewData?.reservationsParEspace || { fablab: 7, studio: 4, salle_reunion: 3 };
     return {
-      labels: ['FabLab Prototypage', 'Studio Média / Podcast', 'Salles de Réunion'],
+      labels: ['FabLab Prototypage', 'Studio IDS (Podcast & Vidéo)', 'Salles de Réunion'],
       datasets: [{
         label: 'Nombre de Réservations',
         data: [res.fablab || 7, res.studio || 4, res.salle_reunion || 3],

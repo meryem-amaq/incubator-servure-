@@ -194,7 +194,7 @@ export default function PresenceFormation() {
             Incubateur Digital Solidaire
           </h1>
           <p className="text-xs text-slate-400">
-            Feuille d'émargement et assiduité aux parcours pédagogiques
+            Feuille d'émargement et assiduité aux formations Pré/Post-Création
           </p>
         </div>
 

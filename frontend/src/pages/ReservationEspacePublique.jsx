@@ -16,7 +16,7 @@ export const SOUS_SALLES = {
     { id: 'Sous-sol', nom: 'Fablab Sous-sol', description: 'Fraiseuse CNC & Prototypage lourd' }
   ],
   studio: [
-    { id: 'Studio Média', nom: 'Studio Média', description: 'Plateau d\'enregistrement vidéo 4K & Podcast' }
+    { id: 'Studio IDS', nom: 'Studio IDS', description: 'Plateau d\'enregistrement vidéo 4K & Podcast' }
   ]
 };
 
@@ -28,7 +28,7 @@ const ESPACES_DETAILS = {
     color: 'from-amber-500 to-orange-600'
   },
   studio: {
-    nom: 'Studio Média',
+    nom: 'Studio IDS',
     description: 'Studio d’enregistrement podcast, vidéo 4K, photographie de produits & streaming',
     badge: 'Média & Création de Contenu',
     color: 'from-purple-500 to-indigo-600'

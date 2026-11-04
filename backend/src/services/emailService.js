@@ -652,7 +652,7 @@ const sendDemandeReservationAccompagnateurEmail = async (reservation, accompagna
 
   const espaceLabels = {
     fablab: '🛠️ Espace FabLab',
-    studio: '🎥 Studio Média / Photo',
+    studio: '🎥 Studio IDS',
     salle_reunion: '🏢 Les Salles'
   };
   const espace = espaceLabels[reservation.espace] || reservation.espace || 'Espace Incubateur';

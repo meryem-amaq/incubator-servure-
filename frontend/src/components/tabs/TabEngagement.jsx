@@ -1057,7 +1057,7 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
               }`}
             >
               <GraduationCap size={14} className={activeEngagementTab === 'formations' ? 'text-white' : 'text-emerald-500'} />
-              <span>Partie 2 : Formations</span>
+              <span>Partie 2 : Formations (Pré/Post-Création)</span>
               <span className={`text-[10px] px-1.5 py-0.2 rounded font-black ${
                 activeEngagementTab === 'formations' ? 'bg-white/20 text-white' : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
               }`}>

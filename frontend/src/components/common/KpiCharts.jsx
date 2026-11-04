@@ -2444,7 +2444,7 @@ export function KpiAssiduite({ impactStats, stats }) {
           tension: 0.35,
         },
         {
-          label: 'Formations pédagogiques',
+          label: 'Formations Pré/Post-Création',
           data: eventsByMonth.formationsCounts,
           borderColor: '#3b82f6',
           backgroundColor: 'rgba(59, 130, 246, 0.15)',
@@ -3330,7 +3330,7 @@ export function KpiAssiduite({ impactStats, stats }) {
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-dark-400 mt-0.5">
-              Comparatif mensuel des ateliers collectifs et formations pédagogiques réalisés
+              Comparatif mensuel des ateliers collectifs et formations Pré/Post-Création réalisés
             </p>
           </div>
 
@@ -3423,7 +3423,7 @@ export function KpiAssiduite({ impactStats, stats }) {
           <div
             onClick={() => navigate('/formations')}
             className="bg-blue-50/70 dark:bg-blue-950/20 hover:bg-blue-100/80 dark:hover:bg-blue-900/30 rounded-xl p-3 border border-blue-200/80 dark:border-blue-800/40 cursor-pointer transition-all hover:scale-[1.02] group flex flex-col justify-between"
-            title="Cliquer pour accéder aux Modules de Formation pédagogique"
+            title="Cliquer pour accéder aux Formations Pré/Post-Création"
           >
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider flex items-center gap-1.5">
@@ -3944,7 +3944,7 @@ export function KpiMaterielChart({ equipements }) {
           borderColor: isDark ? '#1e293b' : '#ffffff',
           borderWidth: 2,
           weight: 1.15,
-          labels: ['Espace FabLab', 'Studio Média / Photo', 'Les Salles'],
+          labels: ['Espace FabLab', 'Studio IDS', 'Les Salles'],
           keys: ['fablab', 'studio', 'salle_reunion']
         },
         // 2. ANNEAU INTÉRIEUR : État de Santé Global (Cliquable vers l'état du matériel)
@@ -3982,7 +3982,7 @@ export function KpiMaterielChart({ equipements }) {
               const item = items[0];
               if (!item) return '';
               if (item.datasetIndex === 0) {
-                const labels = ['🛠️ Espace FabLab', '🎥 Studio Média / Photo', '🏢 Les Salles'];
+                const labels = ['🛠️ Espace FabLab', '🎥 Studio IDS', '🏢 Les Salles'];
                 return labels[item.dataIndex] || 'Espace';
               }
               const labels = ['🟢 Opérationnels', '🟡 Légère usure', '🟠 En maintenance', '🔴 Défective'];

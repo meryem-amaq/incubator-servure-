@@ -251,7 +251,7 @@ export default function BookingPage() {
         );
 
         if (isStaff || isMyRes || user?.role !== 'incube') {
-          const espaceLabel = r.espace === 'fablab' ? 'Fablab' : r.espace === 'studio' ? 'Studio Média' : 'Salle de réunion';
+          const espaceLabel = r.espace === 'fablab' ? 'Fablab' : r.espace === 'studio' ? 'Studio IDS' : 'Salle de réunion';
           const salleLabel = r.salleSpecifique ? `${espaceLabel} (${r.salleSpecifique})` : espaceLabel;
           events.push({
             id: `res-${r.id}`,
@@ -687,7 +687,7 @@ export default function BookingPage() {
               style={{ minWidth: '175px' }}
             >
               <option value="all">Toutes Catégories</option>
-              <option value="formation">🎓 Formations</option>
+              <option value="formation">🎓 Formations Pré/Post-Création</option>
               <option value="evenement">📅 Ateliers & Événements</option>
               <option value="rendezvous">🤝 Rendez-vous</option>
               <option value="reservation">🏢 Réservations d'espaces</option>

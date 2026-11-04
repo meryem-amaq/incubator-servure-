@@ -30,9 +30,9 @@ const ESPACES = [
   },
   { 
     id: 'studio', 
-    nom: 'Studio Média / Photo', 
+    nom: 'Studio IDS', 
     desc: 'Plateau tournage, Caméras 4K, Micros studio & Podcasting',
-    salles: ['Studio Média'],
+    salles: ['Studio IDS'],
     icon: Camera
   },
   { 
