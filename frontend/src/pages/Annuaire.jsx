@@ -1052,7 +1052,31 @@ export default function Annuaire() {
                       <span className={`badge ${PHASE_COLORS[inc.phase_projet] || 'badge-gray'}`}>
                         {inc.phase_projet}
                       </span>
-                      {inc.compteUtilisateur ? (
+                      {inc.est_suspendu ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30" title="Compte suspendu : réservations bloquées">
+                            <UserX size={10} /> Suspendu
+                          </span>
+                          <button
+                            type="button"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                toast.loading(`Réactivation de ${inc.nom_incube}...`, { id: `react-${inc.id}` });
+                                await api.post(`/incubes/${inc.id}/activer-compte`);
+                                toast.success(`Compte réactivé pour ${inc.nom_incube} !`, { id: `react-${inc.id}` });
+                                load();
+                              } catch (err) {
+                                toast.error(err.response?.data?.message || 'Erreur réactivation', { id: `react-${inc.id}` });
+                              }
+                            }}
+                            className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 border border-emerald-500/30 cursor-pointer"
+                            title="Réactiver cet incubé"
+                          >
+                            <Check size={10} /> Réactiver
+                          </button>
+                        </div>
+                      ) : inc.compteUtilisateur ? (
                         inc.compteUtilisateur.actif ? (
                           <div className="flex items-center gap-1.5">
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20" title="Accès portail actif">
@@ -1062,7 +1086,7 @@ export default function Annuaire() {
                               type="button"
                               onClick={async (e) => {
                                 e.stopPropagation();
-                                if (!window.confirm(`Suspendre le compte de ${inc.nom_incube} ?\n\nSes accès au portail et toutes ses réservations d'espaces seront immédiatement bloqués.`)) return;
+                                if (!window.confirm(`Suspendre le compte de ${inc.nom_incube} ?\n\nSes réservations d'espaces et ses accès au portail seront immédiatement bloqués.`)) return;
                                 try {
                                   toast.loading(`Suspension en cours...`, { id: `susp-${inc.id}` });
                                   await api.post(`/incubes/${inc.id}/desactiver-compte`);
@@ -1072,16 +1096,37 @@ export default function Annuaire() {
                                   toast.error(err.response?.data?.message || 'Erreur lors de la suspension', { id: `susp-${inc.id}` });
                                 }
                               }}
-                              className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-400 hover:bg-rose-500/20 border border-rose-500/20 cursor-pointer transition-colors"
-                              title="Suspendre ce compte (bloque immédiatement ses réservations)"
+                              className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 dark:bg-dark-800 dark:hover:bg-rose-950/40 border border-slate-200 dark:border-dark-700 cursor-pointer transition-colors"
+                              title="Suspendre cet incubé (bloque immédiatement ses réservations)"
                             >
                               <UserX size={10} /> Suspendre
                             </button>
                           </div>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30" title="Compte portail suspendu / inactif">
-                            <UserX size={10} /> Suspendu
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 ring-1 ring-amber-400/30 animate-pulse" title="Compte portail en attente d'activation">
+                              <Clock size={10} /> En attente
+                            </span>
+                            <button
+                              type="button"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (!window.confirm(`Suspendre cet incubé (${inc.nom_incube}) ? Ses réservations d'espaces seront bloquées.`)) return;
+                                try {
+                                  toast.loading(`Suspension en cours...`, { id: `susp-${inc.id}` });
+                                  await api.post(`/incubes/${inc.id}/desactiver-compte`);
+                                  toast.success(`Compte suspendu pour ${inc.nom_incube}`, { id: `susp-${inc.id}` });
+                                  load();
+                                } catch (err) {
+                                  toast.error(err.response?.data?.message || 'Erreur lors de la suspension', { id: `susp-${inc.id}` });
+                                }
+                              }}
+                              className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+                              title="Suspendre cet incubé"
+                            >
+                              <UserX size={10} />
+                            </button>
+                          </div>
                         )
                       ) : inc.email ? (
                         <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-500/30" title="Compte portail non encore activé">
@@ -1128,8 +1173,39 @@ export default function Annuaire() {
                     )}
                   </div>
 
+                  {/* Bannière d'état spécifique : suspendu */}
+                  {inc.est_suspendu && (
+                    <div className="mt-3 p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 dark:bg-rose-950/30 dark:border-rose-800/50 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0 shrink-0">
+                        <UserX size={13} className="text-rose-500 shrink-0" />
+                        <span className="text-[11px] font-bold text-rose-700 dark:text-rose-300 whitespace-nowrap">
+                          Compte suspendu (réservations bloquées)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            toast.loading(`Réactivation de ${inc.nom_incube}...`, { id: `act-${inc.id}` });
+                            const res = await api.post(`/incubes/${inc.id}/activer-compte`);
+                            toast.success(res.data?.message || 'Compte réactivé avec succès !', { id: `act-${inc.id}` });
+                            load();
+                          } catch (err) {
+                            toast.error(err.response?.data?.message || "Erreur lors de la réactivation", { id: `act-${inc.id}` });
+                          }
+                        }}
+                        className="btn btn-secondary btn-sm !py-1 !px-2.5 text-[11px] font-bold flex items-center gap-1 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 border border-emerald-500/30 whitespace-nowrap shrink-0 ml-auto sm:ml-0"
+                        title="Réactiver ce compte et rétablir les réservations"
+                      >
+                        <Check size={12} className="text-emerald-500" />
+                        <span>Réactiver</span>
+                      </button>
+                    </div>
+                  )}
+
                   {/* Alerte et bouton d'activation rapide sur la carte pour les comptes en attente */}
-                  {(inc.compteUtilisateur && !inc.compteUtilisateur.actif) && (
+                  {(!inc.est_suspendu && inc.compteUtilisateur && !inc.compteUtilisateur.actif) && (
                     <div className="mt-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 dark:bg-amber-950/30 dark:border-amber-800/50 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0 shrink-0">
                         <Clock size={13} className="text-amber-500 shrink-0 animate-pulse" />
@@ -1159,7 +1235,7 @@ export default function Annuaire() {
                     </div>
                   )}
                   {/* Email présent mais aucun compte lié : activation rapide possible */}
-                  {(inc.email && !inc.compteUtilisateur) && (
+                  {(!inc.est_suspendu && inc.email && !inc.compteUtilisateur) && (
                     <div className="mt-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 dark:bg-amber-950/30 dark:border-amber-800/50 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0 shrink-0">
                         <Clock size={13} className="text-amber-500 shrink-0 animate-pulse" />

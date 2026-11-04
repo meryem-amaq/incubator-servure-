@@ -10,23 +10,15 @@ const syncWhitelistCloud = async () => {
   if (process.env.ACTIVER_SYNC_CLOUD !== 'true') return;
 
   try {
-    // 1. Récupérer tous les incubés avec un compte utilisateur actif (exclure les suspendus)
+    // 1. Récupérer tous les incubés avec un email valide (exclure uniquement ceux qui sont suspendus)
     const incubes = await Incube.findAll({
-      attributes: ['id', 'email', 'pp_numero', 'nom_incube'],
-      include: [
-        {
-          model: User,
-          as: 'compteUtilisateur',
-          attributes: ['id', 'actif'],
-          required: false
-        }
-      ]
+      attributes: ['id', 'email', 'pp_numero', 'nom_incube', 'est_suspendu'],
     });
     const listIncubes = incubes
       .filter(i => {
         if (!i.email || i.email.trim() === '') return false;
-        // Si un compte utilisateur existe pour cet incubé et qu'il est inactif/suspendu, NE PAS L'AUTORISER
-        if (i.compteUtilisateur && i.compteUtilisateur.actif === false) return false;
+        // Si l'incubé a été explicitement suspendu par l'administration, NE PAS L'AUTORISER
+        if (i.est_suspendu) return false;
         return true;
       })
       .map(i => ({ 
@@ -1523,9 +1515,11 @@ exports.activerCompte = async (req, res) => {
       // S'assurer que le lien user_id est cohérent dans incubes
       if (incube.user_id !== userAccount.id) {
         incube.user_id = userAccount.id;
-        await incube.save();
       }
     }
+
+    incube.est_suspendu = false;
+    await incube.save();
 
     console.log(`✅ Compte activé : ${emailClean} (user_id=${userAccount.id}, incube_id=${incube.id})`);
 
@@ -1577,30 +1571,24 @@ exports.desactiverCompte = async (req, res) => {
       }
     }
 
-    if (!incube.user_id) {
-      return res.status(400).json({ message: 'Aucun compte utilisateur associé à cet incubé' });
-    }
+    incube.est_suspendu = true;
+    await incube.save();
 
-    const userAccount = await User.findByPk(incube.user_id);
-    if (!userAccount) {
-      return res.status(404).json({ message: 'Compte utilisateur introuvable' });
+    if (incube.user_id) {
+      const userAccount = await User.findByPk(incube.user_id);
+      if (userAccount) {
+        userAccount.actif = false;
+        await userAccount.save();
+      }
     }
-
-    userAccount.actif = false;
-    await userAccount.save();
 
     // Synchronisation instantanée de la liste blanche Cloud pour révoquer immédiatement l'accès
     syncWhitelistCloud().catch(e => console.warn('⚠️ [Whitelist] Erreur sync après désactivation:', e.message));
 
     res.json({
       success: true,
-      message: `Accès au portail suspendu pour ${incube.nom_incube}.`,
-      compteUtilisateur: {
-        id: userAccount.id,
-        email: userAccount.email,
-        actif: userAccount.actif,
-        role: userAccount.role,
-      }
+      message: `Compte suspendu pour ${incube.nom_incube}. Les réservations d'espaces sont désormais bloquées.`,
+      incube
     });
   } catch (err) {
     console.error('❌ Erreur desactiverCompte:', err);

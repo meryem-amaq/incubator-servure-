@@ -170,8 +170,8 @@ router.post('/demande', async (req, res) => {
         if (inc) matchedIncubeId = inc.id;
       }
 
-      // Si le compte de cet incubé est explicitement suspendu/inactif, bloquer immédiatement la réservation
-      if (inc?.compteUtilisateur && inc.compteUtilisateur.actif === false) {
+      // Si le compte de cet incubé est explicitement suspendu, bloquer immédiatement la réservation
+      if (inc?.est_suspendu) {
         return res.status(403).json({
           message: "Votre compte est actuellement suspendu. Vous ne pouvez plus effectuer de réservations d'espaces. Veuillez contacter votre accompagnateur ou l'administration."
         });

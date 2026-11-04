@@ -55,6 +55,7 @@ const Incube = sequelize.define('Incube', {
     }
   },
   badge_id: { type: DataTypes.STRING(50), allowNull: true },
+  est_suspendu: { type: DataTypes.BOOLEAN, defaultValue: false },
 }, { tableName: 'incubes' });
 
 module.exports = Incube;

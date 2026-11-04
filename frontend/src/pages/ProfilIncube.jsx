@@ -123,11 +123,11 @@ export default function ProfilIncube() {
   };
 
   const handleDesactiverCompte = async () => {
-    if (!window.confirm(`Êtes-vous sûr de vouloir suspendre l'accès portail de ${incube.nom_incube} ?`)) return;
+    if (!window.confirm(`Êtes-vous sûr de vouloir suspendre l'accès portail de ${incube.nom_incube} ?\n\nSes réservations d'espaces et son accès au portail seront immédiatement bloqués.`)) return;
     setActionLoading(true);
     try {
       const res = await api.post(`/incubes/${incube.id}/desactiver-compte`);
-      toast.success(res.data?.message || 'Accès suspendu.');
+      toast.success(res.data?.message || 'Accès suspendu et réservations bloquées.');
       load();
     } catch (err) {
       toast.error(err.response?.data?.message || "Erreur lors de la suspension du compte");
@@ -224,16 +224,22 @@ export default function ProfilIncube() {
         <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-700/80 shadow-sm">
           <div className="flex items-center gap-3 min-w-0">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-              incube.compteUtilisateur?.actif 
-                ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
-                : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+              incube.est_suspendu
+                ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+                : incube.compteUtilisateur?.actif 
+                  ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
+                  : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
             }`}>
-              <KeyRound size={20} />
+              {incube.est_suspendu ? <UserX size={20} /> : <KeyRound size={20} />}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2.5 flex-wrap">
                 <span className="text-xs font-bold text-slate-800 dark:text-dark-100">Compte Portail Incubé :</span>
-                {incube.compteUtilisateur ? (
+                {incube.est_suspendu ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
+                    <UserX size={13} className="text-rose-500" /> Compte Suspendu (Réservations bloquées)
+                  </span>
+                ) : incube.compteUtilisateur ? (
                   incube.compteUtilisateur.actif ? (
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
                       <CheckCircle2 size={13} className="text-emerald-500" /> Compte Actif & Opérationnel
@@ -254,7 +260,11 @@ export default function ProfilIncube() {
                 )}
               </div>
               <p className="text-xs text-slate-500 dark:text-dark-400 mt-1">
-                {incube.email ? (
+                {incube.est_suspendu ? (
+                  <span className="text-rose-600 dark:text-rose-400 font-medium">
+                    Ce compte a été suspendu. L'incubé ne peut plus effectuer de réservations d'espaces ni accéder au portail.
+                  </span>
+                ) : incube.email ? (
                   <>Adresse email de connexion : <span className="font-mono font-semibold text-slate-700 dark:text-dark-200">{incube.email}</span></>
                 ) : (
                   "Renseignez une adresse e-mail dans l'onglet 'Infos Générales' pour créer et activer l'accès de l'incubé."
@@ -265,17 +275,40 @@ export default function ProfilIncube() {
 
           {/* Boutons d'actions pour le coach / super admin */}
           <div className="flex items-center gap-2 flex-wrap">
-            {(!incube.compteUtilisateur || !incube.compteUtilisateur.actif) ? (
+            {incube.est_suspendu ? (
               <button
                 type="button"
                 onClick={handleActiverCompte}
-                disabled={actionLoading || !incube.email}
-                className="btn btn-primary btn-sm flex items-center gap-1.5 text-xs font-bold shadow-md shadow-primary-500/20"
-                title={!incube.email ? "Renseignez d'abord un email" : "Valider le compte et envoyer les accès par email"}
+                disabled={actionLoading}
+                className="btn btn-primary btn-sm flex items-center gap-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/20"
+                title="Lever la suspension et réactiver les réservations pour cet incubé"
               >
-                <KeyRound size={14} />
-                {actionLoading ? "Activation en cours..." : "Activer le compte & Envoyer les accès"}
+                <CheckCircle2 size={14} />
+                {actionLoading ? "Réactivation..." : "Réactiver le compte"}
               </button>
+            ) : (!incube.compteUtilisateur || !incube.compteUtilisateur.actif) ? (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleActiverCompte}
+                  disabled={actionLoading || !incube.email}
+                  className="btn btn-primary btn-sm flex items-center gap-1.5 text-xs font-bold shadow-md shadow-primary-500/20"
+                  title={!incube.email ? "Renseignez d'abord un email" : "Valider le compte et envoyer les accès par email"}
+                >
+                  <KeyRound size={14} />
+                  {actionLoading ? "Activation en cours..." : "Activer le compte & Envoyer les accès"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDesactiverCompte}
+                  disabled={actionLoading}
+                  className="btn btn-secondary btn-sm flex items-center gap-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-500/10"
+                  title="Suspendre cet incubé"
+                >
+                  <UserX size={14} />
+                  Suspendre
+                </button>
+              </div>
             ) : (
               <>
                 <button
