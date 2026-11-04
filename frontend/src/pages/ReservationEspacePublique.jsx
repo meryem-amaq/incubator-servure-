@@ -9,7 +9,7 @@ export const SOUS_SALLES = {
   salle_reunion: [
     { id: 'Salle 1', nom: 'Salle 1', description: 'Salle de réunion 1 (6-8 pers.)' },
     { id: 'Salle 2', nom: 'Salle 2', description: 'Salle de réunion 2 (6-8 pers.)' },
-    { id: 'Salle de formation', nom: 'Salle de formation', description: 'Grande salle (20+ pers.)' }
+    { id: 'Salle 3', nom: 'Salle 3', description: 'Salle 3 (Grande salle 20+ pers.)' }
   ],
   fablab: [
     { id: 'Fablab 1', nom: 'Fablab 1 (Étage)', description: 'Atelier Principal • Impression 3D & Laser' },
@@ -34,8 +34,8 @@ const ESPACES_DETAILS = {
     color: 'from-purple-500 to-indigo-600'
   },
   salle_reunion: {
-    nom: 'Salles & Formation',
-    description: 'Espaces de réunion et de formation collaboratifs avec visioconférence 4K',
+    nom: 'Les Salles',
+    description: 'Espaces de réunion et de travail collaboratifs avec visioconférence 4K',
     badge: 'Collaboration & Formation',
     color: 'from-blue-500 to-cyan-600'
   }

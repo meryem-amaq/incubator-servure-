@@ -225,8 +225,8 @@ const DEFAULT_EQUIPEMENTS = [
     nom: 'Vidéoprojecteur Interactif Laser 4K',
     numeroSerie: 'SN-REU-VP-LASER',
     categorie: 'Projection Grand Format',
-    salle: 'Salle de formation',
-    desc: 'Projection très haute luminosité sur mur interactif 3m (Salle de formation)',
+    salle: 'Salle 3',
+    desc: 'Projection très haute luminosité sur mur interactif 3m (Salle 3)',
     etatAvant: 'Opérationnel / Parfait état',
     etatApres: 'Conforme & Rendu propre',
     incidents: []
@@ -236,8 +236,8 @@ const DEFAULT_EQUIPEMENTS = [
     nom: 'Système de Sonorisation & Micro Conférence',
     numeroSerie: 'SN-REU-SONO-CONF',
     categorie: 'Audio & Voix',
-    salle: 'Salle de formation',
-    desc: 'Micros cravate sans fil, micro de table et sonorisation d\'amphithéâtre (Salle de formation)',
+    salle: 'Salle 3',
+    desc: 'Micros cravate sans fil, micro de table et sonorisation d\'amphithéâtre (Salle 3)',
     etatAvant: 'Opérationnel / Parfait état',
     etatApres: 'Conforme & Rendu propre',
     incidents: []
@@ -247,8 +247,8 @@ const DEFAULT_EQUIPEMENTS = [
     nom: 'Pupitre Multimédia & Pointeur Laser',
     numeroSerie: 'SN-REU-PUPITRE-01',
     categorie: 'Animation Formation',
-    salle: 'Salle de formation',
-    desc: 'Pupitre équipé prises HDMI, audio et retour écran pour formateur (Salle de formation)',
+    salle: 'Salle 3',
+    desc: 'Pupitre équipé prises HDMI, audio et retour écran pour formateur (Salle 3)',
     etatAvant: 'Opérationnel / Parfait état',
     etatApres: 'Conforme & Rendu propre',
     incidents: []

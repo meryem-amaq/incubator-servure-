@@ -55,9 +55,9 @@ const ESPACES = [
   },
   { 
     id: 'salle_reunion', 
-    nom: 'Salles & Formation', 
-    desc: 'Salle 1, Salle 2 & Salle de formation • Écrans interactifs 4K & Visioconférence',
-    salles: ['Salle 1', 'Salle 2', 'Salle de formation']
+    nom: 'Les Salles', 
+    desc: 'Salle 1, Salle 2 & Salle 3 • Écrans interactifs 4K & Visioconférence',
+    salles: ['Salle 1', 'Salle 2', 'Salle 3']
   }
 ];
 
@@ -658,6 +658,7 @@ export default function GestionEspaces() {
     if (r.espace !== selectedEspace) return false;
     if (selectedSousSalleFilter !== 'all') {
       if (r.salleSpecifique) {
+        if (selectedSousSalleFilter === 'Salle 3' && r.salleSpecifique === 'Salle de formation') return true;
         return r.salleSpecifique === selectedSousSalleFilter;
       }
       const currentEsp = ESPACES.find(e => e.id === selectedEspace);

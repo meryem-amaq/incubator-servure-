@@ -3944,7 +3944,7 @@ export function KpiMaterielChart({ equipements }) {
           borderColor: isDark ? '#1e293b' : '#ffffff',
           borderWidth: 2,
           weight: 1.15,
-          labels: ['Espace FabLab', 'Studio Média / Photo', 'Salles & Formation'],
+          labels: ['Espace FabLab', 'Studio Média / Photo', 'Les Salles'],
           keys: ['fablab', 'studio', 'salle_reunion']
         },
         // 2. ANNEAU INTÉRIEUR : État de Santé Global (Cliquable vers l'état du matériel)
@@ -3982,7 +3982,7 @@ export function KpiMaterielChart({ equipements }) {
               const item = items[0];
               if (!item) return '';
               if (item.datasetIndex === 0) {
-                const labels = ['🛠️ Espace FabLab', '🎥 Studio Média / Photo', '🎓 Salles & Formation'];
+                const labels = ['🛠️ Espace FabLab', '🎥 Studio Média / Photo', '🏢 Les Salles'];
                 return labels[item.dataIndex] || 'Espace';
               }
               const labels = ['🟢 Opérationnels', '🟡 Légère usure', '🟠 En maintenance', '🔴 Défective'];
