@@ -10,10 +10,25 @@ const syncWhitelistCloud = async () => {
   if (process.env.ACTIVER_SYNC_CLOUD !== 'true') return;
 
   try {
-    // 1. Récupérer tous les incubés avec un email valide
-    const incubes = await Incube.findAll({ attributes: ['email', 'pp_numero'] });
+    // 1. Récupérer tous les incubés avec un compte utilisateur actif (exclure les suspendus)
+    const incubes = await Incube.findAll({
+      attributes: ['id', 'email', 'pp_numero', 'nom_incube'],
+      include: [
+        {
+          model: User,
+          as: 'compteUtilisateur',
+          attributes: ['id', 'actif'],
+          required: false
+        }
+      ]
+    });
     const listIncubes = incubes
-      .filter(i => i.email && i.email.trim() !== '')
+      .filter(i => {
+        if (!i.email || i.email.trim() === '') return false;
+        // Si un compte utilisateur existe pour cet incubé et qu'il est inactif/suspendu, NE PAS L'AUTORISER
+        if (i.compteUtilisateur && i.compteUtilisateur.actif === false) return false;
+        return true;
+      })
       .map(i => ({ 
         email: i.email.trim().toLowerCase(), 
         pp_numero: i.pp_numero || 'INCUBE' 
@@ -1514,6 +1529,9 @@ exports.activerCompte = async (req, res) => {
 
     console.log(`✅ Compte activé : ${emailClean} (user_id=${userAccount.id}, incube_id=${incube.id})`);
 
+    // Synchronisation instantanée de la liste blanche Cloud
+    syncWhitelistCloud().catch(e => console.warn('⚠️ [Whitelist] Erreur sync après activation:', e.message));
+
     // --- 5. Envoi de l'email de bienvenue (hors transaction DB, erreur non bloquante) ---
     let emailResult = { success: false, skipped: true };
     try {
@@ -1570,6 +1588,9 @@ exports.desactiverCompte = async (req, res) => {
 
     userAccount.actif = false;
     await userAccount.save();
+
+    // Synchronisation instantanée de la liste blanche Cloud pour révoquer immédiatement l'accès
+    syncWhitelistCloud().catch(e => console.warn('⚠️ [Whitelist] Erreur sync après désactivation:', e.message));
 
     res.json({
       success: true,

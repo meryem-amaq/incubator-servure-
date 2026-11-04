@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Search, Plus, Users, Briefcase, TrendingUp, Filter, X, Camera, Upload, FileSpreadsheet, Calendar, AlertCircle, CheckCircle2, XCircle, Clock, Check, Bell, BellRing, RotateCw, UserCheck, KeyRound, Mail, GraduationCap, ClipboardList, Eye } from 'lucide-react';
+import { Search, Plus, Users, Briefcase, TrendingUp, Filter, X, Camera, Upload, FileSpreadsheet, Calendar, AlertCircle, CheckCircle2, XCircle, Clock, Check, Bell, BellRing, RotateCw, UserCheck, KeyRound, Mail, GraduationCap, ClipboardList, Eye, UserX } from 'lucide-react';
 import api, { getPhotoUrl } from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import ExcelImportModal from '../components/common/ExcelImportModal';
@@ -1054,12 +1054,33 @@ export default function Annuaire() {
                       </span>
                       {inc.compteUtilisateur ? (
                         inc.compteUtilisateur.actif ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20" title="Accès portail actif">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Actif
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20" title="Accès portail actif">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Actif
+                            </span>
+                            <button
+                              type="button"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (!window.confirm(`Suspendre le compte de ${inc.nom_incube} ?\n\nSes accès au portail et toutes ses réservations d'espaces seront immédiatement bloqués.`)) return;
+                                try {
+                                  toast.loading(`Suspension en cours...`, { id: `susp-${inc.id}` });
+                                  await api.post(`/incubes/${inc.id}/desactiver-compte`);
+                                  toast.success(`Compte suspendu et réservations bloquées pour ${inc.nom_incube}`, { id: `susp-${inc.id}` });
+                                  load();
+                                } catch (err) {
+                                  toast.error(err.response?.data?.message || 'Erreur lors de la suspension', { id: `susp-${inc.id}` });
+                                }
+                              }}
+                              className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-400 hover:bg-rose-500/20 border border-rose-500/20 cursor-pointer transition-colors"
+                              title="Suspendre ce compte (bloque immédiatement ses réservations)"
+                            >
+                              <UserX size={10} /> Suspendre
+                            </button>
+                          </div>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 ring-1 ring-amber-400/30 animate-pulse" title="Compte portail en attente d'activation">
-                            <Clock size={10} /> En attente
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30" title="Compte portail suspendu / inactif">
+                            <UserX size={10} /> Suspendu
                           </span>
                         )
                       ) : inc.email ? (

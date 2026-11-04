@@ -136,31 +136,85 @@ export default function GestionEspaces() {
     open: false,
     espace: 'fablab',
     salleSpecifique: '',
+    beneficiaireType: 'admin', // 'admin' ou 'incube'
+    selectedIncubeId: '',
     dateReservation: new Date().toISOString().split('T')[0],
     heureDebut: '09:00',
     heureFin: '12:00',
     duree: '3h',
     motifUtilisation: 'Réservation administrative / Équipe IDS',
     equipementsUtilises: '',
-    nomPersonnalise: ''
+    nomPersonnalise: '',
+    emailIncube: '',
+    telephoneIncube: ''
   });
+
+  // Liste des incubés pour la dérogation de quota
+  const [incubesList, setIncubesList] = useState([]);
+  useEffect(() => {
+    api.get('/incubes')
+      .then(res => {
+        if (Array.isArray(res.data)) {
+          setIncubesList(res.data);
+        }
+      })
+      .catch(err => console.warn('Erreur chargement incubés:', err));
+  }, []);
+
+  const handleSelectIncubeBeneficiaire = (incubeId) => {
+    if (!incubeId) {
+      setAdminBookingModal(prev => ({
+        ...prev,
+        selectedIncubeId: '',
+        nomPersonnalise: '',
+        emailIncube: '',
+        telephoneIncube: '',
+        motifUtilisation: `[Dérogation exceptionnelle]`
+      }));
+      return;
+    }
+    const found = incubesList.find(i => String(i.id) === String(incubeId));
+    if (found) {
+      const staffName = user ? `${user.prenom || ''} ${user.nom || ''}`.trim() : 'Accompagnateur';
+      setAdminBookingModal(prev => ({
+        ...prev,
+        selectedIncubeId: found.id,
+        nomPersonnalise: found.nom_incube,
+        emailIncube: found.email || '',
+        telephoneIncube: found.telephone || '',
+        motifUtilisation: `[Dérogation accordée par : ${staffName}] Projet ${found.raison_sociale || found.nom_incube}`
+      }));
+    }
+  };
 
   const handleCreateAdminReservation = async (e) => {
     e.preventDefault();
+    if (adminBookingModal.beneficiaireType === 'incube' && !adminBookingModal.selectedIncubeId) {
+      toast.error("Veuillez sélectionner l'incubé bénéficiaire de la dérogation");
+      return;
+    }
     try {
-      const res = await api.post('/reservations/directe', adminBookingModal);
-      toast.success(res.data?.message || 'Réservation administrative validée !', { icon: '✅' });
+      const payload = {
+        ...adminBookingModal,
+        incubeId: adminBookingModal.beneficiaireType === 'incube' ? adminBookingModal.selectedIncubeId : null,
+      };
+      const res = await api.post('/reservations/directe', payload);
+      toast.success(res.data?.message || 'Réservation validée avec succès !', { icon: '✅' });
       setAdminBookingModal({
         open: false,
         espace: selectedEspace,
         salleSpecifique: '',
+        beneficiaireType: 'admin',
+        selectedIncubeId: '',
         dateReservation: new Date().toISOString().split('T')[0],
         heureDebut: '09:00',
         heureFin: '12:00',
         duree: '3h',
         motifUtilisation: 'Réservation administrative / Équipe IDS',
         equipementsUtilises: '',
-        nomPersonnalise: ''
+        nomPersonnalise: '',
+        emailIncube: '',
+        telephoneIncube: ''
       });
       fetchReservations();
     } catch (err) {
@@ -942,7 +996,7 @@ export default function GestionEspaces() {
               <span>{syncingCloud ? 'Synchronisation...' : 'Sync Cloud'}</span>
             </button>
 
-            {/* 5. BOUTON NOUVELLE RÉSERVATION DIRECTE ADMIN */}
+            {/* 5. BOUTON NOUVELLE RÉSERVATION DIRECTE ADMIN / DÉROGATION */}
             <button
               type="button"
               onClick={() => {
@@ -951,19 +1005,23 @@ export default function GestionEspaces() {
                   open: true,
                   espace: selectedEspace,
                   salleSpecifique: selectedSousSalleFilter !== 'all' ? selectedSousSalleFilter : (currentEsp?.salles?.[0] || ''),
+                  beneficiaireType: 'admin',
+                  selectedIncubeId: '',
                   dateReservation: new Date().toISOString().split('T')[0],
                   heureDebut: '09:00',
                   heureFin: '12:00',
                   duree: '3h',
                   motifUtilisation: 'Réservation administrative / Équipe IDS',
                   equipementsUtilises: '',
-                  nomPersonnalise: user?.nom ? `${user.prenom || ''} ${user.nom} (Admin)`.trim() : 'Administration'
+                  nomPersonnalise: user?.nom ? `${user.prenom || ''} ${user.nom} (Admin)`.trim() : 'Administration IDS',
+                  emailIncube: user?.email || '',
+                  telephoneIncube: user?.telephone || ''
                 });
               }}
               className="btn py-1.5 px-3 rounded-xl text-xs font-black bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white flex items-center gap-1.5 shadow-sm shadow-emerald-500/25 cursor-pointer transition-all shrink-0 border border-emerald-400/30"
-              title="Créer une réservation directe immédiate pour l'administration"
+              title="Créer une réservation directe validée (Staff ou Dérogation Incubé)"
             >
-              <Plus size={14} /> <span>Réserver pour l'Admin</span>
+              <Plus size={14} /> <span>Nouvelle Réservation Directe</span>
             </button>
           </div>
         </div>
@@ -2149,6 +2207,88 @@ export default function GestionEspaces() {
                 ℹ️ Cette réservation sera <strong>immédiatement validée</strong> dans le planning sans passer par la file d'attente, et le créneau sera bloqué contre tout conflit.
               </div>
 
+              {/* Type de Bénéficiaire (Administration ou Incubé Dérogatoire) */}
+              <div className="space-y-1.5 p-3 rounded-2xl bg-slate-50 dark:bg-dark-800/80 border border-slate-200 dark:border-dark-700">
+                <label className="font-bold text-slate-800 dark:text-dark-200 block mb-1">
+                  Bénéficiaire de la réservation *
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAdminBookingModal(prev => ({
+                        ...prev,
+                        beneficiaireType: 'admin',
+                        selectedIncubeId: '',
+                        nomPersonnalise: user?.nom ? `${user.prenom || ''} ${user.nom} (Admin)`.trim() : 'Administration IDS',
+                        emailIncube: user?.email || '',
+                        telephoneIncube: user?.telephone || '',
+                        motifUtilisation: 'Réservation administrative / Équipe IDS'
+                      }));
+                    }}
+                    className={`py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      adminBookingModal.beneficiaireType === 'admin'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'bg-white dark:bg-dark-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-dark-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <ShieldCheck size={14} />
+                    <span>Administration IDS</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAdminBookingModal(prev => ({
+                        ...prev,
+                        beneficiaireType: 'incube',
+                        nomPersonnalise: '',
+                        emailIncube: '',
+                        telephoneIncube: '',
+                        motifUtilisation: `[Dérogation exceptionnelle accordée]`
+                      }));
+                    }}
+                    className={`py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      adminBookingModal.beneficiaireType === 'incube'
+                        ? 'bg-amber-500 text-navy-950 shadow-sm font-black'
+                        : 'bg-white dark:bg-dark-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-dark-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Users size={14} />
+                    <span>Incubé (Dérogation Quota)</span>
+                  </button>
+                </div>
+
+                {adminBookingModal.beneficiaireType === 'incube' && (
+                  <div className="mt-2.5 space-y-2 pt-2 border-t border-slate-200 dark:border-dark-700">
+                    <div>
+                      <label className="font-bold text-amber-700 dark:text-amber-400 block mb-1">
+                        Sélectionner l'incubé bénéficiaire *
+                      </label>
+                      <select
+                        value={adminBookingModal.selectedIncubeId}
+                        onChange={(e) => handleSelectIncubeBeneficiaire(e.target.value)}
+                        className="input w-full !py-2 !text-xs font-semibold cursor-pointer border-amber-500/50 focus:border-amber-500"
+                        required
+                      >
+                        <option value="">-- Choisir un incubé dans la liste --</option>
+                        {incubesList
+                          .filter(i => !i.compteUtilisateur || i.compteUtilisateur.actif !== false)
+                          .map(i => (
+                            <option key={i.id} value={i.id}>
+                              {i.nom_incube} {i.pp_numero ? `(${i.pp_numero})` : ''} {i.raison_sociale ? `• ${i.raison_sociale}` : ''}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-[11px] leading-tight">
+                      ⭐ <strong>Dérogation accordée :</strong> Cette réservation ne sera pas bloquée par les quotas hebdomadaires de l'incubé et lui sera directement attribuée.
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Choix Espace & Salle */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -2194,11 +2334,11 @@ export default function GestionEspaces() {
               {/* Nom du demandeur */}
               <div>
                 <label className="font-bold text-slate-700 dark:text-dark-300 block mb-1">
-                  Nom du demandeur / Responsable *
+                  {adminBookingModal.beneficiaireType === 'incube' ? "Nom de l'incubé / Porteur de projet *" : "Nom du demandeur / Responsable *"}
                 </label>
                 <input
                   type="text"
-                  placeholder="ex: Direction IDS, Formateur externe, Maintenance..."
+                  placeholder={adminBookingModal.beneficiaireType === 'incube' ? "Sélectionnez un incubé ci-dessus" : "ex: Direction IDS, Formateur externe, Maintenance..."}
                   value={adminBookingModal.nomPersonnalise}
                   onChange={(e) => setAdminBookingModal(prev => ({ ...prev, nomPersonnalise: e.target.value }))}
                   className="input w-full !py-2 !text-xs font-semibold"

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
-const { ReservationEspace, Incube } = require('../models');
+const { ReservationEspace, Incube, User } = require('../models');
 const { Op } = require('sequelize');
 const emailService = require('../services/emailService');
 const auth = require('../middleware/auth');
@@ -146,18 +146,39 @@ router.post('/demande', async (req, res) => {
       });
     }
 
-    // Auto-lier l'incubé correspondant si présent dans la base de données
+    // Auto-lier l'incubé correspondant et vérifier si le compte est actif
     let matchedIncubeId = req.body.incubeId ? Number(req.body.incubeId) : null;
     try {
-      if (!matchedIncubeId && email) {
-        const inc = await Incube.findOne({ where: { email } });
+      let inc = null;
+      if (matchedIncubeId) {
+        inc = await Incube.findByPk(matchedIncubeId, {
+          include: [{ model: User, as: 'compteUtilisateur', attributes: ['id', 'actif'] }]
+        });
+      }
+      if (!inc && email) {
+        inc = await Incube.findOne({
+          where: { email },
+          include: [{ model: User, as: 'compteUtilisateur', attributes: ['id', 'actif'] }]
+        });
         if (inc) matchedIncubeId = inc.id;
       }
-      if (!matchedIncubeId && nom) {
-        const inc = await Incube.findOne({ where: { nom_incube: nom } });
+      if (!inc && nom) {
+        inc = await Incube.findOne({
+          where: { nom_incube: nom },
+          include: [{ model: User, as: 'compteUtilisateur', attributes: ['id', 'actif'] }]
+        });
         if (inc) matchedIncubeId = inc.id;
       }
-    } catch (lookupErr) {}
+
+      // Si le compte de cet incubé est explicitement suspendu/inactif, bloquer immédiatement la réservation
+      if (inc?.compteUtilisateur && inc.compteUtilisateur.actif === false) {
+        return res.status(403).json({
+          message: "Votre compte est actuellement suspendu. Vous ne pouvez plus effectuer de réservations d'espaces. Veuillez contacter votre accompagnateur ou l'administration."
+        });
+      }
+    } catch (lookupErr) {
+      console.warn('⚠️ Erreur vérification compte incubé pour réservation:', lookupErr.message);
+    }
 
     const reservation = await ReservationEspace.create({
       espace: espace || 'fablab',
@@ -421,13 +442,16 @@ router.post('/directe', auth, requireStaff, async (req, res) => {
       }
     } catch (lookupErr) {}
 
+    const targetEmail = req.body.emailIncube || req.user?.email || 'admin@cgs.dz';
+    const targetTelephone = req.body.telephoneIncube || req.user?.telephone || null;
+
     const reservation = await ReservationEspace.create({
       espace: espace || 'fablab',
       salleSpecifique: salleSpecifique || null,
       incubeId: directIncubeId,
       nomIncube: nomAffiche,
-      emailIncube: req.user?.email || 'admin@cgs.dz',
-      telephoneIncube: req.user?.telephone || null,
+      emailIncube: targetEmail,
+      telephoneIncube: targetTelephone,
       dateReservation,
       heureDebut,
       heureFin,
@@ -436,6 +460,13 @@ router.post('/directe', auth, requireStaff, async (req, res) => {
       equipementsUtilises: equipementsUtilises ? String(equipementsUtilises).trim() : 'Tous les équipements',
       statut: 'valide'
     });
+
+    // Si la réservation est accordée pour un incubé, lui expédier immédiatement sa confirmation officielle
+    if (directIncubeId || (req.body.emailIncube && req.body.emailIncube.includes('@'))) {
+      emailService.sendReservationValidationEmail(reservation).catch(err => {
+        console.warn('⚠️ Notification email incubé (réservation directe):', err.message);
+      });
+    }
 
     // Générer la checklist matériel automatiquement
     try {
