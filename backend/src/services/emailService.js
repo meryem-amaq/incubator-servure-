@@ -638,9 +638,88 @@ const sendPasswordResetByAdminEmail = async (user, newPassword) => {
   });
 };
 
+
+/**
+ * 1.bis Notification envoyée à l'Accompagnateur pour validation en 1-Clic Sécurisé
+ */
+const sendDemandeReservationAccompagnateurEmail = async (reservation, accompagnateur = {}, { urlValide, urlRefuse }) => {
+  const recipient = accompagnateur.email || process.env.ADMIN_NOTIFY_EMAIL || 'incubateur.digital.solidaire@gmail.com';
+  const nomAccomp = accompagnateur.prenom ? `${accompagnateur.prenom} ${accompagnateur.nom || ''}`.trim() : (accompagnateur.nom || 'Accompagnateur');
+  const nomIncube = reservation.nomIncube || reservation.nomComplet || 'Un incubé';
+  const dateStr = reservation.dateReservation ? String(reservation.dateReservation).split('T')[0] : 'Date à venir';
+  const horaire = `${reservation.heureDebut || '—'} à ${reservation.heureFin || '—'}`;
+  const duree = reservation.duree || `${Math.round((reservation.dureeMinutes || 120) / 60)}h`;
+
+  const espaceLabels = {
+    fablab: '🛠️ Espace FabLab',
+    studio: '🎥 Studio Média / Photo',
+    salle_reunion: '🏢 Les Salles'
+  };
+  const espace = espaceLabels[reservation.espace] || reservation.espace || 'Espace Incubateur';
+  const salle = reservation.salleSpecifique || reservation.salle ? ` (${reservation.salleSpecifique || reservation.salle})` : '';
+
+  const subject = `🔔 Demande de Réservation à Valider : ${nomIncube} — ${espace}${salle}`;
+
+  const safeNomAccomp = escapeHtml(nomAccomp);
+  const safeNomIncube = escapeHtml(nomIncube);
+  const safeEspace = escapeHtml(espace);
+  const safeSalle = escapeHtml(salle);
+  const safeDate = escapeHtml(dateStr);
+  const safeHoraire = escapeHtml(horaire);
+  const safeDuree = escapeHtml(duree);
+  const safeMotif = escapeHtml(reservation.motifUtilisation || reservation.motif || 'Non renseigné');
+  const safeEquip = escapeHtml(reservation.equipementsUtilises || 'Aucun équipement spécifique');
+
+  const contentHtml = `
+    <p>Bonjour <strong>${safeNomAccomp}</strong>,</p>
+    <p>Votre incubé <strong>${safeNomIncube}</strong> a formulé une nouvelle demande de réservation d'espace nécessitant votre approbation.</p>
+
+    <div class="card" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 20px; margin: 20px 0;">
+      <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+        <tr><td style="padding: 7px 0; color: #64748b; font-weight: 600; width: 35%;">Porteur de Projet :</td><td style="padding: 7px 0; font-weight: 800; color: #00254d;">${safeNomIncube}</td></tr>
+        <tr><td style="padding: 7px 0; color: #64748b; font-weight: 600;">Espace & Salle :</td><td style="padding: 7px 0; font-weight: 800; color: #0c87eb;">${safeEspace}${safeSalle}</td></tr>
+        <tr><td style="padding: 7px 0; color: #64748b; font-weight: 600;">Date du créneau :</td><td style="padding: 7px 0; font-weight: 800; color: #00254d;">${safeDate}</td></tr>
+        <tr><td style="padding: 7px 0; color: #64748b; font-weight: 600;">Horaires :</td><td style="padding: 7px 0; font-weight: 700; color: #00254d;">${safeHoraire} (Durée : ${safeDuree})</td></tr>
+        <tr><td style="padding: 7px 0; color: #64748b; font-weight: 600;">Motif / Activité :</td><td style="padding: 7px 0; color: #475569; font-style: italic;">« ${safeMotif} »</td></tr>
+        ${reservation.equipementsUtilises ? `<tr><td style="padding: 7px 0; color: #64748b; font-weight: 600;">Matériel demandé :</td><td style="padding: 7px 0; color: #475569;">${safeEquip}</td></tr>` : ''}
+      </table>
+    </div>
+
+    <!-- BOUTONS D'ACTION 1-CLIC SÉCURISÉS -->
+    <div style="text-align: center; margin: 30px 0 16px 0;">
+      <a href="${urlValide}" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-weight: 800; font-size: 14px; display: inline-block; margin: 6px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35); letter-spacing: 0.2px;">
+        ✅ Valider la Réservation
+      </a>
+      <a href="${urlRefuse}" style="background: #ffffff; color: #ef4444; border: 1.5px solid #ef4444; text-decoration: none; padding: 13px 24px; border-radius: 12px; font-weight: 700; font-size: 13px; display: inline-block; margin: 6px;">
+        ❌ Refuser
+      </a>
+    </div>
+
+    <p style="font-size: 11px; color: #94a3b8; text-align: center; margin-top: 18px;">
+      🔒 <strong>Lien sécurisé et strictement personnel</strong> (valable 48h). Aucune connexion par mot de passe n'est requise.
+    </p>
+  `;
+
+  const html = renderEmailTemplate({
+    title: `Demande de Réservation : ${safeNomIncube}`,
+    preheader: `${safeNomIncube} a réservé ${safeEspace}${safeSalle} pour le ${safeDate}`,
+    badgeText: 'Action Requise • Accompagnement',
+    badgeColor: '#f59e0b',
+    contentHtml
+  });
+
+  return await sendEmail({
+    to: recipient,
+    subject,
+    html,
+    text: `Bonjour ${nomAccomp}, ${nomIncube} a réservé ${espace}${salle} le ${dateStr} (${horaire}). Pour valider : ${urlValide} | Pour refuser : ${urlRefuse}`
+  });
+};
+
 module.exports = {
   sendEmail,
   sendReservationStatusEmail,
+  sendDemandeReservationAccompagnateurEmail,
   sendRdvConfirmationEmail,
   sendFormationInvitationEmail,
   sendAlerteAssiduiteEmail,

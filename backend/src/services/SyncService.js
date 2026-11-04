@@ -1,6 +1,8 @@
 require('dotenv').config();
 const { Op } = require('sequelize');
-const { ReservationEspace, PresenceAtelier, Atelier, Incube, EquipementEspace, ChecklistMateriel } = require('../models');
+const { ReservationEspace, PresenceAtelier, Atelier, Incube, EquipementEspace, ChecklistMateriel, User } = require('../models');
+const { generateConfirmationToken } = require('../utils/tokenHelper');
+const emailService = require('./emailService');
 
 /**
  * Service de synchronisation bidirectionnelle entre le serveur local (Master)
@@ -142,6 +144,13 @@ class SyncService {
             }
           }
 
+          // Notification 1-clic par email à l'accompagnateur si statut en_attente
+          if (targetStatut === 'en_attente') {
+            this.notifyAccompagnateurForReservation(createdReservation).catch(err => {
+              console.warn(`⚠️ [SyncService] Erreur notification accompagnateur : ${err.message}`);
+            });
+          }
+
           syncedReservationIds.push(res.id);
         } catch (err) {
           console.error(`❌ [SyncService] Échec insertion réservation ID cloud ${res.id}:`, err.message);
@@ -198,6 +207,61 @@ class SyncService {
           syncedPresenceIds.push(p.id);
         } catch (err) {
           console.error(`❌ [SyncService] Échec insertion présence ID cloud ${p.id}:`, err.message);
+        }
+      }
+
+      
+      // 3.bis Synchronisation des décisions prises en ligne sur le Cloud (Accompagnateur / Heroku)
+      if (data.decisions && Array.isArray(data.decisions) && data.decisions.length > 0) {
+        for (const dec of data.decisions) {
+          try {
+            const dateVal = dec.dateReservation ? String(dec.dateReservation).split('T')[0] : null;
+            if (!dateVal || !dec.heureDebut || !dec.heureFin) continue;
+
+            const localWhere = {
+              dateReservation: dateVal,
+              heureDebut: dec.heureDebut,
+              heureFin: dec.heureFin,
+              espace: dec.espace,
+              statut: 'en_attente'
+            };
+            if (dec.salle) localWhere.salleSpecifique = dec.salle;
+
+            const pendingRes = await ReservationEspace.findOne({ where: localWhere });
+            if (pendingRes) {
+              pendingRes.statut = dec.decision; // 'valide' ou 'refuse'
+              await pendingRes.save();
+              console.log(`⚡ [SyncService] Réservation locale #${pendingRes.id} synchronisée vers "${dec.decision}" (décision Cloud par ${dec.decision_par || 'Accompagnateur'})`);
+
+              // Génération automatique de la checklist matériel si validée
+              if (dec.decision === 'valide' && EquipementEspace && ChecklistMateriel) {
+                try {
+                  const equipWhere = { espace: pendingRes.espace };
+                  if (pendingRes.salleSpecifique) equipWhere.salle = pendingRes.salleSpecifique;
+                  const equipements = await EquipementEspace.findAll({ where: equipWhere });
+                  if (equipements && equipements.length > 0) {
+                    await ChecklistMateriel.destroy({ where: { reservation_id: pendingRes.id } });
+                    const checklists = equipements.map(e => ({
+                      reservation_id: pendingRes.id,
+                      equipement_id: e.id,
+                      etat_avant: e.etatAvant || 'Opérationnel / Parfait état',
+                      etat_apres: e.etatApres || 'Conforme & Rendu propre'
+                    }));
+                    await ChecklistMateriel.bulkCreate(checklists);
+                  }
+                } catch (chkErr) {}
+              }
+
+              // Notification officielle à l'incubé par email
+              if (pendingRes.emailIncube) {
+                emailService.sendReservationStatusEmail(pendingRes, dec.decision, dec.decision_motif).catch(e => {
+                  console.warn(`⚠️ [SyncService] Erreur notification email incubé pour rés #${pendingRes.id}:`, e.message);
+                });
+              }
+            }
+          } catch (decErr) {
+            console.warn(`⚠️ [SyncService] Erreur traitement décision cloud:`, decErr.message);
+          }
         }
       }
 
@@ -307,6 +371,79 @@ class SyncService {
       }
     } catch (err) {
       console.warn(`⚠️ [SyncService] Erreur pushLocalReservationsToCloud :`, err.message);
+    }
+  }
+
+  /**
+   * Notifie l'accompagnateur ou l'administrateur par email avec les boutons 1-clic sécurisés
+   */
+  async notifyAccompagnateurForReservation(reservation) {
+    try {
+      if (!reservation) return;
+
+      let accompagnateur = null;
+      let matchedIncube = null;
+
+      // Recherche de l'incubé et de son accompagnateur assigné
+      if (reservation.incubeId) {
+        matchedIncube = await Incube.findByPk(reservation.incubeId, {
+          include: [{ model: User, as: 'accompagnateurAdmin', attributes: ['id', 'nom', 'prenom', 'email'] }]
+        });
+      } else if (reservation.emailIncube) {
+        matchedIncube = await Incube.findOne({
+          where: { email: reservation.emailIncube.trim().toLowerCase() },
+          include: [{ model: User, as: 'accompagnateurAdmin', attributes: ['id', 'nom', 'prenom', 'email'] }]
+        });
+      } else if (reservation.nomIncube) {
+        matchedIncube = await Incube.findOne({
+          where: { nom_incube: reservation.nomIncube.trim() },
+          include: [{ model: User, as: 'accompagnateurAdmin', attributes: ['id', 'nom', 'prenom', 'email'] }]
+        });
+      }
+
+      if (matchedIncube?.accompagnateurAdmin?.email) {
+        accompagnateur = matchedIncube.accompagnateurAdmin;
+      } else if (matchedIncube?.accompagnateur) {
+        accompagnateur = await User.findOne({
+          where: { nom: { [Op.like]: `%${matchedIncube.accompagnateur}%` } },
+          attributes: ['id', 'nom', 'prenom', 'email']
+        });
+      }
+
+      const targetEmail = accompagnateur?.email || process.env.ADMIN_NOTIFY_EMAIL || 'incubateur.digital.solidaire@gmail.com';
+      const targetAccomp = accompagnateur || {
+        nom: matchedIncube?.accompagnateur || 'Accompagnateur IDS',
+        prenom: '',
+        email: targetEmail
+      };
+
+      // Génération des tokens cryptographiques HMAC-SHA256 (valables 48h)
+      const tokenValide = generateConfirmationToken({
+        reservationId: reservation.id,
+        action: 'valide',
+        email: targetEmail,
+        expiresInHours: 48
+      });
+
+      const tokenRefuse = generateConfirmationToken({
+        reservationId: reservation.id,
+        action: 'refuse',
+        email: targetEmail,
+        expiresInHours: 48
+      });
+
+      const urlValide = `${this.cloudUrl}/confirmer-reservation?token=${tokenValide}`;
+      const urlRefuse = `${this.cloudUrl}/confirmer-reservation?token=${tokenRefuse}`;
+
+      console.log(`📧 [SyncService] Envoi email validation 1-clic à ${targetEmail} pour rés #${reservation.id} (${reservation.nomIncube})`);
+
+      await emailService.sendDemandeReservationAccompagnateurEmail(
+        reservation,
+        targetAccomp,
+        { urlValide, urlRefuse }
+      );
+    } catch (err) {
+      console.warn(`⚠️ [SyncService] Échec envoi email accompagnateur rés #${reservation?.id}:`, err.message);
     }
   }
 }

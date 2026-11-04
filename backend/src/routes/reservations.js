@@ -177,6 +177,17 @@ router.post('/demande', async (req, res) => {
 
     const displaySalle = salleSpecifique ? ` (${salleSpecifique})` : '';
     console.log(`📌 Nouvelle Demande de Réservation Espace [${(espace || 'FABLAB').toUpperCase()}${displaySalle}] pour ${nom}`);
+    // Déclencher la notification accompagnateur (1-clic) et pousser au Cloud
+    (async () => {
+      try {
+        const SyncService = require('../services/SyncService');
+        await SyncService.pushLocalReservationsToCloud();
+        await SyncService.notifyAccompagnateurForReservation(reservation);
+      } catch (syncErr) {
+        console.warn('⚠️ Erreur notification accompagnateur rés locale:', syncErr.message);
+      }
+    })();
+
     res.status(201).json({ success: true, message: 'Demande de réservation envoyée !', reservation });
   } catch (err) {
     console.error('Erreur création réservation:', err.message);
