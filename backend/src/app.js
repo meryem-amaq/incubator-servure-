@@ -298,6 +298,29 @@ app.listen(PORT, '0.0.0.0', () => {
 sequelize.authenticate()
   .then(async () => {
     console.log('✅ Base de données connectée (MariaDB/MySQL) - Démarrage instantané (1s)');
+
+    // Auto-migration idempotente et légère au démarrage (ajoute les colonnes manquantes sans altérer les données existantes)
+    try {
+      const checkAndAddColumn = async (table, column, definition) => {
+        try {
+          const [results] = await sequelize.query(`SHOW COLUMNS FROM ${table} LIKE '${column}'`);
+          if (!results || results.length === 0) {
+            await sequelize.query(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+            console.log(`✅ Auto-migration : colonne '${column}' ajoutée à la table '${table}'`);
+          }
+        } catch (e) {
+          // Ignorer si la colonne existe déjà
+        }
+      };
+
+      await checkAndAddColumn('incubes', 'est_suspendu', 'TINYINT(1) DEFAULT 0');
+      await checkAndAddColumn('suivi_engagement', 'heures_ateliers', 'FLOAT DEFAULT 0');
+      await checkAndAddColumn('suivi_engagement', 'nb_ateliers', 'INT DEFAULT 0');
+      await checkAndAddColumn('suivi_engagement', 'heures_ateliers_animes', 'FLOAT DEFAULT 0');
+      await checkAndAddColumn('suivi_engagement', 'nb_ateliers_animes', 'INT DEFAULT 0');
+    } catch (migErr) {
+      console.warn('⚠️ Note auto-migration:', migErr.message);
+    }
     try {
       const bcrypt = require('bcryptjs');
       const { User } = require('./models');
