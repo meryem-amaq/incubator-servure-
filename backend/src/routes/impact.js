@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const isSuperAdmin = require('../middleware/isSuperAdmin');
-const { PresenceAtelier, ReservationEspace, EquipementEspace, Incube, Atelier, sequelize } = require('../models');
+const { PresenceAtelier, ReservationEspace, EquipementEspace, Incube, Atelier, SuiviEngagement, Attendance, sequelize } = require('../models');
 const { Op } = require('sequelize');
 
 /**
@@ -23,7 +23,60 @@ router.get('/stats', auth, isSuperAdmin, async (req, res) => {
     const promoIncubes = await Incube.findAll({ where: whereIncube, attributes: ['id', 'nom_incube', 'pp_numero'] });
     const totalIncubes = promoIncubes.length;
 
-    // 2. STATS ATELIERS & ASSIDUITÉ
+    // 2. STATS ENGAGEMENT & PRÉSENCE PHYSIQUE (TOURNIQUETS / HEURES AU CENTRE IDS)
+    const promoIncubeIds = promoIncubes.map(i => i.id);
+    const engagementWhere = promoIncubeIds.length > 0 ? { incube_id: { [Op.in]: promoIncubeIds } } : {};
+
+    const engagementRows = await SuiviEngagement.findAll({
+      where: engagementWhere,
+      attributes: [
+        'incube_id',
+        [sequelize.fn('SUM', sequelize.col('moyenne_heures_presence')), 'totalHeures'],
+        [sequelize.fn('COUNT', sequelize.col('id')), 'nbMois'],
+        [sequelize.fn('AVG', sequelize.col('moyenne_heures_presence')), 'moyenneHeures']
+      ],
+      group: ['incube_id'],
+      raw: true
+    });
+
+    const incubeMap = new Map(promoIncubes.map(i => [i.id, i]));
+    const maxHeures = engagementRows.length > 0
+      ? Math.max(...engagementRows.map(r => parseFloat(r.totalHeures) || 0), 1)
+      : 1;
+
+    const topIncubesEngagement = engagementRows
+      .map(r => {
+        const inc = incubeMap.get(r.incube_id);
+        const totalH = Math.round((parseFloat(r.totalHeures) || 0) * 10) / 10;
+        const moyH = Math.round((parseFloat(r.moyenneHeures) || 0) * 10) / 10;
+        return {
+          incubeId: r.incube_id,
+          nom: inc ? inc.nom_incube : 'Incubé',
+          nomComplet: inc ? inc.nom_incube : 'Incubé',
+          ppNumero: inc ? inc.pp_numero : 'PP-IDS',
+          totalHeures: totalH,
+          moyenneHeures: moyH,
+          count: totalH,
+          nbMois: parseInt(r.nbMois, 10) || 0,
+          taux: Math.min(100, Math.round((totalH / maxHeures) * 100))
+        };
+      })
+      .filter(i => i.totalHeures > 0)
+      .sort((a, b) => b.totalHeures - a.totalHeures)
+      .slice(0, 5);
+
+    const totalHeuresPresencesGlobal = Math.round(
+      engagementRows.reduce((sum, r) => sum + (parseFloat(r.totalHeures) || 0), 0) * 10
+    ) / 10;
+
+    let totalPassagesTourniquets = 0;
+    try {
+      totalPassagesTourniquets = await Attendance.count();
+    } catch (e) {
+      console.warn('Erreur count Attendance:', e.message);
+    }
+
+    // 2b. STATS ATELIERS & ASSIDUITÉ (CONSERVÉES POUR LE VOLET FORMATION / FUTUR GRAPHE DÉDIÉ)
     let presenceWhere = { present: true };
     if (promotion && promotion !== 'all' && promotion !== 'Toutes') {
       const ids = promoIncubes.map(i => String(i.id));
@@ -49,7 +102,7 @@ router.get('/stats', auth, isSuperAdmin, async (req, res) => {
     const distinctAtelierIds = [...new Set(allPresences.map(p => p.atelierId))];
     const totalAteliersActifs = distinctAtelierIds.length;
 
-    // Top incubés les plus assidus
+    // Top incubés les plus assidus aux ateliers
     const incubeCounts = {};
     allPresences.forEach(p => {
       const key = p.incubeId || p.nom;
@@ -65,7 +118,7 @@ router.get('/stats', auth, isSuperAdmin, async (req, res) => {
       incubeCounts[key].count += 1;
     });
 
-    const topIncubes = Object.values(incubeCounts)
+    const topIncubesAteliers = Object.values(incubeCounts)
       .sort((a, b) => b.count - a.count)
       .slice(0, 5)
       .map(i => ({
@@ -165,12 +218,20 @@ router.get('/stats', auth, isSuperAdmin, async (req, res) => {
 
     res.json({
       success: true,
+      engagement: {
+        totalHeuresPresencesGlobal,
+        totalPassagesTourniquets,
+        topIncubes: topIncubesEngagement
+      },
       assiduite: {
         totalIncubes,
         totalAteliersActifs,
         totalPresences,
         globalAssiduiteRate,
-        topIncubes,
+        totalHeuresPresencesGlobal,
+        totalPassagesTourniquets,
+        topIncubes: topIncubesEngagement,
+        topIncubesAteliers,
         tousLesAteliers
       },
       espaces: {

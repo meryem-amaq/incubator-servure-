@@ -487,11 +487,11 @@ export default function Dashboard() {
               <div id="dashboard-pdf-page-1" className="space-y-6 bg-transparent">
                 {/* 4 KPIs Clés d'Impact */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* KPI 1 : Assiduité Globale */}
+                  {/* KPI 1 : Présence Physique & Engagement */}
                   <div className="card p-5 border border-emerald-200 dark:border-emerald-800/40 bg-gradient-to-br from-emerald-50/40 to-teal-50/20 dark:from-emerald-950/20 dark:to-dark-900">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
-                        Assiduité Globale
+                        Présence sur Site
                       </span>
                       <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
                         <Award size={20} />
@@ -499,11 +499,11 @@ export default function Dashboard() {
                     </div>
                     <div className="mt-4">
                       <div className="text-3xl font-black text-emerald-700 dark:text-emerald-300 tracking-tight">
-                        {impactStats?.assiduite?.globalAssiduiteRate || 0}%
+                        {impactStats?.engagement?.totalHeuresPresencesGlobal ?? impactStats?.assiduite?.totalHeuresPresencesGlobal ?? 0} <span className="text-lg font-bold">h</span>
                       </div>
                       <p className="text-xs text-slate-500 dark:text-dark-400 mt-1 flex items-center gap-1 font-medium">
                         <CheckCircle2 size={13} className="text-emerald-500" />
-                        {impactStats?.assiduite?.totalPresences || 0} signatures certifiées en BDD
+                        {impactStats?.engagement?.totalPassagesTourniquets ?? impactStats?.assiduite?.totalPassagesTourniquets ?? 0} passages certifiés (Tourniquets)
                       </p>
                     </div>
                   </div>
@@ -592,27 +592,27 @@ export default function Dashboard() {
 
               {/* Grille principale : Top Incubés & Répartition Espaces / Matériel (2 colonnes égales) */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Colonne gauche : Top 5 des Incubés les plus Assidus */}
+                {/* Colonne gauche : Top 5 des Incubés les plus Présents (Heures sur site) */}
                 <div className="card p-5 lg:col-span-1 flex flex-col justify-between h-full space-y-4">
                   <div className="flex-1 space-y-3">
                     <div className="flex items-center justify-between border-b border-slate-100 dark:border-dark-800 pb-2.5">
                       <div>
                         <h2 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                          Top Incubés Assidus
+                          Top Incubés les Plus Présents
                         </h2>
                         <p className="text-[11px] text-slate-500 dark:text-dark-400">
-                          Porteurs de projets les plus présents aux ateliers
+                          Porteurs de projets les plus présents au centre IDS (Heures tourniquets)
                         </p>
                       </div>
                     </div>
 
                     {(!impactStats?.assiduite?.topIncubes || impactStats.assiduite.topIncubes.length === 0) ? (
                       <div className="text-center py-8 text-slate-400 text-xs">
-                        Aucun émargement enregistré pour le moment.
+                        Aucune heure de présence enregistrée pour le moment.
                       </div>
                     ) : (
                       <div className="space-y-2.5">
-                        {impactStats.assiduite.topIncubes.slice(0, 4).map((inc, idx) => (
+                        {impactStats.assiduite.topIncubes.slice(0, 5).map((inc, idx) => (
                           <div
                             key={inc.incubeId || idx}
                             onClick={() => inc.incubeId && navigate(`/incube/${inc.incubeId}`)}
@@ -638,14 +638,14 @@ export default function Dashboard() {
                                 </div>
                               </div>
                               <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-black text-[11px] shrink-0">
-                                {inc.count} atelier{inc.count > 1 ? 's' : ''}
+                                {inc.totalHeures !== undefined ? `${inc.totalHeures} h` : `${inc.count} h`}
                               </span>
                             </div>
 
                             <div className="space-y-1">
                               <div className="flex justify-between text-[10px] font-bold text-slate-400">
-                                <span>Taux d'assiduité :</span>
-                                <span className="text-emerald-600 font-extrabold">{inc.taux}%</span>
+                                <span>Volume de présence sur site :</span>
+                                <span className="text-emerald-600 font-extrabold">{inc.totalHeures || inc.count || 0} h</span>
                               </div>
                               <div className="w-full h-1.5 bg-slate-200 dark:bg-dark-700 rounded-full overflow-hidden">
                                 <div
@@ -663,10 +663,10 @@ export default function Dashboard() {
                   <div className="pt-1" data-html2canvas-ignore="true">
                     <button
                       type="button"
-                      onClick={() => navigate('/evenements')}
+                      onClick={() => navigate('/engagement')}
                       className="w-full btn btn-secondary py-1.5 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      <span>Gérer les Ateliers & Émargements</span>
+                      <span>Consulter le Suivi d'Engagement & Tourniquets</span>
                       <ExternalLink size={12} />
                     </button>
                   </div>

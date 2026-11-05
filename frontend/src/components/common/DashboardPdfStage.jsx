@@ -652,12 +652,12 @@ export default function DashboardPdfStage({ stats, impactStats, activeTab = 'eco
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px', height: '115px' }}>
               <div style={{ border: '1.5px solid #a7f3d0', borderRadius: '14px', padding: '14px', backgroundColor: '#f0fdf4' }}>
-                <span style={{ fontSize: '11px', fontWeight: '800', color: '#166534' }}>ASSIDUITÉ GLOBALE</span>
+                <span style={{ fontSize: '11px', fontWeight: '800', color: '#166534' }}>PRÉSENCE SUR SITE (TOURNIQUETS)</span>
                 <div style={{ fontSize: '28px', fontWeight: '900', color: '#15803d', marginTop: '6px' }}>
-                  {impactStats?.assiduite?.globalAssiduiteRate || 0}%
+                  {impactStats?.engagement?.totalHeuresPresencesGlobal ?? impactStats?.assiduite?.totalHeuresPresencesGlobal ?? 0} h
                 </div>
                 <p style={{ fontSize: '10px', color: '#059669', margin: '4px 0 0' }}>
-                  {impactStats?.assiduite?.totalPresences || 0} signatures certifiées
+                  {impactStats?.engagement?.totalPassagesTourniquets ?? impactStats?.assiduite?.totalPassagesTourniquets ?? 0} passages certifiés
                 </p>
               </div>
 
@@ -1036,7 +1036,7 @@ export default function DashboardPdfStage({ stats, impactStats, activeTab = 'eco
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', height: '100%' }}>
             <div style={{ border: '1.5px solid #e2e8f0', borderRadius: '14px', padding: '16px', backgroundColor: '#ffffff' }}>
               <h4 style={{ fontSize: '13px', fontWeight: '900', color: '#0f172a', margin: '0 0 12px' }}>
-                TOP INCUBÉS LES PLUS ASSIDUS AUX FORMATIONS
+                TOP INCUBÉS - PRÉSENCE PHYSIQUE AU CENTRE
               </h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {(impactStats?.assiduite?.topIncubes || []).slice(0, 6).map((inc, i) => (
@@ -1052,9 +1052,9 @@ export default function DashboardPdfStage({ stats, impactStats, activeTab = 'eco
                     }}
                   >
                     <span style={{ fontSize: '12px', fontWeight: '800', color: '#1e293b' }}>
-                      {i + 1}. {inc.nomComplet}
+                      {i + 1}. {inc.nomComplet} {inc.ppNumero ? `(${inc.ppNumero})` : ''}
                     </span>
-                    <span style={{ fontSize: '12px', fontWeight: '900', color: '#10b981' }}>{inc.taux}% de présence</span>
+                    <span style={{ fontSize: '12px', fontWeight: '900', color: '#10b981' }}>{inc.totalHeures || inc.count || 0} h de présence</span>
                   </div>
                 ))}
               </div>
