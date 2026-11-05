@@ -873,7 +873,7 @@ export default function ReservationEspacePublique() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 font-bold text-slate-200">
                   <span className="text-base">📜</span>
-                  <span>{espaceKey === 'studio' ? "Charte d'engagement & Conditions du Studio IDS" : "Règlement intérieur & Conditions d'utilisation"}</span>
+                  <span>ENGAGEMENT D'UTILISATION DU STUDIO DE CRÉATION DE CONTENU</span>
                 </div>
                 <button
                   type="button"
@@ -896,54 +896,63 @@ export default function ReservationEspacePublique() {
                     }}
                     className="max-h-60 sm:max-h-72 overflow-y-auto pr-2.5 text-[11px] text-slate-300 space-y-3 pt-2.5 border-t border-slate-800/80 leading-relaxed scrollbar-thin scrollbar-thumb-amber-500/40 scrollbar-track-slate-950"
                   >
-                    <p className="text-slate-300 italic bg-slate-950/70 p-3 rounded-lg border border-slate-800 text-[11px]">
-                      Reconnais, que l’Incubateur Digital Solidaire, sis à angle Avenue Assalam et route de Kénitra, qui relève du réseau du Centre des Très Petites Entreprises Solidaires (CTPES), ci-après dénommé « IDS », met gratuitement à la disposition de ma startup un studio de création de contenu équipé de matériel professionnel de grande valeur. En contrepartie de cet accès privilégié, je m’engage personnellement et au nom de l’ensemble des collaborateurs et invités de ma startup, à respecter scrupuleusement les conditions d’utilisation suivantes :
+                    <div className="text-center font-extrabold text-amber-400 text-xs uppercase tracking-wide border-b border-slate-800 pb-2">
+                      ENGAGEMENT D'UTILISATION DU STUDIO DE CRÉATION DE CONTENU
+                    </div>
+
+                    <p className="text-slate-300 italic bg-slate-950/70 p-3 rounded-lg border border-slate-800 text-[11px] leading-relaxed">
+                      Je reconnais que l’<strong>Incubateur Digital Solidaire</strong>, sis à l'angle de l’Avenue Assalam et route de Kénitra, qui relève du réseau du <strong>Centre des Très Petites Entreprises Solidaire (CTPES)</strong>, ci-après dénommé <strong>« IDS »</strong>, met gratuitement à la disposition de ma startup un studio de création de contenu équipé de matériel professionnel de grande valeur.<br /><br />
+                      En contrepartie de cet accès privilégié, je m’engage personnellement et au nom de l’ensemble des collaborateurs et invités de ma startup, à respecter scrupuleusement les conditions d’utilisation suivantes :
                     </p>
 
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 pt-1">
                       <h4 className="font-extrabold text-amber-400 text-xs uppercase tracking-wide">
                         1. ACCÈS ET RÉSERVATION
                       </h4>
-                      <ul className="space-y-1 pl-1 text-slate-300">
-                        <li>• <strong>Autorisation préalable :</strong> L’accès au studio, étant sur autorisation préalable, je m'engage à formuler une demande d’autorisation au moins 48 heures ouvrables à l'avance via le formulaire établi par l’administration de l’IDS qui peut accepter, proposer un autre créneau horaire, reporter ou refuser la demande.</li>
-                        <li>• <strong>Annulation :</strong> Je m'engage à informer l'administration de l’IDS en cas d’annulation de la réservation au moins 24 heures à l'avance.</li>
-                        <li>• <strong>Tiers et Invités :</strong> Je m'engage à déclarer et à faire valider par l'administration, lors de la réservation, l'identité de toute personne externe à la startup amenée à entrer dans le studio et ce selon la procédure et les formalités mises en place.</li>
+                      <ul className="space-y-1.5 pl-1 text-slate-300">
+                        <li>• <strong>Autorisation :</strong> L’accès au studio étant soumis à une autorisation préalable, je m'engage à formuler une demande d’autorisation au moins <strong>48 heures ouvrables à l'avance</strong> via le formulaire établi par l’administration de l’IDS, qui peut accepter, proposer un autre créneau horaire, reporter ou refuser la demande.</li>
+                        <li>• <strong>Annulation :</strong> Je m'engage à informer l'administration de l’IDS en cas d’annulation de la réservation au moins <strong>24 heures à l'avance</strong>.</li>
+                        <li>• <strong>Tiers et Invités :</strong> Je m'engage à déclarer et à faire valider par l'administration, lors de la réservation, l'identité de toute personne externe à la startup amenée à entrer dans le studio, conformément à la procédure et aux formalités mises en place.</li>
                         <li>• <strong>Usage exclusif :</strong> Je m'engage à utiliser le studio uniquement pour les projets de ma startup incubée et je m’interdis formellement toute sous-location ou mise à disposition du studio à un tiers.</li>
                       </ul>
                     </div>
 
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 pt-1">
                       <h4 className="font-extrabold text-amber-400 text-xs uppercase tracking-wide">
                         2. UTILISATION ET PROTECTION DU MATÉRIEL DU STUDIO
                       </h4>
-                      <ul className="space-y-1 pl-1 text-slate-300">
+                      <ul className="space-y-1.5 pl-1 text-slate-300">
                         <li>• <strong>État du matériel :</strong> Je m'engage à effectuer une vérification contradictoire avec l’administration de l’IDS en signant l’inventaire du matériel du studio (inventaire d'entrée et de sortie) avant et après chaque session.</li>
                         <li>• <strong>Manipulation :</strong> Je m'engage à ce que le matériel ne soit manipulé que par des personnes formées ou autorisées.</li>
                         <li>• <strong>Notification :</strong> Je m'engage à informer immédiatement l'administration de l’IDS de tout incident, panne ou anomalie constatés sur le matériel.</li>
-                        <li>• <strong>Matériel propre :</strong> Au cas d’utilisation du matériel propre, je m’engage à notifier à l’administration de l’IDS la liste du matériel propre utilisé.</li>
+                        <li>• <strong>Matériel propre :</strong> En cas d’utilisation de matériel propre, je m’engage à notifier à l’administration de l’IDS la liste du matériel utilisé.</li>
                         <li>• <strong>Hygiène et sécurité :</strong> Je m'engage à respecter l'interdiction stricte d'introduire de la nourriture ou des boissons dans le studio.</li>
                         <li>• <strong>Remise à l’état initial :</strong> Je m'engage à restituer le studio dans un état de propreté irréprochable et selon la configuration technique d'origine à la fin de ma session.</li>
                       </ul>
                     </div>
 
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 pt-1">
                       <h4 className="font-extrabold text-amber-400 text-xs uppercase tracking-wide">
                         3. RESPONSABILITÉ FINANCIÈRE ET SANCTIONS
                       </h4>
-                      <ul className="space-y-1 pl-1 text-slate-300">
-                        <li>• <strong>Prise en charge des dégâts :</strong> Je reconnais que ma startup assume la responsabilité juridique et financière des équipements du studio durant la session d’utilisation du studio. En cas de dégradation due à une mauvaise utilisation, une négligence ou le non-respect du présent engagement, je m'engage à rembourser l'intégralité des frais de réparation ou de remplacement à neuf dudit matériel.</li>
+                      <ul className="space-y-1.5 pl-1 text-slate-300">
+                        <li>• <strong>Prise en charge des dégâts :</strong> Je reconnais que ma startup assume la responsabilité juridique et financière des équipements du studio durant la session d’utilisation. En cas de dégradation due à une mauvaise utilisation, une négligence ou le non-respect du présent engagement, je m'engage à rembourser l'intégralité des frais de réparation ou de remplacement à neuf dudit matériel.</li>
                         <li>• <strong>Sanctions :</strong> Je prends acte que tout manquement aux présents engagements et aux règles générales d’utilisation pourra entraîner la suspension immédiate de mon accès au studio.</li>
                       </ul>
                     </div>
 
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 pt-1">
                       <h4 className="font-extrabold text-amber-400 text-xs uppercase tracking-wide">
                         4. RESPONSABILITÉ LÉGALE DU CONTENU
                       </h4>
-                      <ul className="space-y-1 pl-1 text-slate-300">
-                        <li>• <strong>Information sur le contenu :</strong> Je m’engage à renseigner dans la demande d’autorisation les informations essentielles sur le contenu de chaque session d’utilisation du Studio.</li>
-                        <li>• <strong>Responsabilité Éditoriale :</strong> Je reconnais que ma startup assume de manière pleine et entière la qualité d'éditeur de tous les contenus audio, vidéo ou visuels (podcasts, interviews, vlogs, etc.) réalisés au sein du studio de l’IDS. L’IDS en sa qualité d’incubateur, agit exclusivement en tant que facilitateur technique et fournisseurs de moyens d’appui à ma startup et ne saurait être qualifié de co-éditeur ou de co-producteur. En conséquence, l'IDS décline toute responsabilité civile ou pénale quant aux messages, opinions et informations diffusés.</li>
-                        <li>• <strong>Conformité Légale :</strong> Je m'engage à ce que l'ensemble des productions réalisées dans le studio respectent scrupuleusement la législation marocaine. Le contenu ne doit comporter aucune incitation à la haine, discrimination, diffamation, injure, atteinte à la vie privée, à l'ordre public…</li>
+                      <ul className="space-y-1.5 pl-1 text-slate-300">
+                        <li>• <strong>Information sur le contenu :</strong> Je m’engage à renseigner dans la demande d’autorisation les informations essentielles sur le contenu de chaque session d’utilisation du studio.</li>
+                        <li>• <strong>Responsabilité Éditoriale :</strong> Je reconnais que ma startup assume de manière pleine et entière la qualité d'éditeur de tous les contenus audio, vidéo ou visuels (podcasts, interviews, vlogs, etc.) réalisés au sein du studio de l’IDS.  
+                          <div className="my-1.5 p-2 rounded bg-slate-950/80 border border-slate-800 text-slate-400 italic">
+                            L’IDS, en sa qualité d’incubateur, agit exclusivement en tant que facilitateur technique et fournisseur de moyens d’appui à ma startup et ne saurait être qualifié de co-éditeur ou de co-producteur. En conséquence, l'IDS décline toute responsabilité civile ou pénale quant aux messages, opinions et informations diffusés.
+                          </div>
+                        </li>
+                        <li>• <strong>Conformité Légale :</strong> Je m'engage à ce que l'ensemble des productions réalisées dans le studio respectent scrupuleusement la législation marocaine. Le contenu ne doit comporter aucune incitation à la haine, discrimination, diffamation, injure, atteinte à la vie privée, à l'ordre public, etc.</li>
                         <li>• <strong>Clause de garantie et d'indemnisation :</strong> En cas d’action en justice, de plainte, de mise en demeure ou de réclamation d’un tiers (pour violation de droit d’auteur, diffamation, vol de propriété intellectuelle ou autre) visant un contenu produit dans le studio de l’IDS, ma startup s’engage à garantir, défendre et indemniser intégralement l’incubateur IDS contre toutes les conséquences financières (frais d'avocat, dommages et intérêts, amendes).</li>
                       </ul>
                     </div>
