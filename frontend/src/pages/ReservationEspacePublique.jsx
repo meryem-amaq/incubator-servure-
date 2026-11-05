@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -130,7 +130,9 @@ export default function ReservationEspacePublique() {
 
   const [hasInvites, setHasInvites] = useState(false);
   const [acceptConditions, setAcceptConditions] = useState(false);
-  const [showConditions, setShowConditions] = useState(false);
+  const [showConditions, setShowConditions] = useState(true);
+  const [hasReadToBottom, setHasReadToBottom] = useState(false);
+  const conditionsBoxRef = useRef(null);
 
   // Mettre à jour l'heure début/fin par défaut si l'espace change
   useEffect(() => {
@@ -435,6 +437,7 @@ export default function ReservationEspacePublique() {
             onClick={() => {
               setSubmittedData(null);
               setAcceptConditions(false);
+              setHasReadToBottom(false);
               setHasInvites(false);
               setForm(f => ({ ...f, motif: '', thematique: '', invitesExternes: '', equipementsUtilises: '' }));
               setSelectedEquipements([]);
@@ -866,40 +869,135 @@ export default function ReservationEspacePublique() {
 
           {/* CONDITIONS D'UTILISATION & RÈGLEMENT INTÉRIEUR */}
           <div className="space-y-2.5 pt-3 border-t border-slate-800">
-            <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3 text-xs text-slate-300 space-y-2">
+            <div className="bg-slate-900/95 border border-slate-800 rounded-xl p-3.5 text-xs text-slate-300 space-y-2.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 font-bold text-slate-200">
-                  <span>📜 Règlement intérieur & Conditions d'utilisation</span>
+                  <span className="text-base">📜</span>
+                  <span>{espaceKey === 'studio' ? "Charte d'engagement & Conditions du Studio IDS" : "Règlement intérieur & Conditions d'utilisation"}</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowConditions(prev => !prev)}
                   className="text-[11px] text-amber-400 hover:text-amber-300 font-semibold underline underline-offset-2 cursor-pointer"
                 >
-                  {showConditions ? 'Masquer' : 'Lire le règlement'}
+                  {showConditions ? 'Réduire' : 'Lire le règlement'}
                 </button>
               </div>
 
               {showConditions && (
-                <div className="text-[11px] text-slate-400 space-y-1.5 pt-2 border-t border-slate-800 leading-relaxed">
-                  <p>• <strong>Ponctualité & Présence :</strong> La présence de la personne ayant réservé est obligatoire. Tout retard supérieur à 15 minutes peut entraîner l'annulation du créneau.</p>
-                  <p>• <strong>Respect du matériel :</strong> Tous les équipements mis à disposition (micros, caméras, machines FabLab, écrans) doivent être manipulés avec précaution. Tout dysfonctionnement ou incident doit être immédiatement signalé.</p>
-                  <p>• <strong>Restitution propre :</strong> L'espace doit être restitué en parfait état de propreté et rangé à la fin du créneau horaire alloué.</p>
-                  <p>• <strong>Règles de sécurité :</strong> Respect strict des consignes de sécurité, de civisme et du protocole d'accès de l'Incubateur Digital Solidaire.</p>
-                </div>
+                <>
+                  <div
+                    ref={conditionsBoxRef}
+                    onScroll={(e) => {
+                      const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+                      if (scrollTop + clientHeight >= scrollHeight - 30) {
+                        setHasReadToBottom(true);
+                      }
+                    }}
+                    className="max-h-60 sm:max-h-72 overflow-y-auto pr-2.5 text-[11px] text-slate-300 space-y-3 pt-2.5 border-t border-slate-800/80 leading-relaxed scrollbar-thin scrollbar-thumb-amber-500/40 scrollbar-track-slate-950"
+                  >
+                    <p className="text-slate-300 italic bg-slate-950/70 p-3 rounded-lg border border-slate-800 text-[11px]">
+                      Reconnais, que l’Incubateur Digital Solidaire, sis à angle Avenue Assalam et route de Kénitra, qui relève du réseau du Centre des Très Petites Entreprises Solidaires (CTPES), ci-après dénommé « IDS », met gratuitement à la disposition de ma startup un studio de création de contenu équipé de matériel professionnel de grande valeur. En contrepartie de cet accès privilégié, je m’engage personnellement et au nom de l’ensemble des collaborateurs et invités de ma startup, à respecter scrupuleusement les conditions d’utilisation suivantes :
+                    </p>
+
+                    <div className="space-y-1.5">
+                      <h4 className="font-extrabold text-amber-400 text-xs uppercase tracking-wide">
+                        1. ACCÈS ET RÉSERVATION
+                      </h4>
+                      <ul className="space-y-1 pl-1 text-slate-300">
+                        <li>• <strong>Autorisation préalable :</strong> L’accès au studio, étant sur autorisation préalable, je m'engage à formuler une demande d’autorisation au moins 48 heures ouvrables à l'avance via le formulaire établi par l’administration de l’IDS qui peut accepter, proposer un autre créneau horaire, reporter ou refuser la demande.</li>
+                        <li>• <strong>Annulation :</strong> Je m'engage à informer l'administration de l’IDS en cas d’annulation de la réservation au moins 24 heures à l'avance.</li>
+                        <li>• <strong>Tiers et Invités :</strong> Je m'engage à déclarer et à faire valider par l'administration, lors de la réservation, l'identité de toute personne externe à la startup amenée à entrer dans le studio et ce selon la procédure et les formalités mises en place.</li>
+                        <li>• <strong>Usage exclusif :</strong> Je m'engage à utiliser le studio uniquement pour les projets de ma startup incubée et je m’interdis formellement toute sous-location ou mise à disposition du studio à un tiers.</li>
+                      </ul>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <h4 className="font-extrabold text-amber-400 text-xs uppercase tracking-wide">
+                        2. UTILISATION ET PROTECTION DU MATÉRIEL DU STUDIO
+                      </h4>
+                      <ul className="space-y-1 pl-1 text-slate-300">
+                        <li>• <strong>État du matériel :</strong> Je m'engage à effectuer une vérification contradictoire avec l’administration de l’IDS en signant l’inventaire du matériel du studio (inventaire d'entrée et de sortie) avant et après chaque session.</li>
+                        <li>• <strong>Manipulation :</strong> Je m'engage à ce que le matériel ne soit manipulé que par des personnes formées ou autorisées.</li>
+                        <li>• <strong>Notification :</strong> Je m'engage à informer immédiatement l'administration de l’IDS de tout incident, panne ou anomalie constatés sur le matériel.</li>
+                        <li>• <strong>Matériel propre :</strong> Au cas d’utilisation du matériel propre, je m’engage à notifier à l’administration de l’IDS la liste du matériel propre utilisé.</li>
+                        <li>• <strong>Hygiène et sécurité :</strong> Je m'engage à respecter l'interdiction stricte d'introduire de la nourriture ou des boissons dans le studio.</li>
+                        <li>• <strong>Remise à l’état initial :</strong> Je m'engage à restituer le studio dans un état de propreté irréprochable et selon la configuration technique d'origine à la fin de ma session.</li>
+                      </ul>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <h4 className="font-extrabold text-amber-400 text-xs uppercase tracking-wide">
+                        3. RESPONSABILITÉ FINANCIÈRE ET SANCTIONS
+                      </h4>
+                      <ul className="space-y-1 pl-1 text-slate-300">
+                        <li>• <strong>Prise en charge des dégâts :</strong> Je reconnais que ma startup assume la responsabilité juridique et financière des équipements du studio durant la session d’utilisation du studio. En cas de dégradation due à une mauvaise utilisation, une négligence ou le non-respect du présent engagement, je m'engage à rembourser l'intégralité des frais de réparation ou de remplacement à neuf dudit matériel.</li>
+                        <li>• <strong>Sanctions :</strong> Je prends acte que tout manquement aux présents engagements et aux règles générales d’utilisation pourra entraîner la suspension immédiate de mon accès au studio.</li>
+                      </ul>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <h4 className="font-extrabold text-amber-400 text-xs uppercase tracking-wide">
+                        4. RESPONSABILITÉ LÉGALE DU CONTENU
+                      </h4>
+                      <ul className="space-y-1 pl-1 text-slate-300">
+                        <li>• <strong>Information sur le contenu :</strong> Je m’engage à renseigner dans la demande d’autorisation les informations essentielles sur le contenu de chaque session d’utilisation du Studio.</li>
+                        <li>• <strong>Responsabilité Éditoriale :</strong> Je reconnais que ma startup assume de manière pleine et entière la qualité d'éditeur de tous les contenus audio, vidéo ou visuels (podcasts, interviews, vlogs, etc.) réalisés au sein du studio de l’IDS. L’IDS en sa qualité d’incubateur, agit exclusivement en tant que facilitateur technique et fournisseurs de moyens d’appui à ma startup et ne saurait être qualifié de co-éditeur ou de co-producteur. En conséquence, l'IDS décline toute responsabilité civile ou pénale quant aux messages, opinions et informations diffusés.</li>
+                        <li>• <strong>Conformité Légale :</strong> Je m'engage à ce que l'ensemble des productions réalisées dans le studio respectent scrupuleusement la législation marocaine. Le contenu ne doit comporter aucune incitation à la haine, discrimination, diffamation, injure, atteinte à la vie privée, à l'ordre public…</li>
+                        <li>• <strong>Clause de garantie et d'indemnisation :</strong> En cas d’action en justice, de plainte, de mise en demeure ou de réclamation d’un tiers (pour violation de droit d’auteur, diffamation, vol de propriété intellectuelle ou autre) visant un contenu produit dans le studio de l’IDS, ma startup s’engage à garantir, défendre et indemniser intégralement l’incubateur IDS contre toutes les conséquences financières (frais d'avocat, dommages et intérêts, amendes).</li>
+                      </ul>
+                    </div>
+
+                    <div className="pt-2 text-center text-slate-400 font-mono text-[10px]">
+                      — Fin du règlement intérieur et de la charte d'engagement IDS —
+                    </div>
+                  </div>
+
+                  {/* GUIDE SCROLL / STATUT DE LECTURE */}
+                  {!hasReadToBottom ? (
+                    <div className="flex items-center justify-between text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="animate-bounce">👇</span>
+                        <span>Faites défiler le texte jusqu'en bas pour débloquer l'acceptation</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (conditionsBoxRef.current) {
+                            conditionsBoxRef.current.scrollTop = conditionsBoxRef.current.scrollHeight;
+                            setHasReadToBottom(true);
+                          }
+                        }}
+                        className="text-[10px] uppercase font-bold text-amber-300 underline hover:text-white cursor-pointer shrink-0 ml-2"
+                      >
+                        Aller en bas ↓
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-2.5 animate-fadeIn">
+                      <span>✅</span>
+                      <span className="font-semibold">Règlement lu jusqu'au bout. Vous pouvez maintenant cocher la case d'acceptation ci-dessous.</span>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
-            <label className="flex items-start gap-2.5 cursor-pointer select-none">
+            <label className={`flex items-start gap-2.5 select-none transition-opacity ${!hasReadToBottom ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
               <input
                 type="checkbox"
                 required
+                disabled={!hasReadToBottom}
                 checked={acceptConditions}
-                onChange={e => setAcceptConditions(e.target.checked)}
-                className="w-4 h-4 mt-0.5 rounded border-slate-700 bg-slate-800 text-amber-500 focus:ring-amber-500 focus:ring-offset-slate-900 cursor-pointer accent-amber-500"
+                onChange={e => {
+                  if (hasReadToBottom) {
+                    setAcceptConditions(e.target.checked);
+                  }
+                }}
+                className="w-4 h-4 mt-0.5 rounded border-slate-700 bg-slate-800 text-amber-500 focus:ring-amber-500 focus:ring-offset-slate-900 cursor-pointer accent-amber-500 disabled:cursor-not-allowed"
               />
               <span className="text-xs text-slate-300 leading-tight">
-                J'ai lu et j'accepte les conditions d'utilisation et le règlement intérieur de l'incubateur <span className="text-amber-400">*</span>
+                J'ai lu l'intégralité du document et j'accepte sans réserve les conditions d'utilisation et le règlement intérieur de l'incubateur <span className="text-amber-400">*</span>
               </span>
             </label>
           </div>
