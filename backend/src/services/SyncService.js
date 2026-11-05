@@ -106,6 +106,7 @@ class SyncService {
           const targetStatut = isAdmin ? 'valide' : 'en_attente';
 
           const createdReservation = await ReservationEspace.create({
+            cloudId: res.id || null,
             espace: res.espace || 'fablab',
             salleSpecifique: res.salle_specifique || res.salleSpecifique || res.salle || null,
             nomIncube: res.nom_incube || res.nomIncube || res.nomComplet || res.nom || '—',
@@ -146,7 +147,7 @@ class SyncService {
 
           // Notification 1-clic par email à l'accompagnateur si statut en_attente
           if (targetStatut === 'en_attente') {
-            this.notifyAccompagnateurForReservation(createdReservation).catch(err => {
+            this.notifyAccompagnateurForReservation(createdReservation, res.id).catch(err => {
               console.warn(`⚠️ [SyncService] Erreur notification accompagnateur : ${err.message}`);
             });
           }
@@ -377,7 +378,7 @@ class SyncService {
   /**
    * Notifie l'accompagnateur ou l'administrateur par email avec les boutons 1-clic sécurisés
    */
-  async notifyAccompagnateurForReservation(reservation) {
+  async notifyAccompagnateurForReservation(reservation, cloudReservationId = null) {
     try {
       if (!reservation) return;
 
@@ -417,25 +418,39 @@ class SyncService {
         email: targetEmail
       };
 
-      // Génération des tokens cryptographiques HMAC-SHA256 (valables 48h)
+      const targetRid = cloudReservationId || reservation.cloudId || reservation.id;
+
+      // Génération des tokens cryptographiques HMAC-SHA256 (valables 48h) avec métadonnées complètes
       const tokenValide = generateConfirmationToken({
-        reservationId: reservation.id,
+        reservationId: targetRid,
         action: 'valide',
         email: targetEmail,
+        dateReservation: reservation.dateReservation,
+        heureDebut: reservation.heureDebut,
+        heureFin: reservation.heureFin,
+        espace: reservation.espace,
+        nomIncube: reservation.nomIncube,
+        emailIncube: reservation.emailIncube,
         expiresInHours: 48
       });
 
       const tokenRefuse = generateConfirmationToken({
-        reservationId: reservation.id,
+        reservationId: targetRid,
         action: 'refuse',
         email: targetEmail,
+        dateReservation: reservation.dateReservation,
+        heureDebut: reservation.heureDebut,
+        heureFin: reservation.heureFin,
+        espace: reservation.espace,
+        nomIncube: reservation.nomIncube,
+        emailIncube: reservation.emailIncube,
         expiresInHours: 48
       });
 
       const urlValide = `${this.cloudUrl}/confirmer-reservation?token=${tokenValide}`;
       const urlRefuse = `${this.cloudUrl}/confirmer-reservation?token=${tokenRefuse}`;
 
-      console.log(`📧 [SyncService] Envoi email validation 1-clic à ${targetEmail} pour rés #${reservation.id} (${reservation.nomIncube})`);
+      console.log(`📧 [SyncService] Envoi email validation 1-clic à ${targetEmail} pour rés #${reservation.id} (cloud #${targetRid}, ${reservation.nomIncube})`);
 
       await emailService.sendDemandeReservationAccompagnateurEmail(
         reservation,

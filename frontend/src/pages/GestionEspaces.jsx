@@ -863,6 +863,31 @@ export default function GestionEspaces() {
         </button>
       </div>
 
+      {/* ALERTE VISUELLE EN CAS DE DEMANDES EN ATTENTE DANS D'AUTRES ESPACES */}
+      {reservations.filter(r => r.statut === 'en_attente' && r.espace !== selectedEspace).length > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-amber-800 dark:text-amber-200 shadow-xs animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 animate-ping"></span>
+            <span>
+              <strong>{reservations.filter(r => r.statut === 'en_attente' && r.espace !== selectedEspace).length}</strong> autre(s) demande(s) en attente dans d'autres espaces (
+              {Array.from(new Set(reservations.filter(r => r.statut === 'en_attente' && r.espace !== selectedEspace).map(r => ESPACES.find(e => e.id === r.espace)?.nom || r.espace))).join(', ')}
+              ).
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+            {ESPACES.filter(esp => esp.id !== selectedEspace && reservations.some(r => r.statut === 'en_attente' && r.espace === esp.id)).map(esp => (
+              <button
+                key={esp.id}
+                onClick={() => { setSelectedEspace(esp.id); setActiveTab('demandes'); }}
+                className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold transition shadow-sm cursor-pointer"
+              >
+                Traiter {esp.nom}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 2. BARRE D'OUTILS ET FILTRES DÉDIÉE À L'ONGLET RÉSERVATIONS */}
       {activeTab === 'demandes' && (
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5 pt-1">

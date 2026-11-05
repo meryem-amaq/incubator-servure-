@@ -16,7 +16,7 @@ function getSecret() {
  * @param {number} [params.expiresInHours=48] - Durée de validité en heures (défaut: 48h)
  * @returns {string} Token sécurisé au format URL-safe (payloadBase64.signature)
  */
-function generateConfirmationToken({ reservationId, action, email, expiresInHours = 48 }) {
+function generateConfirmationToken({ reservationId, action, email, dateReservation, heureDebut, heureFin, espace, nomIncube, emailIncube, expiresInHours = 48 }) {
   const secret = getSecret();
   const exp = Math.floor(Date.now() / 1000) + (expiresInHours * 3600);
   const nonce = crypto.randomBytes(6).toString('hex');
@@ -25,6 +25,11 @@ function generateConfirmationToken({ reservationId, action, email, expiresInHour
     rid: String(reservationId),
     act: action === 'refuse' ? 'refuse' : 'valide',
     eml: email ? String(email).trim().toLowerCase() : '',
+    date: dateReservation ? String(dateReservation).split('T')[0] : undefined,
+    deb: heureDebut || undefined,
+    fin: heureFin || undefined,
+    esp: espace || undefined,
+    inc: emailIncube || nomIncube || undefined,
     exp,
     nonce
   };

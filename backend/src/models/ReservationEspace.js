@@ -7,6 +7,11 @@ const ReservationEspace = sequelize.define('ReservationEspace', {
       primaryKey: true,
       autoIncrement: true
     },
+    cloudId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: 'cloud_id'
+    },
     espace: {
       type: DataTypes.STRING(100),
       allowNull: false,
