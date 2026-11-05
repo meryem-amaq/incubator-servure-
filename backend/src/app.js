@@ -32,6 +32,9 @@ const emailService = require('./services/emailService');
 
 const app = express();
 
+// Activer le proxy de confiance pour obtenir les vraies adresses IP clients derrière Nginx / reverse proxy
+app.set('trust proxy', 1);
+
 // Middlewares
 app.use(cors({ origin: process.env.FRONTEND_URL || '*', credentials: true }));
 app.use(express.json({ limit: '10mb' }));
