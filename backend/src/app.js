@@ -314,10 +314,20 @@ sequelize.authenticate()
       };
 
       await checkAndAddColumn('incubes', 'est_suspendu', 'TINYINT(1) DEFAULT 0');
+      await checkAndAddColumn('incubes', 'matricule', 'INT NULL');
       await checkAndAddColumn('suivi_engagement', 'heures_ateliers', 'FLOAT DEFAULT 0');
       await checkAndAddColumn('suivi_engagement', 'nb_ateliers', 'INT DEFAULT 0');
       await checkAndAddColumn('suivi_engagement', 'heures_ateliers_animes', 'FLOAT DEFAULT 0');
       await checkAndAddColumn('suivi_engagement', 'nb_ateliers_animes', 'INT DEFAULT 0');
+      await checkAndAddColumn('ateliers', 'animateur_type', "ENUM('externe', 'incube') DEFAULT 'externe'");
+      await checkAndAddColumn('ateliers', 'animateur_incube_id', 'INT NULL');
+      await checkAndAddColumn('ateliers', 'intervenant', 'VARCHAR(150) NULL');
+      await checkAndAddColumn('ateliers', 'statut_ouverture', "VARCHAR(50) DEFAULT 'auto'");
+      await checkAndAddColumn('ateliers', 'drive_link', 'VARCHAR(500) NULL');
+      await checkAndAddColumn('users', 'type', "VARCHAR(50) DEFAULT 'Incube'");
+      await checkAndAddColumn('users', 'badge_id', 'VARCHAR(50) NULL');
+      await checkAndAddColumn('rh_detail', 'badge_id', 'VARCHAR(50) NULL');
+      await checkAndAddColumn('rh_detail', 'matricule', 'INT NULL');
     } catch (migErr) {
       console.warn('⚠️ Note auto-migration:', migErr.message);
     }
