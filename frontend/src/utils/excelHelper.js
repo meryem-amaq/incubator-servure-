@@ -1,24 +1,72 @@
-import * as XLSX from 'xlsx';
+import XLSX from 'xlsx-js-style';
 
 export const loadXLSX = () => {
-  if (XLSX && XLSX.utils) return Promise.resolve(XLSX);
-  if (window.XLSX) return Promise.resolve(window.XLSX);
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
-    script.onload = () => {
-      if (window.XLSX) resolve(window.XLSX);
-      else reject(new Error("Impossible de charger la librairie Excel XLSX"));
-    };
-    script.onerror = () => {
-      const fallback = document.createElement('script');
-      fallback.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-      fallback.onload = () => resolve(window.XLSX);
-      fallback.onerror = () => reject(new Error("Erreur de chargement de la bibliothèque Excel"));
-      document.head.appendChild(fallback);
-    };
-    document.head.appendChild(script);
-  });
+  return Promise.resolve(XLSX);
+};
+
+// Application du style visuel officiel IDS (Bleu Marine, bordures nettes, freeze pane, alternance de lignes)
+export const applyIdsTableStyle = (ws, totalRows = 0, isTemplate = false) => {
+  if (!ws || !ws['!ref']) return;
+
+  // 1. Hauteurs de ligne aérées
+  ws['!rows'] = [{ hpt: 30 }]; // Ligne d'en-tête (30pt)
+  const nbRowsToStyle = Math.max(totalRows || 0, isTemplate ? 10 : 0);
+  for (let r = 1; r <= nbRowsToStyle; r++) {
+    ws['!rows'].push({ hpt: 22 });
+  }
+
+  // 2. Figer la 1ère ligne d'en-tête (Freeze Pane)
+  ws['!views'] = [{ state: 'frozen', ySplit: 1 }];
+
+  // 3. Styliser l'en-tête et les cellules
+  const range = XLSX.utils.decode_range(ws['!ref']);
+
+  for (let R = range.s.r; R <= range.e.r; ++R) {
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+      if (!ws[cellAddress]) {
+        if (isTemplate && R > 0) {
+          ws[cellAddress] = { t: 's', v: '' };
+        } else {
+          continue;
+        }
+      }
+      const cell = ws[cellAddress];
+
+      if (R === 0) {
+        // En-tête officiel IDS (Bleu marine #0F172A, texte blanc gras, centré)
+        cell.s = {
+          fill: { fgColor: { rgb: "0F172A" } },
+          font: { name: "Calibri", sz: 11, bold: true, color: { rgb: "FFFFFF" } },
+          alignment: { vertical: "center", horizontal: "center", wrapText: true },
+          border: {
+            top: { style: "thin", color: { rgb: "334155" } },
+            bottom: { style: "medium", color: { rgb: "0F172A" } },
+            left: { style: "thin", color: { rgb: "334155" } },
+            right: { style: "thin", color: { rgb: "334155" } }
+          }
+        };
+      } else {
+        // Lignes de données : alternance de lignes blanches et gris perle
+        const isZebra = R % 2 === 1;
+        cell.s = {
+          fill: { fgColor: { rgb: isZebra ? "FFFFFF" : "F8FAFC" } },
+          font: { name: "Calibri", sz: 10, color: { rgb: "1E293B" } },
+          alignment: { vertical: "center", horizontal: "left" },
+          border: {
+            top: { style: "thin", color: { rgb: "E2E8F0" } },
+            bottom: { style: "thin", color: { rgb: "E2E8F0" } },
+            left: { style: "thin", color: { rgb: "E2E8F0" } },
+            right: { style: "thin", color: { rgb: "E2E8F0" } }
+          }
+        };
+        // Forcer format texte pour téléphone ou codes commençant par 0
+        if (cell.v !== undefined && cell.v !== null && String(cell.v).startsWith('0')) {
+          cell.z = '@';
+        }
+      }
+    }
+  }
 };
 
 // Normalisation des chaînes pour matcher les noms de colonnes sans accents/casse
@@ -572,224 +620,180 @@ export const mapExcelRows = (rawRows, type) => {
 // Alias pour rétrocompatibilité
 export const mapRowsToFields = mapExcelRows;
 
-// Générer et télécharger des modèles Excel (.xlsx) pré-remplis
+// Générer et télécharger des modèles Excel (.xlsx) 100% VIERGES (sans fausses données de démo) et stylisés aux couleurs IDS
 export const downloadTemplate = async (type) => {
   const XLSX = await loadXLSX();
 
   const templates = {
     incube: {
-      filename: 'modele_import_incubes.xlsx',
+      filename: 'modele_import_incubes_vierge.xlsx',
       sheetName: 'Incubes',
-      data: [
-        {
-          "Nom de l'incubé": "Mohamed Alami",
-          "CNI / CIN": "AB123456",
-          "N° PP": "PP-2025-001",
-          "Email": "mohamed.alami@biotech.ma",
-          "Téléphone": "0661234567",
-          "Genre": "Homme",
-          "Date de naissance": "1994-05-12",
-          "Âge": 31,
-          "Niveau d'étude": "Master 2",
-          "Situation familiale": "Marié(e)",
-          "Raison sociale": "BioTech Solutions SARL",
-          "Statut juridique": "SARL",
-          "RC": "124580",
-          "Phase du projet": "Idéation",
-          "Secteur d'activité": "Intelligence Artificielle",
-          "Promotion": "Promotion 1",
-          "Accompagnateur": "Karim Benali",
-          "Date de démarrage": "2025-01-15",
-          "Ville": "Casablanca",
-          "Province": "Casablanca",
-          "N° Badge RFID": "0012345678"
-        },
-        {
-          "Nom de l'incubé": "Fatima Zahra Mansouri",
-          "CNI / CIN": "CD987654",
-          "N° PP": "PP-2025-002",
-          "Email": "fatima.mansouri@ecopack.ma",
-          "Téléphone": "0662345678",
-          "Genre": "Femme",
-          "Date de naissance": "1997-11-23",
-          "Âge": 28,
-          "Niveau d'étude": "Licence / Bac+3",
-          "Situation familiale": "Célibataire",
-          "Raison sociale": "EcoPack Maroc",
-          "Phase du projet": "Lancement",
-          "Statut juridique": "Auto-entrepreneur",
-          "RC": "985412",
-          "Secteur d'activité": "GREEN-TECH",
-          "Promotion": "Promotion 2",
-          "Accompagnateur": "Nadia Tazi",
-          "Date de démarrage": "2025-02-01",
-          "Ville": "Rabat",
-          "Province": "Rabat",
-          "N° Badge RFID": "0087654321"
-        }
+      headers: [
+        "Nom de l'incubé *",
+        "CIN",
+        "N° PP",
+        "Email",
+        "Téléphone",
+        "Raison sociale",
+        "Statut juridique",
+        "RC",
+        "Phase du projet",
+        "Secteur d'activité",
+        "Promotion",
+        "Accompagnateur",
+        "Date de démarrage",
+        "Genre",
+        "Date de naissance",
+        "Âge",
+        "Niveau d'étude",
+        "Situation familiale",
+        "Ville",
+        "Province",
+        "N° Badge RFID"
+      ],
+      guide: [
+        ["Nom de l'incubé *", "Nom et prénom du porteur (Champ obligatoire)", "Ex: Ayoub El Mansouri"],
+        ["CIN", "Carte Nationale d'Identité (Optionnel mais recommandé)", "Ex: AB123456"],
+        ["N° PP", "Numéro Porteur de Projet", "Ex: PP-2025-001"],
+        ["Email", "Adresse email du porteur pour les convocations et alertes", "Ex: porteur@gmail.com"],
+        ["Téléphone", "Numéro de téléphone mobile (le 0 initial sera conservé)", "Ex: 0612345678"],
+        ["Raison sociale", "Nom du projet ou raison sociale de la structure", "Ex: InnovTech Solutions SARL"],
+        ["Statut juridique", "Forme légale de la startup", "Auto-entrepreneur, SARL, SARL AU, ou Autre"],
+        ["RC", "Numéro d'immatriculation au Registre du Commerce", "Ex: 124580"],
+        ["Phase du projet", "Étape actuelle d'avancement de la startup", "Idéation, Lancement, Croissance, Maturité"],
+        ["Secteur d'activité", "Domaine économique d'activité", "GREEN-TECH, Intelligence Artificielle, E-Commerce..."],
+        ["Promotion", "Nom de la promotion / cohorte", "Promotion 1, Promotion 2, Promotion 3..."],
+        ["Accompagnateur", "Nom du coach ou mentor référent IDS", "Ex: Karim Benali"],
+        ["Date de démarrage", "Date de début de l'accompagnement", "Format AAAA-MM-JJ (ex: 2025-01-15)"],
+        ["Genre", "Genre du porteur de projet", "Homme ou Femme"],
+        ["Date de naissance", "Date de naissance du porteur", "Format AAAA-MM-JJ (ex: 1995-04-12)"],
+        ["Âge", "Âge calculé ou saisi", "Ex: 30"],
+        ["Niveau d'étude", "Dernier diplôme ou niveau académique", "Bac, Bac+2, Bac+3, Bac+5, Doctorat..."],
+        ["Situation familiale", "État civil", "Célibataire, Marié(e), Divorcé(e), Veuf(ve)"],
+        ["Ville", "Ville de résidence ou d'activité", "Ex: Salé, Rabat, Kénitra..."],
+        ["Province", "Province ou préfecture", "Ex: Salé, Rabat, Kénitra..."],
+        ["N° Badge RFID", "Identifiant du badge physique pour les tourniquets", "Ex: 0012345678"]
       ]
     },
     materiel: {
-      filename: 'modele_import_materiel.xlsx',
+      filename: 'modele_import_materiel_vierge.xlsx',
       sheetName: 'Materiel',
-      data: [
-        {
-          "Origine": "propre",
-          "Article": "Ordinateur Portable Dell XPS 15",
-          "Date acquisition": "2025-01-10",
-          "Caractéristiques / N° série": "Intel i7, 32GB RAM, SN: 987654321",
-          "Quantité": 1,
-          "Valeur ou État": "Neuf / 14000 MAD"
-        },
-        {
-          "Origine": "ids",
-          "Article": "Imprimante 3D Creality Ender 3",
-          "Date acquisition": "2025-02-05",
-          "Caractéristiques / N° série": "Prêt Fablab IDS - SN: FAB-004",
-          "Quantité": 1,
-          "Valeur ou État": "Bon état"
-        }
+      headers: [
+        "Origine (propre/ids) *",
+        "Article *",
+        "Date acquisition",
+        "Caractéristiques / N° série",
+        "Quantité",
+        "Valeur ou État"
+      ],
+      guide: [
+        ["Origine (propre/ids) *", "Type de propriété du matériel", "propre (matériel incubé) OU ids (prêt incubateur)"],
+        ["Article *", "Désignation de l'équipement", "Ex: Ordinateur portable Dell XPS 15"],
+        ["Date acquisition", "Date d'achat ou de mise à disposition", "Format AAAA-MM-JJ (ex: 2025-01-10)"],
+        ["Caractéristiques / N° série", "Spécifications techniques ou SN", "Ex: 16GB RAM, SN: 987654321"],
+        ["Quantité", "Nombre d'unités", "Ex: 1"],
+        ["Valeur ou État", "Valeur en MAD ou état physique", "Ex: Neuf / 14000 MAD ou Bon état"]
       ]
     },
     plan_action: {
-      filename: 'modele_import_plan_action.xlsx',
+      filename: 'modele_import_plan_action_vierge.xlsx',
       sheetName: 'PlanAction',
-      data: [
-        {
-          "Mois": "Janvier",
-          "Objectifs": "Finalisation du prototype fonctionnel (MVP)",
-          "Échéance": "2025-01-31",
-          "Réalisation": "Réalisé",
-          "Problèmes rencontrés": "Léger retard de livraison des composants",
-          "Commentaires": "MVP validé avec le mentor technique"
-        },
-        {
-          "Mois": "Février",
-          "Objectifs": "Lancement de la campagne de prospection B2B",
-          "Échéance": "2025-02-28",
-          "Réalisation": "En cours",
-          "Problèmes rencontrés": "Aucun",
-          "Commentaires": "5 premiers clients contactés"
-        }
+      headers: [
+        "Mois *",
+        "Objectifs *",
+        "Échéance",
+        "Réalisation",
+        "Problèmes rencontrés",
+        "Commentaires"
+      ],
+      guide: [
+        ["Mois *", "Mois concerné par l'action", "Janvier, Février, Mars, Avril, Mai, Juin..."],
+        ["Objectifs *", "Intitulé clair de l'objectif ou jalon", "Ex: Finalisation du MVP fonctionnel"],
+        ["Échéance", "Date limite prévue de réalisation", "Format AAAA-MM-JJ (ex: 2025-01-31)"],
+        ["Réalisation", "État d'avancement de l'action", "Non commencé, En cours, Réalisé, Bloqué"],
+        ["Problèmes rencontrés", "Obstacles ou difficultés identifiés", "Ex: Retard livraison fournisseur"],
+        ["Commentaires", "Observations ou validation du mentor", "Ex: MVP validé avec le mentor"]
       ]
     },
     rh_personnel: {
-      filename: 'modele_import_personnel.xlsx',
+      filename: 'modele_import_personnel_vierge.xlsx',
       sheetName: 'Personnel',
-      data: [
-        {
-          "Nom complet": "Yassine Berrada",
-          "Poste": "Développeur Fullstack",
-          "Type de contrat": "CDI",
-          "Date embauche": "2025-01-01",
-          "Date fin": "",
-          "Salaire mensuel": 9000
-        },
-        {
-          "Nom complet": "Salma Bennani",
-          "Poste": "Designer UI/UX",
-          "Type de contrat": "Stage",
-          "Date embauche": "2025-02-01",
-          "Date fin": "2025-07-31",
-          "Salaire mensuel": 3500
-        }
+      headers: [
+        "Nom complet *",
+        "Poste",
+        "Type de contrat",
+        "Date embauche",
+        "Date fin",
+        "Salaire mensuel"
+      ],
+      guide: [
+        ["Nom complet *", "Nom et prénom du salarié", "Ex: Yassine Berrada"],
+        ["Poste", "Fonction occupée", "Ex: Développeur Fullstack"],
+        ["Type de contrat", "Nature du contrat de travail", "CDI, CDD, Stage, ANAPEC, Freelance"],
+        ["Date embauche", "Date d'entrée en fonction", "Format AAAA-MM-JJ (ex: 2025-01-01)"],
+        ["Date fin", "Date de fin pour contrat temporaire", "Format AAAA-MM-JJ ou vide si CDI"],
+        ["Salaire mensuel", "Rémunération mensuelle en MAD", "Ex: 8500"]
       ]
     },
     rh_emploi: {
-      filename: 'modele_import_emplois.xlsx',
+      filename: 'modele_import_emplois_vierge.xlsx',
       sheetName: 'Emplois',
-      data: [
-        { "Mois": "Janvier", "Personnel permanent": 2, "Personnel temporaire": 1 },
-        { "Mois": "Février", "Personnel permanent": 3, "Personnel temporaire": 1 },
-        { "Mois": "Mars", "Personnel permanent": 3, "Personnel temporaire": 2 }
-      ]
-    },
-    engagement: {
-      filename: 'modele_import_engagement.xlsx',
-      sheetName: 'Engagement',
-      data: [
-        {
-          "Mois": "Janvier",
-          "Année": 2025,
-          "Heures présence": 36,
-          "Taux présence (%)": 95,
-          "Initiatives": "Participation active aux ateliers techniques du Fablab",
-          "Observations": "Très assidu et impliqué"
-        },
-        {
-          "Mois": "Février",
-          "Année": 2025,
-          "Heures présence": 40,
-          "Taux présence (%)": 100,
-          "Initiatives": "Animation d'une session de partage d'expérience",
-          "Observations": "Objectifs du mois atteints avec brio"
-        }
+      headers: [
+        "Mois *",
+        "Personnel permanent",
+        "Personnel temporaire"
+      ],
+      guide: [
+        ["Mois *", "Mois du suivi", "Janvier, Février, Mars..."],
+        ["Personnel permanent", "Nombre d'employés permanents (CDI...)", "Ex: 3"],
+        ["Personnel temporaire", "Nombre d'employés temporaires (CDD, stagiaires)", "Ex: 1"]
       ]
     },
     financier: {
-      filename: 'modele_import_finances.xlsx',
+      filename: 'modele_import_finances_vierge.xlsx',
       sheetName: 'Finances',
-      data: [
-        {
-          "Mois (1-12)": 1,
-          "Année": 2025,
-          "Ventes": 25000,
-          "Autres revenus": 5000,
-          "Achats": 8000,
-          "Charges personnel": 9000,
-          "CNSS": 1800,
-          "Salaire porteur": 4000,
-          "Loyer coworking": 1500,
-          "Eau & Électricité": 300,
-          "Transport": 600,
-          "Téléphone": 400,
-          "Taxes": 200,
-          "TVA": 2500,
-          "Remboursement crédit": 0,
-          "Autres charges": 500
-        },
-        {
-          "Mois (1-12)": 2,
-          "Année": 2025,
-          "Ventes": 32000,
-          "Autres revenus": 0,
-          "Achats": 10000,
-          "Charges personnel": 9000,
-          "CNSS": 1800,
-          "Salaire porteur": 4500,
-          "Loyer coworking": 1500,
-          "Eau & Électricité": 350,
-          "Transport": 700,
-          "Téléphone": 400,
-          "Taxes": 200,
-          "TVA": 3200,
-          "Remboursement crédit": 0,
-          "Autres charges": 600
-        }
+      headers: [
+        "Mois (1-12) *",
+        "Année *",
+        "Ventes",
+        "Autres revenus",
+        "Achats",
+        "Charges personnel",
+        "CNSS",
+        "Salaire porteur",
+        "Loyer coworking",
+        "Eau & Électricité",
+        "Transport",
+        "Téléphone",
+        "Taxes",
+        "TVA",
+        "Remboursement crédit",
+        "Autres charges"
+      ],
+      guide: [
+        ["Mois (1-12) *", "Numéro du mois dans l'année (1 à 12)", "Ex: 1 pour Janvier, 2 pour Février"],
+        ["Année *", "Année de l'exercice financier", "Ex: 2025 ou 2026"],
+        ["Ventes", "Chiffre d'affaires mensuel hors taxes en MAD", "Ex: 25000"],
+        ["Autres charges", "Toutes les charges en MAD (nombres sans devise)", "Ex: 1500"]
       ]
     },
     fiche_technique: {
-      filename: 'modele_fiche_technique.xlsx',
+      filename: 'modele_fiche_technique_vierge.xlsx',
       sheetName: 'Fiche Technique',
-      data: [
-        {
-          "N° Ordre": "1",
-          "Date": "2025-01-15",
-          "Statut Juridique": "SARL",
-          "État d'avancement": "En cours",
-          "Anomalie signalée": "Retard livraison matières premières",
-          "Déclaration d'échec": "Non",
-          "Observations": "Objectifs du 1er trimestre en bonne voie"
-        },
-        {
-          "N° Ordre": "2",
-          "Date": "2025-02-10",
-          "Statut Juridique": "SARL",
-          "État d'avancement": "Réalisé",
-          "Anomalie signalée": "Aucune",
-          "Déclaration d'échec": "Non",
-          "Observations": "Lancement officiel de l'application"
-        }
+      headers: [
+        "N° Ordre",
+        "Date",
+        "Statut Juridique",
+        "État d'avancement",
+        "Anomalie signalée",
+        "Déclaration d'échec",
+        "Observations"
+      ],
+      guide: [
+        ["Date", "Date de la fiche de suivi", "Format AAAA-MM-JJ"],
+        ["État d'avancement", "Statut général du projet", "En cours, Réalisé, En difficulté"],
+        ["Anomalie signalée", "Problème constaté lors du suivi", "Ex: Rupture de stock composants"],
+        ["Déclaration d'échec", "Le projet est-il déclaré abandonné ?", "Non ou Oui"]
       ]
     }
   };
@@ -797,21 +801,25 @@ export const downloadTemplate = async (type) => {
   const tpl = templates[type];
   if (!tpl) return;
 
-  const ws = XLSX.utils.json_to_sheet(tpl.data);
+  const wb = XLSX.utils.book_new();
 
-  // Auto-ajuster proprement la largeur de chaque colonne
-  if (tpl.data && tpl.data.length > 0) {
-    const keys = Object.keys(tpl.data[0]);
-    ws['!cols'] = keys.map(k => {
-      const maxValLen = Math.max(
-        ...tpl.data.map(row => (row[k] !== undefined && row[k] !== null ? String(row[k]).length : 0))
-      );
-      return { wch: Math.max(k.length + 4, maxValLen + 3, 14) };
-    });
+  // 1. Feuille principale 100% VIERGE (aucun faux incubé ni démo)
+  const ws = XLSX.utils.aoa_to_sheet([tpl.headers]);
+  ws['!cols'] = tpl.headers.map(h => ({ wch: Math.max(h.length + 4, 16) }));
+  applyIdsTableStyle(ws, 0, true);
+  XLSX.utils.book_append_sheet(wb, ws, tpl.sheetName);
+
+  // 2. Deuxième feuille d'aide et d'instructions pour guider la saisie
+  if (tpl.guide && tpl.guide.length > 0) {
+    const wsGuide = XLSX.utils.aoa_to_sheet([
+      ['Colonne', 'Description', 'Valeurs autorisées / Format attendu'],
+      ...tpl.guide
+    ]);
+    wsGuide['!cols'] = [{ wch: 28 }, { wch: 45 }, { wch: 45 }];
+    applyIdsTableStyle(wsGuide, tpl.guide.length, false);
+    XLSX.utils.book_append_sheet(wb, wsGuide, 'Guide & Instructions');
   }
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, tpl.sheetName);
   XLSX.writeFile(wb, tpl.filename);
 };
 
@@ -859,180 +867,74 @@ export const readAllWorkbookSheets = async (file) => {
   });
 };
 
-// Téléchargement d'un classeur complet multi-onglets (Dossier complet incubé)
+// Téléchargement d'un classeur complet multi-onglets (Dossier complet incubé) 100% VIERGE
 export const exportFullIncubeTemplate = async () => {
   const XLSX = await loadXLSX();
   const wb = XLSX.utils.book_new();
 
-  // 1. Infos (Profil complet de l'incubé)
-  const wsInfos = XLSX.utils.json_to_sheet([
-    {
-      "Nom de l'incubé": "Mohamed Alami",
-      "CNI / CIN": "AB123456",
-      "Email": "mohamed.alami@biotech.ma",
-      "Téléphone": "0661234567",
-      "Genre": "Homme",
-      "Date de naissance": "1994-05-12",
-      "Âge": "31",
-      "Niveau d'étude": "Master 2",
-      "Situation familiale": "Marié(e)",
-      "Raison sociale": "BioTech Solutions SARL",
-      "Statut juridique": "SARL",
-      "N° PP": "PP-2025-001",
-      "RC": "RC-124580",
-      "Phase du projet": "Idéation",
-      "Secteur d'activité": "Intelligence Artificielle",
-      "Province": "Casablanca",
-      "Ville": "Casablanca",
-      "Promotion": "Promotion 1",
-      "Accompagnateur": "Meryem Amaqran",
-      "Date de démarrage": "2025-01-15",
-      "N° Badge RFID": "RFID-0042",
-      "Associés": "Karim Tazi (CIN: AB123456, 50%)"
-    }
+  const addStyledSheet = (sheetName, headers) => {
+    const ws = XLSX.utils.aoa_to_sheet([headers]);
+    ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 4, 16) }));
+    applyIdsTableStyle(ws, 0, true);
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  };
+
+  // 1. Infos Générales
+  addStyledSheet("1. Infos Générales", [
+    "Nom de l'incubé *", "CIN", "N° PP", "Email", "Téléphone", "Genre", "Date de naissance", "Âge",
+    "Niveau d'étude", "Situation familiale", "Raison sociale", "Statut juridique", "RC", "Phase du projet",
+    "Secteur d'activité", "Province", "Ville", "Promotion", "Accompagnateur", "Date de démarrage",
+    "N° Badge RFID", "Associés"
   ]);
-  XLSX.utils.book_append_sheet(wb, wsInfos, "1. Infos Générales");
 
   // 2. Matériel
-  const wsMat = XLSX.utils.json_to_sheet([
-    {
-      "Origine (propre/ids)": "propre",
-      "Article": "Ordinateur Portable Dell XPS 15",
-      "Date acquisition": "2025-01-10",
-      "Caractéristiques / N° série": "Intel i7, 32GB RAM, SN: 987654321",
-      "Quantité": 1,
-      "Valeur ou État": "Neuf / 14000 MAD"
-    },
-    {
-      "Origine (propre/ids)": "ids",
-      "Article": "Imprimante 3D Creality",
-      "Date acquisition": "2025-02-05",
-      "Caractéristiques / N° série": "Prêt Fablab IDS - SN: FAB-004",
-      "Quantité": 1,
-      "Valeur ou État": "Bon état"
-    }
+  addStyledSheet("2. Matériel", [
+    "Origine (propre/ids) *", "Article *", "Date acquisition", "Caractéristiques / N° série", "Quantité", "Valeur ou État"
   ]);
-  XLSX.utils.book_append_sheet(wb, wsMat, "2. Matériel");
 
   // 3. Plan d'action
-  const wsPlan = XLSX.utils.json_to_sheet([
-    {
-      "Mois": "Janvier",
-      "Objectifs": "Finalisation du prototype fonctionnel (MVP)",
-      "Échéance": "2025-01-31",
-      "Réalisation": "Réalisé",
-      "Problèmes rencontrés": "Léger retard livraison",
-      "Commentaires": "MVP validé avec le mentor"
-    },
-    {
-      "Mois": "Février",
-      "Objectifs": "Lancement campagne prospection B2B",
-      "Échéance": "2025-02-28",
-      "Réalisation": "En cours",
-      "Problèmes rencontrés": "Aucun",
-      "Commentaires": "5 premiers clients contactés"
-    }
+  addStyledSheet("3. Plan d'Action", [
+    "Mois *", "Objectifs *", "Échéance", "Réalisation", "Problèmes rencontrés", "Commentaires"
   ]);
-  XLSX.utils.book_append_sheet(wb, wsPlan, "3. Plan d'Action");
 
   // 4. Personnel RH
-  const wsPersonnel = XLSX.utils.json_to_sheet([
-    {
-      "Nom complet": "Yassine Berrada",
-      "Poste": "Développeur Fullstack",
-      "Type de contrat": "CDI",
-      "Date embauche": "2025-01-01",
-      "Date fin": "",
-      "Salaire mensuel": 9000
-    }
+  addStyledSheet("4. Personnel RH", [
+    "Nom complet *", "Poste", "Type de contrat", "Date embauche", "Date fin", "Salaire mensuel"
   ]);
-  XLSX.utils.book_append_sheet(wb, wsPersonnel, "4. Personnel RH");
 
   // 5. Emplois RH
-  const wsEmplois = XLSX.utils.json_to_sheet([
-    { "Mois": "Janvier", "Personnel permanent": 2, "Personnel temporaire": 1 },
-    { "Mois": "Février", "Personnel permanent": 3, "Personnel temporaire": 1 }
+  addStyledSheet("5. Emplois RH", [
+    "Mois *", "Personnel permanent", "Personnel temporaire"
   ]);
-  XLSX.utils.book_append_sheet(wb, wsEmplois, "5. Emplois RH");
 
   // 6. Finances
-  const wsFinances = XLSX.utils.json_to_sheet([
-    {
-      "Mois (1-12)": 1,
-      "Année": 2025,
-      "Ventes": 25000,
-      "Autres revenus": 5000,
-      "Achats": 8000,
-      "Charges personnel": 9000,
-      "CNSS": 1800,
-      "Salaire porteur": 4000,
-      "Loyer coworking": 1500,
-      "Eau & Électricité": 300,
-      "Transport": 600,
-      "Téléphone": 400,
-      "Taxes": 200,
-      "TVA": 2500,
-      "Remboursement crédit": 0,
-      "Autres charges": 500
-    }
+  addStyledSheet("6. Finances", [
+    "Mois (1-12) *", "Année *", "Ventes", "Autres revenus", "Achats", "Charges personnel", "CNSS",
+    "Salaire porteur", "Loyer coworking", "Eau & Électricité", "Transport", "Téléphone", "Taxes", "TVA",
+    "Remboursement crédit", "Autres charges"
   ]);
-  XLSX.utils.book_append_sheet(wb, wsFinances, "6. Finances");
-
-  // Note : L'engagement et les heures de présence sont enregistrés automatiquement par les tourniquets ZKTeco
-  // et ne doivent pas être injectés via Excel.
-
-  // 8. Associés
-  const wsAssocies = XLSX.utils.json_to_sheet([
-    {
-      "Nom & prénom": "Karim Bennani",
-      "CIN": "AB123456",
-      "Fonction": "Co-fondateur (CTO)",
-      "Tel": "0600112233"
-    }
-  ]);
-  XLSX.utils.book_append_sheet(wb, wsAssocies, "8. Associés");
 
   // 7. Engagement & Présence
-  const wsEng = XLSX.utils.json_to_sheet([
-    {
-      "Mois": "Janvier",
-      "Année": 2025,
-      "Heures présence": 36,
-      "Taux présence (%)": 95,
-      "Initiatives": "Participation active aux ateliers techniques",
-      "Observations": "Très assidu et motivé"
-    }
+  addStyledSheet("7. Engagement", [
+    "Mois *", "Année *", "Heures présence", "Taux présence (%)", "Initiatives", "Observations"
   ]);
-  XLSX.utils.book_append_sheet(wb, wsEng, "7. Engagement");
 
-  // 9. Fiche Technique (Fiche de Suivi)
-  const wsFicheTech = XLSX.utils.json_to_sheet([
-    {
-      "N° Ordre": "1",
-      "Date": "2025-01-15",
-      "Statut Juridique": "SARL",
-      "État d'avancement": "En cours",
-      "Anomalie signalée": "Retard livraison matières premières",
-      "Déclaration d'échec": "Non",
-      "Observations": "Objectifs du 1er trimestre en bonne voie"
-    }
+  // 8. Associés
+  addStyledSheet("8. Associés", [
+    "Nom & prénom *", "CIN", "Fonction", "Tel"
   ]);
-  XLSX.utils.book_append_sheet(wb, wsFicheTech, "9. Fiche Technique");
+
+  // 9. Fiche Technique
+  addStyledSheet("9. Fiche Technique", [
+    "N° Ordre", "Date", "Statut Juridique", "État d'avancement", "Anomalie signalée", "Déclaration d'échec", "Observations"
+  ]);
 
   // 10. Formations & Ateliers
-  const wsForm = XLSX.utils.json_to_sheet([
-    {
-      "Thème": "Business Model Canvas & Chiffrage Prévisionnel",
-      "Formateur": "Karim Alami",
-      "Date formation": "2025-02-10",
-      "Heures": 3,
-      "Présence": "Présent",
-      "Attestation": "Oui"
-    }
+  addStyledSheet("10. Formations", [
+    "Thème *", "Formateur", "Date formation", "Heures", "Présence", "Attestation"
   ]);
-  XLSX.utils.book_append_sheet(wb, wsForm, "10. Formations");
 
-  XLSX.writeFile(wb, "modele_dossier_complet_incube.xlsx");
+  XLSX.writeFile(wb, "modele_dossier_complet_incube_vierge.xlsx");
 };
 
 // Analyse automatique de toutes les feuilles d'un classeur pour les mapper
@@ -1115,278 +1017,74 @@ export const parseFullIncubeWorkbook = (allSheets) => {
   return result;
 };
 
-// Télécharger le modèle global pour importer TOUS les incubés avec TOUS leurs détails
+// Télécharger le modèle global pour importer TOUS les incubés avec TOUS leurs détails (100% VIERGE)
 export const exportGlobalPromotionTemplate = async () => {
   const XLSX = await loadXLSX();
   const wb = XLSX.utils.book_new();
 
-  // 1. Liste des incubés (Toutes les informations d'un profil complet)
-  const wsIncubes = XLSX.utils.json_to_sheet([
-    {
-      "Nom de l'incubé": "Mohamed Alami",
-      "CNI / CIN": "AB123456",
-      "Email": "mohamed.alami@biotech.ma",
-      "Téléphone": "0661234567",
-      "Genre": "Homme",
-      "Date de naissance": "1994-05-12",
-      "Âge": "31",
-      "Niveau d'étude": "Master 2",
-      "Situation familiale": "Marié(e)",
-      "Raison sociale": "BioTech Solutions SARL",
-      "Statut juridique": "SARL",
-      "N° PP": "PP-2025-001",
-      "RC": "RC-124580",
-      "Phase du projet": "Idéation",
-      "Secteur d'activité": "Intelligence Artificielle",
-      "Province": "Casablanca",
-      "Ville": "Casablanca",
-      "Promotion": "Promotion 1",
-      "Accompagnateur": "Meryem Amaqran",
-      "Date de démarrage": "2025-01-15",
-      "N° Badge RFID": "RFID-0042",
-      "Associés": "Karim Tazi (CIN: AB123456, 50%)"
-    },
-    {
-      "Nom de l'incubé": "Fatima Zahra Mansouri",
-      "CNI / CIN": "CD987654",
-      "Email": "fatima.mansouri@ecopack.ma",
-      "Téléphone": "0662345678",
-      "Genre": "Femme",
-      "Date de naissance": "1997-11-23",
-      "Âge": "28",
-      "Niveau d'étude": "Licence / Bac+3",
-      "Situation familiale": "Célibataire",
-      "Raison sociale": "EcoPack Maroc",
-      "Statut juridique": "Auto-entrepreneur",
-      "N° PP": "PP-2025-002",
-      "RC": "RC-985412",
-      "Phase du projet": "Lancement",
-      "Secteur d'activité": "GREEN-TECH",
-      "Province": "Rabat",
-      "Ville": "Rabat",
-      "Promotion": "Promotion 2",
-      "Accompagnateur": "Nadia Sefiani",
-      "Date de démarrage": "2025-02-01",
-      "N° Badge RFID": "RFID-0089",
-      "Associés": "Youssef Mansouri (CIN: CD987654, 30%)"
-    }
+  const addStyledSheet = (sheetName, headers) => {
+    const ws = XLSX.utils.aoa_to_sheet([headers]);
+    ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 4, 16) }));
+    applyIdsTableStyle(ws, 0, true);
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  };
+
+  // 1. Liste des incubés
+  addStyledSheet("1. Incubes", [
+    "Nom de l'incubé *", "CIN", "N° PP", "Email", "Téléphone", "Genre", "Date de naissance", "Âge",
+    "Niveau d'étude", "Situation familiale", "Raison sociale", "Statut juridique", "RC", "Phase du projet",
+    "Secteur d'activité", "Province", "Ville", "Promotion", "Accompagnateur", "Date de démarrage",
+    "N° Badge RFID", "Associés"
   ]);
-  XLSX.utils.book_append_sheet(wb, wsIncubes, "1. Incubes");
 
   // 2. Matériel
-  const wsMat = XLSX.utils.json_to_sheet([
-    {
-      "Nom Incubé ou N° PP": "Mohamed Alami",
-      "Origine (propre/ids)": "propre",
-      "Article": "Ordinateur Portable Dell XPS 15",
-      "Date acquisition": "2025-01-10",
-      "Caractéristiques / N° série": "Intel i7, 32GB RAM, SN: 987654321",
-      "Quantité": 1,
-      "Valeur ou État": "Neuf / 14000 MAD"
-    },
-    {
-      "Nom Incubé ou N° PP": "Fatima Zahra Mansouri",
-      "Origine (propre/ids)": "ids",
-      "Article": "Imprimante 3D Creality Ender 3",
-      "Date acquisition": "2025-02-05",
-      "Caractéristiques / N° série": "Prêt Fablab IDS - SN: FAB-004",
-      "Quantité": 1,
-      "Valeur ou État": "Bon état"
-    }
+  addStyledSheet("2. Materiel", [
+    "Nom Incubé ou N° PP *", "Origine (propre/ids) *", "Article *", "Date acquisition", "Caractéristiques / N° série", "Quantité", "Valeur ou État"
   ]);
-  XLSX.utils.book_append_sheet(wb, wsMat, "2. Materiel");
 
   // 3. Plan d'Action
-  const wsPlan = XLSX.utils.json_to_sheet([
-    {
-      "Nom Incubé ou N° PP": "Mohamed Alami",
-      "Mois": "Janvier",
-      "Objectifs": "Finalisation du prototype fonctionnel (MVP)",
-      "Échéance": "2025-01-31",
-      "Réalisation": "Réalisé",
-      "Problèmes rencontrés": "Léger retard de livraison des composants",
-      "Commentaires": "MVP validé avec le mentor technique"
-    },
-    {
-      "Nom Incubé ou N° PP": "Fatima Zahra Mansouri",
-      "Mois": "Février",
-      "Objectifs": "Lancement de la campagne de prospection B2B",
-      "Échéance": "2025-02-28",
-      "Réalisation": "En cours",
-      "Problèmes rencontrés": "Aucun",
-      "Commentaires": "5 premiers clients contactés"
-    }
+  addStyledSheet("3. Plan Action", [
+    "Nom Incubé ou N° PP *", "Mois *", "Objectifs *", "Échéance", "Réalisation", "Problèmes rencontrés", "Commentaires"
   ]);
-  XLSX.utils.book_append_sheet(wb, wsPlan, "3. Plan Action");
 
   // 4. Personnel RH
-  const wsPers = XLSX.utils.json_to_sheet([
-    {
-      "Nom Incubé ou N° PP": "Mohamed Alami",
-      "Nom complet": "Yassine Berrada",
-      "Poste": "Développeur Fullstack",
-      "Type de contrat": "CDI",
-      "Date embauche": "2025-01-01",
-      "Date fin": "",
-      "Salaire mensuel": 9000
-    },
-    {
-      "Nom Incubé ou N° PP": "Fatima Zahra Mansouri",
-      "Nom complet": "Salma Bennani",
-      "Poste": "Designer UI/UX",
-      "Type de contrat": "Stage",
-      "Date embauche": "2025-02-01",
-      "Date fin": "2025-07-31",
-      "Salaire mensuel": 3500
-    }
+  addStyledSheet("4. Personnel RH", [
+    "Nom Incubé ou N° PP *", "Nom complet *", "Poste", "Type de contrat", "Date embauche", "Date fin", "Salaire mensuel"
   ]);
-  XLSX.utils.book_append_sheet(wb, wsPers, "4. Personnel RH");
 
   // 5. Emplois RH
-  const wsEmp = XLSX.utils.json_to_sheet([
-    { "Nom Incubé ou N° PP": "Mohamed Alami", "Mois": "Janvier", "Personnel permanent": 2, "Personnel temporaire": 1 },
-    { "Nom Incubé ou N° PP": "Fatima Zahra Mansouri", "Mois": "Février", "Personnel permanent": 1, "Personnel temporaire": 2 }
+  addStyledSheet("5. Emplois RH", [
+    "Nom Incubé ou N° PP *", "Mois *", "Personnel permanent", "Personnel temporaire"
   ]);
-  XLSX.utils.book_append_sheet(wb, wsEmp, "5. Emplois RH");
 
   // 6. Finances
-  const wsFin = XLSX.utils.json_to_sheet([
-    {
-      "Nom Incubé ou N° PP": "Mohamed Alami",
-      "Mois (1-12)": 1,
-      "Année": 2025,
-      "Ventes": 25000,
-      "Autres revenus": 5000,
-      "Achats": 8000,
-      "Charges personnel": 9000,
-      "CNSS": 1800,
-      "Salaire porteur": 4000,
-      "Loyer coworking": 1500,
-      "Eau & Électricité": 300,
-      "Transport": 600,
-      "Téléphone": 400,
-      "Taxes": 200,
-      "TVA": 2500,
-      "Remboursement crédit": 0,
-      "Autres charges": 500
-    },
-    {
-      "Nom Incubé ou N° PP": "Fatima Zahra Mansouri",
-      "Mois (1-12)": 1,
-      "Année": 2025,
-      "Ventes": 18000,
-      "Autres revenus": 2000,
-      "Achats": 5000,
-      "Charges personnel": 5000,
-      "CNSS": 1000,
-      "Salaire porteur": 3500,
-      "Loyer coworking": 1200,
-      "Eau & Électricité": 200,
-      "Transport": 400,
-      "Téléphone": 300,
-      "Taxes": 150,
-      "TVA": 1800,
-      "Remboursement crédit": 0,
-      "Autres charges": 300
-    }
+  addStyledSheet("6. Finances", [
+    "Nom Incubé ou N° PP *", "Mois (1-12) *", "Année *", "Ventes", "Autres revenus", "Achats", "Charges personnel", "CNSS",
+    "Salaire porteur", "Loyer coworking", "Eau & Électricité", "Transport", "Téléphone", "Taxes", "TVA",
+    "Remboursement crédit", "Autres charges"
   ]);
-  XLSX.utils.book_append_sheet(wb, wsFin, "6. Finances");
 
   // 7. Engagement & Assiduité
-  const wsEng = XLSX.utils.json_to_sheet([
-    {
-      "Nom Incubé ou N° PP": "Mohamed Alami",
-      "Mois": "Janvier",
-      "Année": 2025,
-      "Heures présence": 36,
-      "Taux présence (%)": 95,
-      "Initiatives": "Participation active aux ateliers techniques",
-      "Observations": "Très assidu et motivé"
-    },
-    {
-      "Nom Incubé ou N° PP": "Fatima Zahra Mansouri",
-      "Mois": "Janvier",
-      "Année": 2025,
-      "Heures présence": 32,
-      "Taux présence (%)": 90,
-      "Initiatives": "Présentation de son prototype en plénière",
-      "Observations": "Bonne intégration au groupe"
-    }
+  addStyledSheet("7. Engagement", [
+    "Nom Incubé ou N° PP *", "Mois *", "Année *", "Heures présence", "Taux présence (%)", "Initiatives", "Observations"
   ]);
-  XLSX.utils.book_append_sheet(wb, wsEng, "7. Engagement");
 
   // 8. Fiches de Suivi & Entretiens
-  const wsSuivi = XLSX.utils.json_to_sheet([
-    {
-      "Nom Incubé ou N° PP": "Mohamed Alami",
-      "N° Ordre": "1",
-      "Date suivi": "2025-01-20",
-      "Objet réunion": "Diagnostic initial & cadrage des besoins",
-      "Statut avancement": "En bonne voie",
-      "Statut juridique": "SARL en cours",
-      "Anomalie signalée": "Aucune",
-      "Déclaration échec": "Non",
-      "Observations": "Première séance d'alignement très positive"
-    },
-    {
-      "Nom Incubé ou N° PP": "Fatima Zahra Mansouri",
-      "N° Ordre": "1",
-      "Date suivi": "2025-02-15",
-      "Objet réunion": "Revue du prototype et plan de prospection",
-      "Statut avancement": "Normal",
-      "Statut juridique": "Auto-entrepreneur actif",
-      "Anomalie signalée": "Besoin de sourcing emballages biosourcés",
-      "Déclaration échec": "Non",
-      "Observations": "Mise en relation effectuée avec un fournisseur partenaire"
-    }
+  addStyledSheet("8. Fiches de Suivi", [
+    "Nom Incubé ou N° PP *", "N° Ordre", "Date suivi", "Objet réunion", "Statut avancement", "Statut juridique", "Anomalie signalée", "Déclaration échec", "Observations"
   ]);
-  XLSX.utils.book_append_sheet(wb, wsSuivi, "8. Fiches de Suivi");
 
   // 9. Formations & Ateliers
-  const wsFormations = XLSX.utils.json_to_sheet([
-    {
-      "Nom Incubé ou N° PP": "Mohamed Alami",
-      "Thème": "Business Model Canvas & Chiffrage Prévisionnel",
-      "Formateur": "Karim Alami",
-      "Date formation": "2025-02-10",
-      "Heures": 3,
-      "Présence": "Présent",
-      "Attestation": "Oui"
-    },
-    {
-      "Nom Incubé ou N° PP": "Fatima Zahra Mansouri",
-      "Thème": "Choix de la Forme Juridique et Statuts",
-      "Formateur": "Me. Benjelloun",
-      "Date formation": "2025-02-25",
-      "Heures": 3,
-      "Présence": "Présent",
-      "Attestation": "Oui"
-    }
+  addStyledSheet("9. Formations", [
+    "Nom Incubé ou N° PP *", "Thème *", "Formateur", "Date formation", "Heures", "Présence", "Attestation"
   ]);
-  XLSX.utils.book_append_sheet(wb, wsFormations, "9. Formations");
 
   // 10. Associés & Partenaires
-  const wsAssocies = XLSX.utils.json_to_sheet([
-    {
-      "Nom Incubé ou N° PP": "Mohamed Alami",
-      "Nom & prénom": "Karim Tazi",
-      "CIN": "AB123456",
-      "Fonction": "Co-fondateur (CTO)",
-      "Téléphone": "0600112233",
-      "Part capital (%)": 50
-    },
-    {
-      "Nom Incubé ou N° PP": "Fatima Zahra Mansouri",
-      "Nom & prénom": "Youssef Mansouri",
-      "CIN": "CD987654",
-      "Fonction": "Responsable Opérations",
-      "Téléphone": "0699887766",
-      "Part capital (%)": 30
-    }
+  addStyledSheet("10. Associés", [
+    "Nom Incubé ou N° PP *", "Nom & prénom *", "CIN", "Fonction", "Téléphone", "Part capital (%)"
   ]);
-  XLSX.utils.book_append_sheet(wb, wsAssocies, "10. Associés");
 
-  XLSX.writeFile(wb, "modele_global_tous_incubes_avec_details.xlsx");
+  XLSX.writeFile(wb, "modele_global_tous_incubes_avec_details_vierge.xlsx");
 };
 
 // Parser un classeur global contenant TOUS les incubés et TOUS leurs détails
@@ -1690,8 +1388,11 @@ export const exportIncubesListToExcel = async (incubesList = [], filename = 'ann
     const maxValLen = Math.max(
       ...data.map(row => (row[k] !== undefined && row[k] !== null ? String(row[k]).length : 0))
     );
-    return { wch: Math.max(k.length + 4, maxValLen + 3, 12) };
+    return { wch: Math.max(k.length + 4, maxValLen + 3, 14) };
   });
+
+  // Appliquer le style visuel officiel IDS (Bleu marine, en-tête figé, bordures, zébrures)
+  applyIdsTableStyle(ws, data.length, false);
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Incubés IDS");
