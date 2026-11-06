@@ -426,6 +426,33 @@ export default function TabInfos({ incube, onUpdate }) {
               />
             </div>
             <div>
+              <label className="label">CIN (Carte d'Identité)</label>
+              <input
+                className="input uppercase font-mono font-semibold"
+                placeholder="Ex: AB123456"
+                value={form.cin || ''}
+                onChange={(e) => {
+                  const val = e.target.value.toUpperCase();
+                  setForm(prev => ({ ...prev, cin: val }));
+                }}
+              />
+            </div>
+            <div>
+              <label className="label">Situation familiale</label>
+              <select
+                className="input"
+                value={form.situation_familiale || ''}
+                onChange={f('situation_familiale')}
+              >
+                <option value="">— Sélectionner —</option>
+                {SITUATION_OPTS.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
               <label className="label">📧 Adresse Email (pour convocations & RDV)</label>
               <input
                 type="email"
@@ -461,21 +488,6 @@ export default function TabInfos({ incube, onUpdate }) {
                 value={form.rc || ''}
                 onChange={f('rc')}
               />
-            </div>
-            <div>
-              <label className="label">Situation familiale</label>
-              <select
-                className="input"
-                value={form.situation_familiale || ''}
-                onChange={f('situation_familiale')}
-              >
-                <option value="">— Sélectionner —</option>
-                {SITUATION_OPTS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
             </div>
             {/* Promotion */}
             <div>

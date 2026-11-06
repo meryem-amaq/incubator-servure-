@@ -1485,7 +1485,10 @@ export default function Annuaire() {
                     />
                   </div>
                 </div>
-                <div><label className="label">Raison sociale</label><input className="input" placeholder="Ex: BioTech Solutions SARL" value={form.raison_sociale} onChange={e => setForm({ ...form, raison_sociale: e.target.value })} /></div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div><label className="label">Raison sociale</label><input className="input" placeholder="Ex: BioTech Solutions SARL" value={form.raison_sociale} onChange={e => setForm({ ...form, raison_sociale: e.target.value })} /></div>
+                  <div><label className="label">CIN (Carte d'Identité)</label><input className="input uppercase font-mono font-semibold" placeholder="Ex: AB123456" value={form.cin || ''} onChange={e => setForm({ ...form, cin: e.target.value.toUpperCase() })} /></div>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div><label className="label">Phase du projet</label>
                     <select className="input" value={form.phase_projet} onChange={e => setForm({ ...form, phase_projet: e.target.value })}>
