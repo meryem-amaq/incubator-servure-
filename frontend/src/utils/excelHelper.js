@@ -536,6 +536,157 @@ export const parseStackedOptionBSheet = (worksheet, xlsxLib = XLSX) => {
   return incubes.length > 0 ? incubes : null;
 };
 
+// Détection automatique de la ligne d'en-tête (ligne 0 ou ligne 1 si présence d'une bannière de titre fusionnée)
+export const detectSheetHeaderRowIndex = (ws, xlsxLib = XLSX) => {
+  if (!ws) return 0;
+  const matrix = xlsxLib.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  if (!matrix || matrix.length <= 1) return 0;
+
+  const row0NonEmpty = (matrix[0] || []).filter(c => String(c).trim() !== '').length;
+  const row1NonEmpty = (matrix[1] || []).filter(c => String(c).trim() !== '').length;
+
+  // Si la ligne 0 a 1 ou 2 cellules remplies (bannière de titre) et que la ligne 1 a au moins 2 colonnes remplies
+  if (row0NonEmpty <= 2 && row1NonEmpty >= 2) {
+    return 1;
+  }
+
+  return 0;
+};
+
+// Construction universelle d'une feuille avec bannière de titre stylisée IDS (identique à Infos Générales)
+export const buildSingleTableSheetWithBanner = ({
+  bannerTitle,
+  bannerColor = "0F172A",
+  headerColor = "1E293B",
+  headers = [],
+  rowsData = [],
+  isTemplate = false,
+  emptyRowsCount = 5,
+  xlsxLib = XLSX
+}) => {
+  const ws = {};
+  const merges = [];
+  const rows = [];
+  let currentRow = 0;
+
+  const nbCols = headers.length;
+
+  // 1. BANNIÈRE DE TITRE (Ligne 0) - Fusionnée sur toute la largeur
+  merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: nbCols - 1 } });
+  rows.push({ hpt: 32 });
+
+  for (let c = 0; c < nbCols; c++) {
+    const addr = xlsxLib.utils.encode_cell({ r: currentRow, c });
+    ws[addr] = {
+      t: 's',
+      v: c === 0 ? bannerTitle : '',
+      s: {
+        fill: { fgColor: { rgb: bannerColor } },
+        font: { name: "Calibri", sz: 12, bold: true, color: { rgb: "FFFFFF" } },
+        alignment: { vertical: "center", horizontal: "center" },
+        border: {
+          top: { style: "thin", color: { rgb: "334155" } },
+          bottom: { style: "thin", color: { rgb: "334155" } },
+          left: { style: "thin", color: { rgb: "334155" } },
+          right: { style: "thin", color: { rgb: "334155" } }
+        }
+      }
+    };
+  }
+  currentRow++;
+
+  // 2. LIGNE DES EN-TÊTES DE COLONNES (Ligne 1)
+  rows.push({ hpt: 30 });
+  headers.forEach((h, c) => {
+    const addr = xlsxLib.utils.encode_cell({ r: currentRow, c });
+    const labelStr = typeof h === 'string' ? h : h.label;
+    ws[addr] = {
+      t: 's',
+      v: labelStr,
+      s: {
+        fill: { fgColor: { rgb: headerColor } },
+        font: { name: "Calibri", sz: 10, bold: true, color: { rgb: "FFFFFF" } },
+        alignment: { vertical: "center", horizontal: "center", wrapText: true },
+        border: {
+          top: { style: "thin", color: { rgb: "334155" } },
+          bottom: { style: "medium", color: { rgb: bannerColor } },
+          left: { style: "thin", color: { rgb: "334155" } },
+          right: { style: "thin", color: { rgb: "334155" } }
+        }
+      }
+    };
+  });
+  currentRow++;
+
+  // 3. LIGNES DE DONNÉES (ou lignes vierges formatées si modèle)
+  const nbData = rowsData.length;
+  const nbRowsToRender = isTemplate ? Math.max(nbData, emptyRowsCount) : nbData;
+
+  for (let r = 0; r < nbRowsToRender; r++) {
+    const rowObj = rowsData[r] || (Array.isArray(rowsData[r]) ? rowsData[r] : {});
+    rows.push({ hpt: 22 });
+    const isZebra = r % 2 === 1;
+
+    headers.forEach((h, c) => {
+      const addr = xlsxLib.utils.encode_cell({ r: currentRow, c });
+      let val = '';
+      if (Array.isArray(rowObj)) {
+        val = rowObj[c] !== undefined && rowObj[c] !== null ? rowObj[c] : '';
+      } else if (typeof h === 'object' && h.key) {
+        val = rowObj[h.key] !== undefined && rowObj[h.key] !== null ? rowObj[h.key] : '';
+      } else {
+        const key = typeof h === 'string' ? h : h.label;
+        val = rowObj[key] !== undefined && rowObj[key] !== null ? rowObj[key] : '';
+      }
+
+      if (val instanceof Date) {
+        val = val.toISOString().split('T')[0];
+      }
+
+      ws[addr] = {
+        t: 's',
+        v: String(val),
+        s: {
+          fill: { fgColor: { rgb: isZebra ? "F8FAFC" : "FFFFFF" } },
+          font: { name: "Calibri", sz: 10, color: { rgb: "1E293B" } },
+          alignment: { vertical: "center", horizontal: "left" },
+          border: {
+            top: { style: "thin", color: { rgb: "E2E8F0" } },
+            bottom: { style: "thin", color: { rgb: "E2E8F0" } },
+            left: { style: "thin", color: { rgb: "E2E8F0" } },
+            right: { style: "thin", color: { rgb: "E2E8F0" } }
+          }
+        }
+      };
+
+      if (val && String(val).startsWith('0')) {
+        ws[addr].z = '@';
+      }
+    });
+    currentRow++;
+  }
+
+  // Définir la plage totale de la feuille
+  ws['!ref'] = xlsxLib.utils.encode_range({
+    s: { r: 0, c: 0 },
+    e: { r: Math.max(currentRow - 1, 1), c: nbCols - 1 }
+  });
+  ws['!merges'] = merges;
+  ws['!rows'] = rows;
+
+  // Calcul des largeurs de colonnes optimales
+  ws['!cols'] = headers.map(h => {
+    if (typeof h === 'object' && h.width) return { wch: h.width };
+    const labelStr = typeof h === 'string' ? h : h.label;
+    return { wch: Math.max(labelStr.length + 4, 16) };
+  });
+
+  // Figer la bannière et l'en-tête (Freeze Pane)
+  ws['!views'] = [{ state: 'frozen', ySplit: 2 }];
+
+  return ws;
+};
+
 // Normalisation des chaînes pour matcher les noms de colonnes sans accents/casse
 export const cleanKey = (str) => {
   if (!str) return '';
@@ -1178,6 +1329,7 @@ export const downloadTemplate = async (type) => {
     materiel: {
       filename: 'modele_import_materiel_vierge.xlsx',
       sheetName: 'Materiel',
+      bannerTitle: '🛠️ GESTION DU MATÉRIEL & DES ÉQUIPEMENTS',
       headers: [
         "Origine (propre/ids) *",
         "Catégorie",
@@ -1204,6 +1356,7 @@ export const downloadTemplate = async (type) => {
     plan_action: {
       filename: 'modele_import_plan_action_vierge.xlsx',
       sheetName: 'PlanAction',
+      bannerTitle: "🎯 PLAN D'ACTION & OBJECTIFS D'ACCOMPAGNEMENT",
       headers: [
         "Mois *",
         "Objectifs *",
@@ -1226,6 +1379,7 @@ export const downloadTemplate = async (type) => {
     rh_personnel: {
       filename: 'modele_import_personnel_vierge.xlsx',
       sheetName: 'Personnel',
+      bannerTitle: '👥 RESSOURCES HUMAINES — SALARIÉS & COLLABORATEURS',
       headers: [
         "Nom complet *",
         "Poste",
@@ -1250,6 +1404,7 @@ export const downloadTemplate = async (type) => {
     rh_emploi: {
       filename: 'modele_import_emplois_vierge.xlsx',
       sheetName: 'Emplois',
+      bannerTitle: '💼 SUIVI MENSUEL DES EMPLOIS CRÉÉS (PERMANENTS & TEMPORAIRES)',
       headers: [
         "Mois *",
         "Personnel permanent",
@@ -1264,6 +1419,7 @@ export const downloadTemplate = async (type) => {
     financier: {
       filename: 'modele_import_finances_vierge.xlsx',
       sheetName: 'Finances',
+      bannerTitle: '💰 ANALYSE FINANCIÈRE & SUIVI DE TRÉSORERIE MENSUELLE',
       headers: [
         "Mois (1-12) *",
         "Année *",
@@ -1292,6 +1448,7 @@ export const downloadTemplate = async (type) => {
     fiche_technique: {
       filename: 'modele_fiche_technique_vierge.xlsx',
       sheetName: 'Fiche Technique',
+      bannerTitle: "📝 FICHES DE SUIVI & RÉUNIONS D'ACCOMPAGNEMENT",
       headers: [
         "N° Ordre",
         "Date",
@@ -1307,6 +1464,27 @@ export const downloadTemplate = async (type) => {
         ["Anomalie signalée", "Problème constaté lors du suivi", "Ex: Rupture de stock composants"],
         ["Déclaration d'échec", "Le projet est-il déclaré abandonné ?", "Non ou Oui"]
       ]
+    },
+    formation: {
+      filename: 'modele_import_formations_vierge.xlsx',
+      sheetName: 'Formations',
+      bannerTitle: '🎓 FORMATIONS, ATELIERS & MONTÉE EN COMPÉTENCES',
+      headers: [
+        "Thème *",
+        "Formateur",
+        "Date formation",
+        "Heures",
+        "Présence",
+        "Attestation"
+      ],
+      guide: [
+        ["Thème *", "Intitulé ou module de la formation", "Ex: Pitch & Storytelling"],
+        ["Formateur", "Nom de l'intervenant ou formateur", "Ex: Yassine Berrada"],
+        ["Date formation", "Date de la séance", "Format AAAA-MM-JJ"],
+        ["Heures", "Durée en heures", "Ex: 4"],
+        ["Présence", "Statut de présence", "Présent, Absent, Excusé"],
+        ["Attestation", "Attestation délivrée", "Oui ou Non"]
+      ]
     }
   };
 
@@ -1315,10 +1493,14 @@ export const downloadTemplate = async (type) => {
 
   const wb = XLSX.utils.book_new();
 
-  // 1. Feuille principale 100% VIERGE (aucun faux incubé ni démo)
-  const ws = XLSX.utils.aoa_to_sheet([tpl.headers]);
-  ws['!cols'] = tpl.headers.map(h => ({ wch: Math.max(h.length + 4, 16) }));
-  applyIdsTableStyle(ws, 0, true);
+  // 1. Feuille principale 100% VIERGE AVEC SA BANNIÈRE DE TITRE OFFICIELLE (identique à Infos Générales)
+  const ws = buildSingleTableSheetWithBanner({
+    bannerTitle: tpl.bannerTitle || tpl.sheetName,
+    headers: tpl.headers,
+    isTemplate: true,
+    emptyRowsCount: 5,
+    xlsxLib: XLSX
+  });
   XLSX.utils.book_append_sheet(wb, ws, tpl.sheetName);
 
   // 2. Deuxième feuille d'aide et d'instructions pour guider la saisie
@@ -1372,7 +1554,9 @@ export const readAllWorkbookSheets = async (file) => {
             }
           }
 
-          sheets[sheetName] = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
+          // Pour toutes les autres feuilles, détecter automatiquement si la ligne 0 est une bannière de titre
+          const headerIdx = detectSheetHeaderRowIndex(ws, XLSX);
+          sheets[sheetName] = XLSX.utils.sheet_to_json(ws, { range: headerIdx, defval: '', raw: false });
         }
         resolve(sheets);
       } catch (err) {
@@ -1384,63 +1568,104 @@ export const readAllWorkbookSheets = async (file) => {
   });
 };
 
-// Téléchargement d'un classeur complet multi-onglets (Dossier complet incubé) 100% VIERGE
+// Téléchargement d'un classeur complet multi-onglets (Dossier complet incubé) 100% VIERGE & AVEC BANNIÈRES DE TITRE
 export const exportFullIncubeTemplate = async () => {
   const XLSX = await loadXLSX();
   const wb = XLSX.utils.book_new();
-
-  const addStyledSheet = (sheetName, headers) => {
-    const ws = XLSX.utils.aoa_to_sheet([headers]);
-    ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 4, 16) }));
-    applyIdsTableStyle(ws, 0, true);
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
-  };
 
   // 1. Infos Générales & Associés (Option B superposée 100% vierge)
   const wsOptionB = buildOptionBSheet([], true, XLSX);
   XLSX.utils.book_append_sheet(wb, wsOptionB, "1. Infos Générales");
 
   // 2. Matériel
-  addStyledSheet("2. Matériel", [
-    "Origine (propre/ids) *", "Article *", "Date acquisition", "Caractéristiques / N° série", "Quantité", "Valeur ou État"
-  ]);
+  const wsMat = buildSingleTableSheetWithBanner({
+    bannerTitle: "🛠️ 2. GESTION DU MATÉRIEL & DES ÉQUIPEMENTS",
+    headers: [
+      "Origine (propre/ids) *", "Catégorie", "Article *", "N° de Série", "Date acquisition", "Caractéristiques", "Quantité", "Valeur (MAD)", "État"
+    ],
+    isTemplate: true,
+    xlsxLib: XLSX
+  });
+  XLSX.utils.book_append_sheet(wb, wsMat, "2. Matériel");
 
-  // 3. Plan d'action
-  addStyledSheet("3. Plan d'Action", [
-    "Mois *", "Objectifs *", "Échéance", "Réalisation", "Problèmes rencontrés", "Commentaires"
-  ]);
+  // 3. Plan d'Action
+  const wsPlan = buildSingleTableSheetWithBanner({
+    bannerTitle: "🎯 3. PLAN D'ACTION & OBJECTIFS D'ACCOMPAGNEMENT",
+    headers: [
+      "Mois *", "Objectifs *", "Date début", "Échéance", "Réalisation", "Problèmes rencontrés", "Commentaires"
+    ],
+    isTemplate: true,
+    xlsxLib: XLSX
+  });
+  XLSX.utils.book_append_sheet(wb, wsPlan, "3. Plan d'Action");
 
   // 4. Personnel RH
-  addStyledSheet("4. Personnel RH", [
-    "Nom complet *", "Poste", "Type de contrat", "Date embauche", "Date fin", "Salaire mensuel"
-  ]);
+  const wsRH = buildSingleTableSheetWithBanner({
+    bannerTitle: "👥 4. RESSOURCES HUMAINES — SALARIÉS & COLLABORATEURS",
+    headers: [
+      "Nom complet *", "Poste", "Type personnel (Permanent/Temporaire)", "Type de contrat", "Date embauche", "Date fin", "Salaire mensuel (MAD)", "N° Badge RFID"
+    ],
+    isTemplate: true,
+    xlsxLib: XLSX
+  });
+  XLSX.utils.book_append_sheet(wb, wsRH, "4. Personnel RH");
 
   // 5. Emplois RH
-  addStyledSheet("5. Emplois RH", [
-    "Mois *", "Personnel permanent", "Personnel temporaire"
-  ]);
+  const wsEmp = buildSingleTableSheetWithBanner({
+    bannerTitle: "💼 5. SUIVI MENSUEL DES EMPLOIS CRÉÉS (PERMANENTS & TEMPORAIRES)",
+    headers: [
+      "Mois *", "Personnel permanent", "Personnel temporaire"
+    ],
+    isTemplate: true,
+    xlsxLib: XLSX
+  });
+  XLSX.utils.book_append_sheet(wb, wsEmp, "5. Emplois RH");
 
   // 6. Finances
-  addStyledSheet("6. Finances", [
-    "Mois (1-12) *", "Année *", "Ventes", "Autres revenus", "Achats", "Charges personnel", "CNSS",
-    "Salaire porteur", "Loyer coworking", "Eau & Électricité", "Transport", "Téléphone", "Taxes", "TVA",
-    "Remboursement crédit", "Autres charges"
-  ]);
+  const wsFin = buildSingleTableSheetWithBanner({
+    bannerTitle: "💰 6. ANALYSE FINANCIÈRE & SUIVI DE TRÉSORERIE MENSUELLE",
+    headers: [
+      "Mois (1-12) *", "Année *", "Ventes (MAD)", "Autres revenus (MAD)", "Achats (MAD)", "Charges personnel (MAD)", "CNSS (MAD)",
+      "Salaire porteur (MAD)", "Loyer coworking (MAD)", "Eau & Électricité (MAD)", "Transport (MAD)", "Téléphone (MAD)", "Taxes (MAD)", "TVA (MAD)",
+      "Remboursement crédit (MAD)", "Autres charges (MAD)"
+    ],
+    isTemplate: true,
+    xlsxLib: XLSX
+  });
+  XLSX.utils.book_append_sheet(wb, wsFin, "6. Finances");
 
   // 7. Engagement & Présence
-  addStyledSheet("7. Engagement", [
-    "Mois *", "Année *", "Heures présence", "Taux présence (%)", "Initiatives", "Observations"
-  ]);
+  const wsEng = buildSingleTableSheetWithBanner({
+    bannerTitle: "⏱️ 7. ASSIDUITÉ, PRÉSENCE TOURNIQUETS & ENGAGEMENT",
+    headers: [
+      "Mois *", "Année *", "Heures présence", "Taux présence (%)", "Initiatives", "Observations"
+    ],
+    isTemplate: true,
+    xlsxLib: XLSX
+  });
+  XLSX.utils.book_append_sheet(wb, wsEng, "7. Engagement");
 
-  // 8. Fiche Technique
-  addStyledSheet("8. Fiche Technique", [
-    "N° Ordre", "Date", "Statut Juridique", "État d'avancement", "Anomalie signalée", "Déclaration d'échec", "Observations"
-  ]);
+  // 8. Fiches de Suivi
+  const wsSuivi = buildSingleTableSheetWithBanner({
+    bannerTitle: "📝 8. FICHES DE SUIVI & RÉUNIONS D'ACCOMPAGNEMENT",
+    headers: [
+      "N° Ordre", "Date suivi", "Objet réunion", "Statut avancement", "Statut juridique", "Anomalie signalée", "Déclaration échec", "Observations"
+    ],
+    isTemplate: true,
+    xlsxLib: XLSX
+  });
+  XLSX.utils.book_append_sheet(wb, wsSuivi, "8. Fiches de Suivi");
 
   // 9. Formations & Ateliers
-  addStyledSheet("9. Formations", [
-    "Thème *", "Formateur", "Date formation", "Heures", "Présence", "Attestation"
-  ]);
+  const wsForm = buildSingleTableSheetWithBanner({
+    bannerTitle: "🎓 9. FORMATIONS, ATELIERS & MONTÉE EN COMPÉTENCES",
+    headers: [
+      "Thème *", "Formateur", "Date formation", "Heures", "Présence", "Attestation"
+    ],
+    isTemplate: true,
+    xlsxLib: XLSX
+  });
+  XLSX.utils.book_append_sheet(wb, wsForm, "9. Formations");
 
   XLSX.writeFile(wb, "modele_dossier_complet_incube_vierge.xlsx");
 };
@@ -1525,7 +1750,7 @@ export const parseFullIncubeWorkbook = (allSheets) => {
   return result;
 };
 
-// Télécharger le modèle global pour importer TOUS les incubés avec TOUS leurs détails (100% VIERGE & Option B)
+// Télécharger le modèle global pour importer TOUS les incubés avec TOUS leurs détails (100% VIERGE & AVEC BANNIÈRES DE TITRE)
 export const exportGlobalPromotionTemplate = async () => {
   const XLSX = await loadXLSX();
   const wb = XLSX.utils.book_new();
@@ -1534,54 +1759,95 @@ export const exportGlobalPromotionTemplate = async () => {
   const wsOptionB = buildOptionBSheet([], true, XLSX);
   XLSX.utils.book_append_sheet(wb, wsOptionB, "1. Infos Générales");
 
-  const addStyledSheet = (sheetName, headers) => {
-    const ws = XLSX.utils.aoa_to_sheet([headers]);
-    ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 4, 16) }));
-    applyIdsTableStyle(ws, 0, true);
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
-  };
-
   // 2. Matériel
-  addStyledSheet("2. Matériel", [
-    "Nom Incubé ou N° PP *", "Origine (propre/ids) *", "Catégorie", "Article *", "N° de Série", "Date acquisition", "Caractéristiques", "Quantité", "Valeur (MAD)", "État"
-  ]);
+  const wsMat = buildSingleTableSheetWithBanner({
+    bannerTitle: "🛠️ 2. GESTION DU MATÉRIEL & DES ÉQUIPEMENTS",
+    headers: [
+      "Nom Incubé ou N° PP *", "Origine (propre/ids) *", "Catégorie", "Article *", "N° de Série", "Date acquisition", "Caractéristiques", "Quantité", "Valeur (MAD)", "État"
+    ],
+    isTemplate: true,
+    xlsxLib: XLSX
+  });
+  XLSX.utils.book_append_sheet(wb, wsMat, "2. Matériel");
 
   // 3. Plan d'Action
-  addStyledSheet("3. Plan d'Action", [
-    "Nom Incubé ou N° PP *", "Mois *", "Objectifs *", "Date début", "Échéance", "Réalisation", "Problèmes rencontrés", "Commentaires"
-  ]);
+  const wsPlan = buildSingleTableSheetWithBanner({
+    bannerTitle: "🎯 3. PLAN D'ACTION & OBJECTIFS D'ACCOMPAGNEMENT",
+    headers: [
+      "Nom Incubé ou N° PP *", "Mois *", "Objectifs *", "Date début", "Échéance", "Réalisation", "Problèmes rencontrés", "Commentaires"
+    ],
+    isTemplate: true,
+    xlsxLib: XLSX
+  });
+  XLSX.utils.book_append_sheet(wb, wsPlan, "3. Plan d'Action");
 
   // 4. Personnel RH
-  addStyledSheet("4. Personnel RH", [
-    "Nom Incubé ou N° PP *", "Nom complet *", "Poste", "Type personnel (Permanent/Temporaire)", "Type de contrat", "Date embauche", "Date fin", "Salaire mensuel (MAD)", "N° Badge RFID"
-  ]);
+  const wsRH = buildSingleTableSheetWithBanner({
+    bannerTitle: "👥 4. RESSOURCES HUMAINES — SALARIÉS & COLLABORATEURS",
+    headers: [
+      "Nom Incubé ou N° PP *", "Nom complet *", "Poste", "Type personnel (Permanent/Temporaire)", "Type de contrat", "Date embauche", "Date fin", "Salaire mensuel (MAD)", "N° Badge RFID"
+    ],
+    isTemplate: true,
+    xlsxLib: XLSX
+  });
+  XLSX.utils.book_append_sheet(wb, wsRH, "4. Personnel RH");
 
   // 5. Emplois RH
-  addStyledSheet("5. Emplois RH", [
-    "Nom Incubé ou N° PP *", "Mois *", "Personnel permanent", "Personnel temporaire"
-  ]);
+  const wsEmp = buildSingleTableSheetWithBanner({
+    bannerTitle: "💼 5. SUIVI MENSUEL DES EMPLOIS CRÉÉS (PERMANENTS & TEMPORAIRES)",
+    headers: [
+      "Nom Incubé ou N° PP *", "Mois *", "Personnel permanent", "Personnel temporaire"
+    ],
+    isTemplate: true,
+    xlsxLib: XLSX
+  });
+  XLSX.utils.book_append_sheet(wb, wsEmp, "5. Emplois RH");
 
   // 6. Finances
-  addStyledSheet("6. Finances", [
-    "Nom Incubé ou N° PP *", "Mois (1-12) *", "Année *", "Ventes", "Autres revenus", "Achats", "Charges personnel", "CNSS",
-    "Salaire porteur", "Loyer coworking", "Eau & Électricité", "Transport", "Téléphone", "Taxes", "TVA",
-    "Remboursement crédit", "Autres charges"
-  ]);
+  const wsFin = buildSingleTableSheetWithBanner({
+    bannerTitle: "💰 6. ANALYSE FINANCIÈRE & SUIVI DE TRÉSORERIE MENSUELLE",
+    headers: [
+      "Nom Incubé ou N° PP *", "Mois (1-12) *", "Année *", "Ventes (MAD)", "Autres revenus (MAD)", "Achats (MAD)", "Charges personnel (MAD)", "CNSS (MAD)",
+      "Salaire porteur (MAD)", "Loyer coworking (MAD)", "Eau & Électricité (MAD)", "Transport (MAD)", "Téléphone (MAD)", "Taxes (MAD)", "TVA (MAD)",
+      "Remboursement crédit (MAD)", "Autres charges (MAD)"
+    ],
+    isTemplate: true,
+    xlsxLib: XLSX
+  });
+  XLSX.utils.book_append_sheet(wb, wsFin, "6. Finances");
 
   // 7. Engagement & Présence
-  addStyledSheet("7. Engagement", [
-    "Nom Incubé ou N° PP *", "Mois *", "Année *", "Heures présence", "Taux présence (%)", "Initiatives", "Observations"
-  ]);
+  const wsEng = buildSingleTableSheetWithBanner({
+    bannerTitle: "⏱️ 7. ASSIDUITÉ, PRÉSENCE TOURNIQUETS & ENGAGEMENT",
+    headers: [
+      "Nom Incubé ou N° PP *", "Mois *", "Année *", "Heures présence", "Taux présence (%)", "Initiatives", "Observations"
+    ],
+    isTemplate: true,
+    xlsxLib: XLSX
+  });
+  XLSX.utils.book_append_sheet(wb, wsEng, "7. Engagement");
 
-  // 8. Fiches de Suivi & Entretiens
-  addStyledSheet("8. Fiches de Suivi", [
-    "Nom Incubé ou N° PP *", "N° Ordre", "Date suivi", "Objet réunion", "Statut avancement", "Statut juridique", "Anomalie signalée", "Déclaration échec", "Observations"
-  ]);
+  // 8. Fiches de Suivi
+  const wsSuivi = buildSingleTableSheetWithBanner({
+    bannerTitle: "📝 8. FICHES DE SUIVI & RÉUNIONS D'ACCOMPAGNEMENT",
+    headers: [
+      "Nom Incubé ou N° PP *", "N° Ordre", "Date suivi", "Objet réunion", "Statut avancement", "Statut juridique", "Anomalie signalée", "Déclaration échec", "Observations"
+    ],
+    isTemplate: true,
+    xlsxLib: XLSX
+  });
+  XLSX.utils.book_append_sheet(wb, wsSuivi, "8. Fiches de Suivi");
 
   // 9. Formations & Ateliers
-  addStyledSheet("9. Formations", [
-    "Nom Incubé ou N° PP *", "Thème *", "Formateur", "Date formation", "Heures", "Présence", "Attestation"
-  ]);
+  const wsForm = buildSingleTableSheetWithBanner({
+    bannerTitle: "🎓 9. FORMATIONS, ATELIERS & MONTÉE EN COMPÉTENCES",
+    headers: [
+      "Nom Incubé ou N° PP *", "Thème *", "Formateur", "Date formation", "Heures", "Présence", "Attestation"
+    ],
+    isTemplate: true,
+    xlsxLib: XLSX
+  });
+  XLSX.utils.book_append_sheet(wb, wsForm, "9. Formations");
 
   XLSX.writeFile(wb, "modele_global_tous_incubes_avec_details_vierge.xlsx");
 };
