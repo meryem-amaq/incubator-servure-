@@ -489,6 +489,96 @@ export default function TabInfos({ incube, onUpdate }) {
                 onChange={f('rc')}
               />
             </div>
+            {/* Statut juridique */}
+            <div>
+              <label className="label">Statut juridique</label>
+              <select
+                className="input"
+                value={STATUT_OPTS.includes(form.statut_juridique) ? form.statut_juridique : (form.statut_juridique ? 'Autre' : '')}
+                onChange={(e) => {
+                  if (e.target.value === 'Autre') {
+                    setForm(prev => ({ ...prev, statut_juridique: '' }));
+                  } else {
+                    setForm(prev => ({ ...prev, statut_juridique: e.target.value }));
+                  }
+                }}
+              >
+                <option value="" disabled>-- Sélectionner --</option>
+                {STATUT_OPTS.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+              {(!STATUT_OPTS.includes(form.statut_juridique) && form.statut_juridique !== undefined) || form.statut_juridique === 'Autre' ? (
+                <input
+                  type="text"
+                  className="input mt-2"
+                  placeholder="Spécifiez le statut juridique"
+                  value={STATUT_OPTS.includes(form.statut_juridique) ? '' : form.statut_juridique}
+                  onChange={f('statut_juridique')}
+                  autoFocus
+                />
+              ) : null}
+
+              {/* Historique des statuts juridiques */}
+              {incube.historique_statuts && incube.historique_statuts.length > 0 && (
+                <div className="mt-3 p-3 bg-slate-50 dark:bg-dark-800/80 rounded-lg border border-slate-200 dark:border-dark-700/60 max-h-32 overflow-y-auto custom-scrollbar">
+                  <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Historique des statuts juridiques</h4>
+                  <div className="space-y-2">
+                    {incube.historique_statuts.map((log, i) => (
+                      <div key={log.id || i} className="flex flex-col gap-0.5 relative pl-3 border-l-2 border-primary-400/50">
+                        <div className="absolute -left-[5px] top-1.5 w-2 h-2 rounded-full bg-primary-500"></div>
+                        <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                          Passage à <span className="text-primary-600 dark:text-primary-400">"{log.nouveau_statut}"</span>
+                        </span>
+                        <span className="text-[10px] text-slate-400 dark:text-dark-400">
+                          Le {new Date(log.date_changement).toLocaleDateString('fr-FR')} 
+                          {log.ancien_statut && ` (depuis "${log.ancien_statut}")`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Phase du projet (État d'avancement) */}
+            <div className="relative">
+              <label className="label">Phase du projet</label>
+              <select
+                className="input"
+                value={form.phase_projet || ''}
+                onChange={f('phase_projet')}
+              >
+                {PHASE_OPTS.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+              {/* Historique des phases */}
+              {incube.historique_phases && incube.historique_phases.length > 0 && (
+                <div className="mt-3 p-3 bg-slate-50 dark:bg-dark-800/80 rounded-lg border border-slate-200 dark:border-dark-700/60 max-h-32 overflow-y-auto custom-scrollbar">
+                  <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Historique des phases</h4>
+                  <div className="space-y-2">
+                    {incube.historique_phases.map((log, i) => (
+                      <div key={log.id || i} className="flex flex-col gap-0.5 relative pl-3 border-l-2 border-primary-400/50">
+                        <div className="absolute -left-[5px] top-1.5 w-2 h-2 rounded-full bg-primary-500"></div>
+                        <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                          Passage à <span className="text-primary-600 dark:text-primary-400">"{log.nouvelle_phase}"</span>
+                        </span>
+                        <span className="text-[10px] text-slate-400 dark:text-dark-400">
+                          Le {new Date(log.date_changement).toLocaleDateString('fr-FR')} 
+                          {log.ancienne_phase && ` (depuis "${log.ancienne_phase}")`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Promotion */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
@@ -549,96 +639,6 @@ export default function TabInfos({ incube, onUpdate }) {
                   <option value={form.promotion}>{form.promotion}</option>
                 )}
               </select>
-            </div>
-
-            {/* Phase du projet (État d'avancement) */}
-            <div className="relative">
-              <label className="label">Phase du projet</label>
-              <select
-                className="input"
-                value={form.phase_projet || ''}
-                onChange={f('phase_projet')}
-              >
-                {PHASE_OPTS.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-              {/* Historique des phases */}
-              {incube.historique_phases && incube.historique_phases.length > 0 && (
-                <div className="mt-3 p-3 bg-slate-50 dark:bg-dark-800/80 rounded-lg border border-slate-200 dark:border-dark-700/60 max-h-32 overflow-y-auto custom-scrollbar">
-                  <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Historique des phases</h4>
-                  <div className="space-y-2">
-                    {incube.historique_phases.map((log, i) => (
-                      <div key={log.id || i} className="flex flex-col gap-0.5 relative pl-3 border-l-2 border-primary-400/50">
-                        <div className="absolute -left-[5px] top-1.5 w-2 h-2 rounded-full bg-primary-500"></div>
-                        <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                          Passage à <span className="text-primary-600 dark:text-primary-400">"{log.nouvelle_phase}"</span>
-                        </span>
-                        <span className="text-[10px] text-slate-400 dark:text-dark-400">
-                          Le {new Date(log.date_changement).toLocaleDateString('fr-FR')} 
-                          {log.ancienne_phase && ` (depuis "${log.ancienne_phase}")`}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Statut juridique */}
-            <div>
-              <label className="label">Statut juridique</label>
-              <select
-                className="input"
-                value={STATUT_OPTS.includes(form.statut_juridique) ? form.statut_juridique : (form.statut_juridique ? 'Autre' : '')}
-                onChange={(e) => {
-                  if (e.target.value === 'Autre') {
-                    setForm(prev => ({ ...prev, statut_juridique: '' }));
-                  } else {
-                    setForm(prev => ({ ...prev, statut_juridique: e.target.value }));
-                  }
-                }}
-              >
-                <option value="" disabled>-- Sélectionner --</option>
-                {STATUT_OPTS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-              {(!STATUT_OPTS.includes(form.statut_juridique) && form.statut_juridique !== undefined) || form.statut_juridique === 'Autre' ? (
-                <input
-                  type="text"
-                  className="input mt-2"
-                  placeholder="Spécifiez le statut juridique"
-                  value={STATUT_OPTS.includes(form.statut_juridique) ? '' : form.statut_juridique}
-                  onChange={f('statut_juridique')}
-                  autoFocus
-                />
-              ) : null}
-
-              {/* Historique des statuts juridiques */}
-              {incube.historique_statuts && incube.historique_statuts.length > 0 && (
-                <div className="mt-3 p-3 bg-slate-50 dark:bg-dark-800/80 rounded-lg border border-slate-200 dark:border-dark-700/60 max-h-32 overflow-y-auto custom-scrollbar">
-                  <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Historique des statuts juridiques</h4>
-                  <div className="space-y-2">
-                    {incube.historique_statuts.map((log, i) => (
-                      <div key={log.id || i} className="flex flex-col gap-0.5 relative pl-3 border-l-2 border-primary-400/50">
-                        <div className="absolute -left-[5px] top-1.5 w-2 h-2 rounded-full bg-primary-500"></div>
-                        <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                          Passage à <span className="text-primary-600 dark:text-primary-400">"{log.nouveau_statut}"</span>
-                        </span>
-                        <span className="text-[10px] text-slate-400 dark:text-dark-400">
-                          Le {new Date(log.date_changement).toLocaleDateString('fr-FR')} 
-                          {log.ancien_statut && ` (depuis "${log.ancien_statut}")`}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
             <div>
               <label className="label">Accompagnateur référent</label>
