@@ -627,17 +627,21 @@ export const MAPPINGS = {
   materiel: {
     incube_ref: ['incube_ref', 'nom_incube', 'nomincube', 'nom', 'porteur', 'pp_numero', 'pp', 'projet', 'ref_incube', 'incubé'],
     type_origine: ['type_origine', 'origine', 'typeorigine', 'type', 'propreouids', 'proprietaire'],
+    secteur_action: ['secteur_action', 'categorie', 'domaine', 'secteur'],
     article: ['article', 'designation', 'nomarticle', 'nom', 'materiel', 'equipement', 'intitule'],
     numero_serie: ['numero_serie', 'numerodeserie', 'noserie', 'nserie', 'sn', 'serie', 'serialnumber', 'serial'],
     date_acquisition_reception: ['date_acquisition_reception', 'dateacquisition', 'datereception', 'dateacq', 'date', 'dateachat'],
     caracteristiques_serie: ['caracteristiques_serie', 'caracteristiques', 'specifications', 'description'],
     quantite: ['quantite', 'qte', 'nombre', 'nb'],
-    valeur_ou_etat: ['valeur_ou_etat', 'valeur', 'etat', 'prix', 'cout', 'montant', 'valeurmad', 'valeuroetat'],
+    valeur: ['valeur', 'valeurmad', 'prix', 'cout', 'montant'],
+    etat: ['etat', 'etatphysique', 'bonetat'],
+    valeur_ou_etat: ['valeur_ou_etat', 'valeuroetat'],
   },
   plan_action: {
     incube_ref: ['incube_ref', 'nom_incube', 'nomincube', 'nom', 'porteur', 'pp_numero', 'pp', 'projet', 'ref_incube', 'incubé'],
     mois: ['mois', 'periode', 'moisconcerne', 'datesuivi', 'datedusuivi', 'datedesuivi', 'jour', 'jourdesuivi'],
     objectifs: ['objectifs', 'objectif', 'action', 'actions', 'tache', 'intitule', 'titre'],
+    date_debut: ['date_debut', 'datedebut', 'debut', 'lancement'],
     echeance: ['echeance', 'dateecheance', 'datefin', 'limite', 'delai'],
     realisation: ['realisation', 'statut', 'etat', 'avancement', 'progression'],
     problemes_rencontres: ['problemes_rencontres', 'problemes', 'bloquants', 'difficultes', 'obstacles', 'problemesrencontres'],
@@ -647,10 +651,12 @@ export const MAPPINGS = {
     incube_ref: ['incube_ref', 'nom_incube', 'nomincube', 'nom', 'porteur', 'pp_numero', 'pp', 'projet', 'ref_incube', 'incubé'],
     nom_complet: ['nom_complet', 'nom', 'nomcomplet', 'salarie', 'employe', 'collaborateur', 'nometprenom'],
     poste: ['poste', 'fonction', 'role', 'intituleposte', 'metier'],
+    type_personnel: ['type_personnel', 'typepersonnel', 'statutpersonnel'],
     nature_contrat: ['nature_contrat', 'contrat', 'typecontrat', 'naturecontrat', 'statutcontrat'],
     date_embauche: ['date_embauche', 'dateembauche', 'debutcontrat', 'datedebut', 'recrutement'],
     date_fin: ['date_fin', 'datefin', 'fincontrat', 'depart'],
     salaire_mensuel: ['salaire_mensuel', 'salaire', 'remuneration', 'salairemad', 'salairemensuel'],
+    badge_id: ['badge_id', 'badge', 'badgerfid', 'rfid', 'numerobadge'],
   },
   rh_emploi: {
     incube_ref: ['incube_ref', 'nom_incube', 'nomincube', 'nom', 'porteur', 'pp_numero', 'pp', 'projet', 'ref_incube', 'incubé'],
@@ -1174,19 +1180,25 @@ export const downloadTemplate = async (type) => {
       sheetName: 'Materiel',
       headers: [
         "Origine (propre/ids) *",
+        "Catégorie",
         "Article *",
+        "N° de Série",
         "Date acquisition",
-        "Caractéristiques / N° série",
+        "Caractéristiques",
         "Quantité",
-        "Valeur ou État"
+        "Valeur (MAD)",
+        "État"
       ],
       guide: [
         ["Origine (propre/ids) *", "Type de propriété du matériel", "propre (matériel incubé) OU ids (prêt incubateur)"],
+        ["Catégorie", "Domaine ou catégorie de l'équipement", "Informatique, Bureautique, Outillage..."],
         ["Article *", "Désignation de l'équipement", "Ex: Ordinateur portable Dell XPS 15"],
+        ["N° de Série", "Numéro de série constructeur (SN)", "Ex: SN-987654321"],
         ["Date acquisition", "Date d'achat ou de mise à disposition", "Format AAAA-MM-JJ (ex: 2025-01-10)"],
-        ["Caractéristiques / N° série", "Spécifications techniques ou SN", "Ex: 16GB RAM, SN: 987654321"],
+        ["Caractéristiques", "Spécifications techniques", "Ex: 16GB RAM, 512GB SSD, Intel i7"],
         ["Quantité", "Nombre d'unités", "Ex: 1"],
-        ["Valeur ou État", "Valeur en MAD ou état physique", "Ex: Neuf / 14000 MAD ou Bon état"]
+        ["Valeur (MAD)", "Valeur estimée en dirhams marocains", "Ex: 14000"],
+        ["État", "État physique actuel", "Neuf, Bon état, Moyen, Hors service"]
       ]
     },
     plan_action: {
@@ -1195,14 +1207,16 @@ export const downloadTemplate = async (type) => {
       headers: [
         "Mois *",
         "Objectifs *",
+        "Date début",
         "Échéance",
         "Réalisation",
         "Problèmes rencontrés",
         "Commentaires"
       ],
       guide: [
-        ["Mois *", "Mois concerné par l'action", "Janvier, Février, Mars, Avril, Mai, Juin..."],
+        ["Mois *", "Mois ou date concernée par l'action", "Ex: Janvier ou 15 Janvier"],
         ["Objectifs *", "Intitulé clair de l'objectif ou jalon", "Ex: Finalisation du MVP fonctionnel"],
+        ["Date début", "Date de début de l'action", "Format AAAA-MM-JJ (ex: 2025-01-05)"],
         ["Échéance", "Date limite prévue de réalisation", "Format AAAA-MM-JJ (ex: 2025-01-31)"],
         ["Réalisation", "État d'avancement de l'action", "Non commencé, En cours, Réalisé, Bloqué"],
         ["Problèmes rencontrés", "Obstacles ou difficultés identifiés", "Ex: Retard livraison fournisseur"],
@@ -1215,18 +1229,22 @@ export const downloadTemplate = async (type) => {
       headers: [
         "Nom complet *",
         "Poste",
+        "Type personnel (Permanent/Temporaire)",
         "Type de contrat",
         "Date embauche",
         "Date fin",
-        "Salaire mensuel"
+        "Salaire mensuel (MAD)",
+        "N° Badge RFID"
       ],
       guide: [
         ["Nom complet *", "Nom et prénom du salarié", "Ex: Yassine Berrada"],
         ["Poste", "Fonction occupée", "Ex: Développeur Fullstack"],
+        ["Type personnel (Permanent/Temporaire)", "Statut du personnel", "Personnel permanent OU Personnel temporaire"],
         ["Type de contrat", "Nature du contrat de travail", "CDI, CDD, Stage, ANAPEC, Freelance"],
         ["Date embauche", "Date d'entrée en fonction", "Format AAAA-MM-JJ (ex: 2025-01-01)"],
         ["Date fin", "Date de fin pour contrat temporaire", "Format AAAA-MM-JJ ou vide si CDI"],
-        ["Salaire mensuel", "Rémunération mensuelle en MAD", "Ex: 8500"]
+        ["Salaire mensuel (MAD)", "Rémunération mensuelle en MAD", "Ex: 8500"],
+        ["N° Badge RFID", "Identifiant du badge d'accès tourniquet IDS", "Ex: 0045678912"]
       ]
     },
     rh_emploi: {
@@ -1507,10 +1525,14 @@ export const parseFullIncubeWorkbook = (allSheets) => {
   return result;
 };
 
-// Télécharger le modèle global pour importer TOUS les incubés avec TOUS leurs détails (100% VIERGE)
+// Télécharger le modèle global pour importer TOUS les incubés avec TOUS leurs détails (100% VIERGE & Option B)
 export const exportGlobalPromotionTemplate = async () => {
   const XLSX = await loadXLSX();
   const wb = XLSX.utils.book_new();
+
+  // 1. Infos Générales & Associés (Option B superposée 100% vierge)
+  const wsOptionB = buildOptionBSheet([], true, XLSX);
+  XLSX.utils.book_append_sheet(wb, wsOptionB, "1. Infos Générales");
 
   const addStyledSheet = (sheetName, headers) => {
     const ws = XLSX.utils.aoa_to_sheet([headers]);
@@ -1519,27 +1541,19 @@ export const exportGlobalPromotionTemplate = async () => {
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
   };
 
-  // 1. Liste des incubés
-  addStyledSheet("1. Incubes", [
-    "Nom de l'incubé *", "CIN", "N° PP", "Email", "Téléphone", "Genre", "Date de naissance", "Âge",
-    "Niveau d'étude", "Situation familiale", "Raison sociale", "Statut juridique", "RC", "Phase du projet",
-    "Secteur d'activité", "Province", "Ville", "Promotion", "Accompagnateur", "Date de démarrage",
-    "N° Badge RFID", "Associés"
-  ]);
-
   // 2. Matériel
-  addStyledSheet("2. Materiel", [
-    "Nom Incubé ou N° PP *", "Origine (propre/ids) *", "Article *", "Date acquisition", "Caractéristiques / N° série", "Quantité", "Valeur ou État"
+  addStyledSheet("2. Matériel", [
+    "Nom Incubé ou N° PP *", "Origine (propre/ids) *", "Catégorie", "Article *", "N° de Série", "Date acquisition", "Caractéristiques", "Quantité", "Valeur (MAD)", "État"
   ]);
 
   // 3. Plan d'Action
-  addStyledSheet("3. Plan Action", [
-    "Nom Incubé ou N° PP *", "Mois *", "Objectifs *", "Échéance", "Réalisation", "Problèmes rencontrés", "Commentaires"
+  addStyledSheet("3. Plan d'Action", [
+    "Nom Incubé ou N° PP *", "Mois *", "Objectifs *", "Date début", "Échéance", "Réalisation", "Problèmes rencontrés", "Commentaires"
   ]);
 
   // 4. Personnel RH
   addStyledSheet("4. Personnel RH", [
-    "Nom Incubé ou N° PP *", "Nom complet *", "Poste", "Type de contrat", "Date embauche", "Date fin", "Salaire mensuel"
+    "Nom Incubé ou N° PP *", "Nom complet *", "Poste", "Type personnel (Permanent/Temporaire)", "Type de contrat", "Date embauche", "Date fin", "Salaire mensuel (MAD)", "N° Badge RFID"
   ]);
 
   // 5. Emplois RH
@@ -1554,7 +1568,7 @@ export const exportGlobalPromotionTemplate = async () => {
     "Remboursement crédit", "Autres charges"
   ]);
 
-  // 7. Engagement & Assiduité
+  // 7. Engagement & Présence
   addStyledSheet("7. Engagement", [
     "Nom Incubé ou N° PP *", "Mois *", "Année *", "Heures présence", "Taux présence (%)", "Initiatives", "Observations"
   ]);
@@ -1567,11 +1581,6 @@ export const exportGlobalPromotionTemplate = async () => {
   // 9. Formations & Ateliers
   addStyledSheet("9. Formations", [
     "Nom Incubé ou N° PP *", "Thème *", "Formateur", "Date formation", "Heures", "Présence", "Attestation"
-  ]);
-
-  // 10. Associés & Partenaires
-  addStyledSheet("10. Associés", [
-    "Nom Incubé ou N° PP *", "Nom & prénom *", "CIN", "Fonction", "Téléphone", "Part capital (%)"
   ]);
 
   XLSX.writeFile(wb, "modele_global_tous_incubes_avec_details_vierge.xlsx");
