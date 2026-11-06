@@ -69,6 +69,473 @@ export const applyIdsTableStyle = (ws, totalRows = 0, isTemplate = false) => {
   }
 };
 
+// ============================================================================
+// RESTRUCTURATION OPTION B : 2 TABLEAUX SUPERPOSÉS SUR LA MÊME FEUILLE
+// Tableau 1 : Informations Générales Porteur & Startup (21 colonnes)
+// Tableau 2 : Associés & Partenaires de la Startup (6 colonnes)
+// ============================================================================
+
+export const OPTION_B_COLUMNS_INCUBE = [
+  { key: 'nom_incube', label: "Nom de l'incubé *", width: 26, required: true },
+  { key: 'pp_numero', label: "N° Porteur de Projet", width: 20 },
+  { key: 'cin', label: "CIN", width: 15 },
+  { key: 'situation_familiale', label: "Situation familiale", width: 18 },
+  { key: 'email', label: "Email", width: 28 },
+  { key: 'telephone', label: "Téléphone", width: 16 },
+  { key: 'raison_sociale', label: "Raison sociale", width: 26 },
+  { key: 'rc', label: "Registre du Commerce (RC)", width: 22 },
+  { key: 'statut_juridique', label: "Statut juridique", width: 18 },
+  { key: 'phase_projet', label: "Phase du projet", width: 16 },
+  { key: 'promotion', label: "Promotion", width: 16 },
+  { key: 'accompagnateur', label: "Accompagnateur référent", width: 24 },
+  { key: 'date_demarrage', label: "Date de démarrage", width: 16 },
+  { key: 'province', label: "Province", width: 16 },
+  { key: 'ville', label: "Ville", width: 16 },
+  { key: 'genre', label: "Genre", width: 12 },
+  { key: 'secteur_activite', label: "Secteur d'activité", width: 24 },
+  { key: 'date_naissance', label: "Date de naissance", width: 16 },
+  { key: 'age', label: "Âge", width: 14 },
+  { key: 'niveau_etude', label: "Niveau d'étude", width: 20 },
+  { key: 'badge_id', label: "N° Badge RFID", width: 16 }
+];
+
+export const OPTION_B_COLUMNS_ASSOCIES = [
+  { key: 'incube_ref', label: "Nom Incubé ou N° PP *", width: 26, required: true },
+  { key: 'nom', label: "Nom & prénom de l'associé *", width: 26, required: true },
+  { key: 'cin', label: "CIN Associé", width: 16 },
+  { key: 'fonction', label: "Fonction (Rôle)", width: 22 },
+  { key: 'tel', label: "Téléphone Associé", width: 18 },
+  { key: 'badge_id', label: "N° Badge RFID Associé", width: 22 }
+];
+
+// Construction de la feuille principale "Infos Générales" avec 2 tableaux superposés
+export const buildOptionBSheet = (incubesList = [], isTemplate = false, xlsxLib = XLSX) => {
+  const ws = {};
+  const merges = [];
+  const rows = [];
+  let currentRow = 0;
+
+  // --- 1. BANNIÈRE TABLEAU 1 (Porteur & Startup - Bleu Marine IDS #0F172A) ---
+  const banner1Text = "📋 1. INFORMATIONS GÉNÉRALES DU PORTEUR ET DE LA STARTUP";
+  merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: OPTION_B_COLUMNS_INCUBE.length - 1 } });
+  rows.push({ hpt: 32 });
+
+  for (let c = 0; c < OPTION_B_COLUMNS_INCUBE.length; c++) {
+    const addr = xlsxLib.utils.encode_cell({ r: currentRow, c });
+    ws[addr] = {
+      t: 's',
+      v: c === 0 ? banner1Text : '',
+      s: {
+        fill: { fgColor: { rgb: "0F172A" } },
+        font: { name: "Calibri", sz: 12, bold: true, color: { rgb: "FFFFFF" } },
+        alignment: { vertical: "center", horizontal: "center" },
+        border: {
+          top: { style: "thin", color: { rgb: "334155" } },
+          bottom: { style: "thin", color: { rgb: "334155" } },
+          left: { style: "thin", color: { rgb: "334155" } },
+          right: { style: "thin", color: { rgb: "334155" } }
+        }
+      }
+    };
+  }
+  currentRow++;
+
+  // --- 2. EN-TÊTE TABLEAU 1 (Slate foncé #1E293B) ---
+  rows.push({ hpt: 30 });
+  OPTION_B_COLUMNS_INCUBE.forEach((col, c) => {
+    const addr = xlsxLib.utils.encode_cell({ r: currentRow, c });
+    ws[addr] = {
+      t: 's',
+      v: col.label,
+      s: {
+        fill: { fgColor: { rgb: "1E293B" } },
+        font: { name: "Calibri", sz: 10, bold: true, color: { rgb: "FFFFFF" } },
+        alignment: { vertical: "center", horizontal: "center", wrapText: true },
+        border: {
+          top: { style: "thin", color: { rgb: "334155" } },
+          bottom: { style: "medium", color: { rgb: "0F172A" } },
+          left: { style: "thin", color: { rgb: "334155" } },
+          right: { style: "thin", color: { rgb: "334155" } }
+        }
+      }
+    };
+  });
+  currentRow++;
+
+  // --- 3. LIGNES TABLEAU 1 (Données réelles ou 5 lignes vierges formatées si modèle) ---
+  const nbIncubes = incubesList.length;
+  const nbTable1Rows = isTemplate ? Math.max(nbIncubes, 5) : nbIncubes;
+
+  for (let r = 0; r < nbTable1Rows; r++) {
+    const inc = incubesList[r] || {};
+    rows.push({ hpt: 22 });
+    const isZebra = r % 2 === 1;
+
+    OPTION_B_COLUMNS_INCUBE.forEach((col, c) => {
+      const addr = xlsxLib.utils.encode_cell({ r: currentRow, c });
+      let val = inc[col.key] !== undefined && inc[col.key] !== null ? inc[col.key] : '';
+      if (col.key === 'accompagnateur' && inc.accompagnateurAdmin) {
+        val = `${inc.accompagnateurAdmin.prenom || ''} ${inc.accompagnateurAdmin.nom || ''}`.trim() || inc.accompagnateur || '';
+      }
+      if ((col.key === 'date_demarrage' || col.key === 'date_naissance') && val) {
+        val = String(val).split('T')[0];
+      }
+
+      ws[addr] = {
+        t: 's',
+        v: String(val),
+        s: {
+          fill: { fgColor: { rgb: isZebra ? "F8FAFC" : "FFFFFF" } },
+          font: { name: "Calibri", sz: 10, color: { rgb: "1E293B" } },
+          alignment: { vertical: "center", horizontal: "left" },
+          border: {
+            top: { style: "thin", color: { rgb: "E2E8F0" } },
+            bottom: { style: "thin", color: { rgb: "E2E8F0" } },
+            left: { style: "thin", color: { rgb: "E2E8F0" } },
+            right: { style: "thin", color: { rgb: "E2E8F0" } }
+          }
+        }
+      };
+      if (val && String(val).startsWith('0')) {
+        ws[addr].z = '@';
+      }
+    });
+    currentRow++;
+  }
+
+  // --- 4. SÉPARATEUR ENTRE LES DEUX TABLEAUX (2 lignes vides) ---
+  for (let s = 0; s < 2; s++) {
+    rows.push({ hpt: 15 });
+    currentRow++;
+  }
+
+  // --- 5. BANNIÈRE TABLEAU 2 (Associés & Partenaires - Vert Émeraude IDS #065F46) ---
+  const banner2Text = "👥 2. ASSOCIÉS & PARTENAIRES DE LA STARTUP";
+  merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: OPTION_B_COLUMNS_ASSOCIES.length - 1 } });
+  rows.push({ hpt: 30 });
+
+  for (let c = 0; c < OPTION_B_COLUMNS_ASSOCIES.length; c++) {
+    const addr = xlsxLib.utils.encode_cell({ r: currentRow, c });
+    ws[addr] = {
+      t: 's',
+      v: c === 0 ? banner2Text : '',
+      s: {
+        fill: { fgColor: { rgb: "065F46" } },
+        font: { name: "Calibri", sz: 11, bold: true, color: { rgb: "FFFFFF" } },
+        alignment: { vertical: "center", horizontal: "center" },
+        border: {
+          top: { style: "thin", color: { rgb: "047857" } },
+          bottom: { style: "thin", color: { rgb: "047857" } },
+          left: { style: "thin", color: { rgb: "047857" } },
+          right: { style: "thin", color: { rgb: "047857" } }
+        }
+      }
+    };
+  }
+  currentRow++;
+
+  // --- 6. EN-TÊTE TABLEAU 2 (Vert Émeraude #047857) ---
+  rows.push({ hpt: 28 });
+  OPTION_B_COLUMNS_ASSOCIES.forEach((col, c) => {
+    const addr = xlsxLib.utils.encode_cell({ r: currentRow, c });
+    ws[addr] = {
+      t: 's',
+      v: col.label,
+      s: {
+        fill: { fgColor: { rgb: "047857" } },
+        font: { name: "Calibri", sz: 10, bold: true, color: { rgb: "FFFFFF" } },
+        alignment: { vertical: "center", horizontal: "center", wrapText: true },
+        border: {
+          top: { style: "thin", color: { rgb: "065F46" } },
+          bottom: { style: "medium", color: { rgb: "064E3B" } },
+          left: { style: "thin", color: { rgb: "065F46" } },
+          right: { style: "thin", color: { rgb: "065F46" } }
+        }
+      }
+    };
+  });
+  currentRow++;
+
+  // --- 7. LIGNES TABLEAU 2 (Associés réels extraits ou 5 lignes vierges formatées si modèle) ---
+  const allAssocies = [];
+  incubesList.forEach(inc => {
+    let list = [];
+    try {
+      list = typeof inc.associes === 'string' ? JSON.parse(inc.associes) : inc.associes;
+    } catch (e) { list = []; }
+    if (Array.isArray(list)) {
+      list.forEach(a => {
+        allAssocies.push({
+          incube_ref: inc.nom_incube || inc.pp_numero || '',
+          nom: a.nom || a.nom_complet || '',
+          cin: a.cin || '',
+          fonction: a.fonction || a.role || '',
+          tel: a.tel || a.telephone || '',
+          badge_id: a.badge_id || a.matricule || ''
+        });
+      });
+    }
+  });
+
+  const nbAssocies = allAssocies.length;
+  const nbTable2Rows = isTemplate ? Math.max(nbAssocies, 5) : nbAssocies;
+
+  for (let r = 0; r < nbTable2Rows; r++) {
+    const assoc = allAssocies[r] || {};
+    rows.push({ hpt: 22 });
+    const isZebra = r % 2 === 1;
+
+    OPTION_B_COLUMNS_ASSOCIES.forEach((col, c) => {
+      const addr = xlsxLib.utils.encode_cell({ r: currentRow, c });
+      const val = assoc[col.key] !== undefined && assoc[col.key] !== null ? assoc[col.key] : '';
+
+      ws[addr] = {
+        t: 's',
+        v: String(val),
+        s: {
+          fill: { fgColor: { rgb: isZebra ? "F0FDF4" : "FFFFFF" } },
+          font: { name: "Calibri", sz: 10, color: { rgb: "064E3B" } },
+          alignment: { vertical: "center", horizontal: "left" },
+          border: {
+            top: { style: "thin", color: { rgb: "D1FAE5" } },
+            bottom: { style: "thin", color: { rgb: "D1FAE5" } },
+            left: { style: "thin", color: { rgb: "D1FAE5" } },
+            right: { style: "thin", color: { rgb: "D1FAE5" } }
+          }
+        }
+      };
+      if (val && String(val).startsWith('0')) {
+        ws[addr].z = '@';
+      }
+    });
+    currentRow++;
+  }
+
+  // Définir la plage totale de la feuille
+  ws['!ref'] = xlsxLib.utils.encode_range({
+    s: { r: 0, c: 0 },
+    e: { r: currentRow - 1, c: OPTION_B_COLUMNS_INCUBE.length - 1 }
+  });
+  ws['!merges'] = merges;
+  ws['!rows'] = rows;
+
+  // Calcul des largeurs optimales (max entre Tableau 1 et Tableau 2 pour les 6 premières colonnes)
+  ws['!cols'] = OPTION_B_COLUMNS_INCUBE.map((col, idx) => {
+    let width = col.width || 16;
+    if (idx < OPTION_B_COLUMNS_ASSOCIES.length) {
+      width = Math.max(width, OPTION_B_COLUMNS_ASSOCIES[idx].width || 16);
+    }
+    return { wch: width };
+  });
+
+  // Figer la bannière et l'en-tête du Tableau 1
+  ws['!views'] = [{ state: 'frozen', ySplit: 2 }];
+
+  return ws;
+};
+
+// Feuille d'instructions détaillée pour l'Option B
+export const buildOptionBGuideSheet = (xlsxLib = XLSX) => {
+  const guideData = [
+    ["SECTION / TABLEAU", "COLONNE", "DESCRIPTION DU CHAMP", "EXEMPLE / FORMAT ATTENDU"],
+    ["1. Porteur & Startup", "Nom de l'incubé *", "Nom et prénom complet du porteur de projet (Champ obligatoire)", "Ex: Ayoub El Mansouri"],
+    ["1. Porteur & Startup", "N° Porteur de Projet", "Identifiant ou code de référence unique", "Ex: PP-2025-001"],
+    ["1. Porteur & Startup", "CIN", "Numéro de la Carte Nationale d'Identité du porteur", "Ex: AB123456"],
+    ["1. Porteur & Startup", "Situation familiale", "État civil du porteur", "Célibataire, Marié(e), Divorcé(e), Veuf(ve)"],
+    ["1. Porteur & Startup", "Email", "Adresse email de contact pour alertes & RDV", "Ex: porteur@gmail.com"],
+    ["1. Porteur & Startup", "Téléphone", "Numéro de téléphone mobile (le 0 initial est conservé)", "Ex: 0612345678"],
+    ["1. Porteur & Startup", "Raison sociale", "Nom commercial ou raison sociale de la startup", "Ex: InnovTech Solutions SARL"],
+    ["1. Porteur & Startup", "Registre du Commerce (RC)", "Numéro d'immatriculation au Registre du Commerce", "Ex: 124580"],
+    ["1. Porteur & Startup", "Statut juridique", "Forme juridique légale de la structure", "Auto-entrepreneur, SARL, SARL AU, ou Autre"],
+    ["1. Porteur & Startup", "Phase du projet", "Étape d'avancement actuelle de la startup", "Idéation, Lancement, Croissance, Maturité"],
+    ["1. Porteur & Startup", "Promotion", "Cohorte / Session d'incubation IDS", "Promotion 1, Promotion 2, Promotion 3..."],
+    ["1. Porteur & Startup", "Accompagnateur référent", "Nom du coach ou mentor IDS assigné", "Ex: Karim Benali"],
+    ["1. Porteur & Startup", "Date de démarrage", "Date de début d'accompagnement IDS", "Format AAAA-MM-JJ (ex: 2025-01-15)"],
+    ["1. Porteur & Startup", "Province", "Province ou préfecture", "Ex: Salé, Rabat, Kénitra..."],
+    ["1. Porteur & Startup", "Ville", "Ville de localisation", "Ex: Salé, Rabat, Casablanca..."],
+    ["1. Porteur & Startup", "Genre", "Genre du porteur de projet", "Homme ou Femme"],
+    ["1. Porteur & Startup", "Secteur d'activité", "Domaine économique d'activité", "GREEN-TECH, E-Commerce, Intelligence Artificielle..."],
+    ["1. Porteur & Startup", "Date de naissance", "Date de naissance du porteur", "Format AAAA-MM-JJ (ex: 1995-04-12)"],
+    ["1. Porteur & Startup", "Âge", "Âge calculé automatiquement ou saisi", "Ex: 30"],
+    ["1. Porteur & Startup", "Niveau d'étude", "Dernier diplôme ou niveau académique", "Bac+5 (Master / Ingénieur), Bac+3, Bac+2..."],
+    ["1. Porteur & Startup", "N° Badge RFID", "Identifiant du badge physique pour tourniquets", "Ex: 0012345678"],
+    ["2. Associés & Partenaires", "Nom Incubé ou N° PP *", "Rattachement au porteur principal du Tableau 1 (Obligatoire)", "Ex: Ayoub El Mansouri ou PP-2025-001"],
+    ["2. Associés & Partenaires", "Nom & prénom de l'associé *", "Nom complet de l'associé / partenaire (Obligatoire)", "Ex: Sara Tazi"],
+    ["2. Associés & Partenaires", "CIN Associé", "Carte Nationale d'Identité de l'associé", "Ex: CD112233"],
+    ["2. Associés & Partenaires", "Fonction (Rôle)", "Rôle / Poste de l'associé au sein de la startup", "Ex: Co-gérante, CTO, Directeur Technique..."],
+    ["2. Associés & Partenaires", "Téléphone Associé", "Numéro de téléphone de contact", "Ex: 0662345678"],
+    ["2. Associés & Partenaires", "N° Badge RFID Associé", "Badge physique de contrôle d'accès tourniquet IDS", "Ex: 0098765432"]
+  ];
+
+  const ws = xlsxLib.utils.aoa_to_sheet(guideData);
+  ws['!cols'] = [{ wch: 26 }, { wch: 28 }, { wch: 48 }, { wch: 45 }];
+  applyIdsTableStyle(ws, guideData.length - 1, false);
+  return ws;
+};
+
+// Création d'un classeur complet Option B (Feuille Infos Générales + Feuille Guide)
+export const buildOptionBWorkbook = (incubesList = [], isTemplate = false, xlsxLib = XLSX) => {
+  const wb = xlsxLib.utils.book_new();
+  const wsInfos = buildOptionBSheet(incubesList, isTemplate, xlsxLib);
+  xlsxLib.utils.book_append_sheet(wb, wsInfos, "Infos Générales");
+
+  const wsGuide = buildOptionBGuideSheet(xlsxLib);
+  xlsxLib.utils.book_append_sheet(wb, wsGuide, "Guide & Instructions");
+
+  return wb;
+};
+
+// Extraction intelligente des deux tableaux superposés Option B
+export const parseStackedOptionBSheet = (worksheet, xlsxLib = XLSX) => {
+  if (!worksheet) return null;
+  const matrix = xlsxLib.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+  if (!matrix || matrix.length === 0) return null;
+
+  // 1. Détecter l'en-tête du Tableau 1 (Incubés / Startup)
+  let incubeHeaderRowIdx = -1;
+  let incubeColsMap = {};
+  let maxIncMatches = 0;
+
+  for (let r = 0; r < Math.min(matrix.length, 20); r++) {
+    const row = matrix[r] || [];
+    let matches = 0;
+    const tempMap = {};
+    for (let c = 0; c < row.length; c++) {
+      const ck = cleanKey(row[c]);
+      if (!ck) continue;
+      for (const colDef of OPTION_B_COLUMNS_INCUBE) {
+        const colCk = cleanKey(colDef.label);
+        if (ck === colCk || (ck.length >= 4 && (colCk.includes(ck) || ck.includes(colCk)))) {
+          tempMap[c] = colDef.key;
+          matches++;
+          break;
+        }
+      }
+    }
+    if (matches >= 4 && matches > maxIncMatches) {
+      maxIncMatches = matches;
+      incubeHeaderRowIdx = r;
+      incubeColsMap = tempMap;
+    }
+  }
+
+  if (incubeHeaderRowIdx === -1) {
+    return null; // Pas un tableau Option B valide
+  }
+
+  // 2. Détecter l'en-tête du Tableau 2 (Associés & Partenaires) situé APRÈS incubeHeaderRowIdx
+  let assocHeaderRowIdx = -1;
+  let assocColsMap = {};
+
+  for (let r = incubeHeaderRowIdx + 1; r < matrix.length; r++) {
+    const row = matrix[r] || [];
+    let matches = 0;
+    const tempMap = {};
+    for (let c = 0; c < row.length; c++) {
+      const ck = cleanKey(row[c]);
+      if (!ck) continue;
+      for (const colDef of OPTION_B_COLUMNS_ASSOCIES) {
+        const colCk = cleanKey(colDef.label);
+        if (ck === colCk || (ck.length >= 4 && (colCk.includes(ck) || ck.includes(colCk)))) {
+          tempMap[c] = colDef.key;
+          matches++;
+          break;
+        }
+      }
+    }
+    if (matches >= 2) {
+      assocHeaderRowIdx = r;
+      assocColsMap = tempMap;
+      break;
+    }
+  }
+
+  // 3. Extraire les incubés entre incubeHeaderRowIdx et assocHeaderRowIdx
+  const endIncubeRow = assocHeaderRowIdx !== -1 ? assocHeaderRowIdx : matrix.length;
+  const incubes = [];
+
+  for (let r = incubeHeaderRowIdx + 1; r < endIncubeRow; r++) {
+    const row = matrix[r] || [];
+    const firstCell = String(row[0] || '').trim();
+    if (firstCell.includes('ASSOCIÉS') || firstCell.includes('ASSOCIES') || firstCell.includes('2.')) {
+      break;
+    }
+
+    const inc = {};
+    let hasData = false;
+
+    for (const [colIdx, key] of Object.entries(incubeColsMap)) {
+      const val = row[colIdx];
+      if (val !== undefined && val !== null && String(val).trim() !== '') {
+        let v = String(val).trim();
+        if (key === 'date_naissance' || key === 'date_demarrage') {
+          v = formatExcelDate(val);
+        }
+        inc[key] = v;
+        hasData = true;
+      }
+    }
+
+    if (hasData && (inc.nom_incube || inc.pp_numero || inc.cin || inc.raison_sociale)) {
+      inc.associes = [];
+      incubes.push(inc);
+    }
+  }
+
+  // 4. Extraire les associés à partir de assocHeaderRowIdx + 1
+  const associesList = [];
+  if (assocHeaderRowIdx !== -1) {
+    for (let r = assocHeaderRowIdx + 1; r < matrix.length; r++) {
+      const row = matrix[r] || [];
+      const assoc = {};
+      let hasData = false;
+
+      for (const [colIdx, key] of Object.entries(assocColsMap)) {
+        const val = row[colIdx];
+        if (val !== undefined && val !== null && String(val).trim() !== '') {
+          assoc[key] = String(val).trim();
+          hasData = true;
+        }
+      }
+
+      if (hasData && (assoc.nom || assoc.cin || assoc.fonction)) {
+        associesList.push(assoc);
+      }
+    }
+  }
+
+  // 5. Associer les associés à leurs incubés respectifs
+  associesList.forEach(assoc => {
+    let target = null;
+    const ref = cleanKey(assoc.incube_ref);
+
+    if (ref) {
+      target = incubes.find(i => {
+        const n = cleanKey(i.nom_incube);
+        const p = cleanKey(i.pp_numero);
+        return (n && (n === ref || n.includes(ref) || ref.includes(n))) ||
+               (p && (p === ref || p.includes(ref) || ref.includes(p)));
+      });
+    }
+
+    if (!target && incubes.length === 1) {
+      target = incubes[0];
+    }
+
+    if (target) {
+      target.associes.push({
+        nom: assoc.nom || '',
+        cin: assoc.cin || '',
+        fonction: assoc.fonction || '',
+        tel: assoc.tel || '',
+        badge_id: assoc.badge_id || ''
+      });
+    }
+  });
+
+  return incubes.length > 0 ? incubes : null;
+};
+
 // Normalisation des chaînes pour matcher les noms de colonnes sans accents/casse
 export const cleanKey = (str) => {
   if (!str) return '';
@@ -118,7 +585,7 @@ export const formatExcelDate = (val) => {
 export const MAPPINGS = {
   incube: {
     nom_incube: ['nom_incube', 'nom', 'nomdelincube', 'nomincube', 'porteur', 'nomporteur', 'nomcomplet', 'nometprenom'],
-    cin: ['cin', 'cni', 'cnie', 'cartenationale', 'cartenationaledidentite', 'cinporteur', 'numcin', 'nocin', 'numcni', 'nocni', 'identite', 'pieceidentite'],
+    cin: ['cin', 'cni', 'cnie', 'cartenationale', 'cartenationaledidentite', 'cinporteur', 'numcin', 'nocin', 'numcni', 'nocni', 'identite', 'pieceidentite', 'cartedidentite'],
     email: ['email', 'mail', 'courriel', 'adresseemail', 'e-mail'],
     telephone: ['telephone', 'tel', 'gsm', 'mobile', 'phone', 'contact'],
     genre: ['genre', 'sexe', 'civilite'],
@@ -128,16 +595,16 @@ export const MAPPINGS = {
     situation_familiale: ['situation_familiale', 'situation', 'situationfamiliale', 'etatcivil'],
     raison_sociale: ['raison_sociale', 'raisonsociale', 'societe', 'entreprise', 'projet', 'nomprojet', 'startup', 'structure'],
     statut_juridique: ['statut_juridique', 'statut', 'formejuridique', 'statutjuridique', 'statutlegal'],
-    pp_numero: ['pp_numero', 'pp', 'nopp', 'npp', 'numeropp', 'numpp', 'codepp', 'identifiant'],
-    rc: ['rc', 'registrecommerce', 'registredecommerce', 'numrc'],
-    phase_projet: ['phase_projet', 'phase', 'phaseprojet', 'etape', 'stadedeprojet', 'stade'],
+    pp_numero: ['pp_numero', 'pp', 'nopp', 'npp', 'numeropp', 'numpp', 'codepp', 'identifiant', 'nporteurdeprojet', 'porteurdeprojet'],
+    rc: ['rc', 'registrecommerce', 'registredecommerce', 'numrc', 'registreducommercerc', 'registreducommerce'],
+    phase_projet: ['phase_projet', 'phase', 'phaseprojet', 'etape', 'stadedeprojet', 'stade', 'phaseduprojet'],
     secteur_activite: ['secteur_activite', 'secteur', 'activite', 'domaine', 'secteuractivite', 'domainedactivite', 'secteurdactivite'],
     province: ['province', 'prefecture', 'region'],
     ville: ['ville', 'cite', 'commune'],
     promotion: ['promotion', 'promo', 'promotion_nom', 'nopromotion', 'cohorte', 'session'],
-    accompagnateur: ['accompagnateur', 'coach', 'responsable', 'mentore', 'referent'],
+    accompagnateur: ['accompagnateur', 'coach', 'responsable', 'mentore', 'referent', 'accompagnateurreferent'],
     date_demarrage: ['date_demarrage', 'datededemarrage', 'datedebut', 'debut', 'date', 'datedelancement'],
-    badge_id: ['badge_id', 'badge', 'badgerfid', 'rfid', 'numérobadge', 'numerobadge', 'codebadge', 'badgeacces'],
+    badge_id: ['badge_id', 'badge', 'badgerfid', 'rfid', 'numérobadge', 'numerobadge', 'codebadge', 'badgeacces', 'nbadgerfid'],
     associes: ['associes', 'partenaires', 'co-fondateurs', 'cofondateurs']
   },
   formation: {
@@ -150,10 +617,12 @@ export const MAPPINGS = {
     attestation: ['attestation', 'certificat', 'valide']
   },
   associes: {
-    nom: ['nom', 'nometprenom', 'nom_prenom', 'nomcomplet'],
-    cin: ['cin', 'cnie', 'carte', 'id'],
-    fonction: ['fonction', 'role', 'poste', 'titre'],
-    tel: ['tel', 'telephone', 'contact'],
+    incube_ref: ['incube_ref', 'nomincube', 'nom_incube', 'pp', 'pp_numero', 'nomincubeounpp', 'porteur', 'ref_incube'],
+    nom: ['nom', 'nometprenom', 'nom_prenom', 'nomcomplet', 'nometprenomdelassocie', 'nomdelassocie', 'associe'],
+    cin: ['cin', 'cnie', 'carte', 'id', 'cinassocie', 'cni'],
+    fonction: ['fonction', 'role', 'poste', 'titre', 'fonctionrole'],
+    tel: ['tel', 'telephone', 'contact', 'telephoneassocie', 'gsm', 'mobile'],
+    badge_id: ['badge_id', 'badge', 'badgerfid', 'rfid', 'nbadgerfidassocie', 'nbadgerfid', 'numerobadge']
   },
   materiel: {
     incube_ref: ['incube_ref', 'nom_incube', 'nomincube', 'nom', 'porteur', 'pp_numero', 'pp', 'projet', 'ref_incube', 'incubé'],
@@ -522,8 +991,21 @@ export const readExcelFile = async (file, type = 'incube') => {
 
         const ws = workbook.Sheets[targetSheetName];
 
-        // 2. Si c'est un incubé, vérifier aussi s'il y a une fiche verticale
+        // 2. Si c'est un incubé :
         if (type === 'incube') {
+          // A. Vérifier en priorité absolue la structure Option B superposée (Tableau 1 Porteur + Tableau 2 Associés)
+          const stacked = parseStackedOptionBSheet(ws, XLSX);
+          if (stacked && stacked.length > 0) {
+            return resolve(stacked);
+          }
+          for (const sName of workbook.SheetNames) {
+            const sStacked = parseStackedOptionBSheet(workbook.Sheets[sName], XLSX);
+            if (sStacked && sStacked.length > 0) {
+              return resolve(sStacked);
+            }
+          }
+
+          // B. Sinon, vérifier s'il y a une fiche verticale
           const vert = extractVerticalIncubeInfo(ws, XLSX);
           if (vert && (vert.nom_incube || vert.pp_numero || vert.raison_sociale)) {
             return resolve([vert]);
@@ -613,6 +1095,11 @@ export const mapExcelRows = (rawRows, type) => {
         mapped[targetField] = val;
       }
     }
+
+    if (rawRow.associes && Array.isArray(rawRow.associes)) {
+      mapped.associes = rawRow.associes;
+    }
+
     return mapped;
   });
 };
@@ -623,6 +1110,13 @@ export const mapRowsToFields = mapExcelRows;
 // Générer et télécharger des modèles Excel (.xlsx) 100% VIERGES (sans fausses données de démo) et stylisés aux couleurs IDS
 export const downloadTemplate = async (type) => {
   const XLSX = await loadXLSX();
+
+  // Pour les incubés, générer la structure officielle Option B (Tableau Porteur + Tableau Associés superposés, 100% vierge)
+  if (type === 'incube') {
+    const wb = buildOptionBWorkbook([], true, XLSX);
+    XLSX.writeFile(wb, 'modele_import_incubes_vierge.xlsx');
+    return;
+  }
 
   const templates = {
     incube: {
@@ -846,8 +1340,13 @@ export const readAllWorkbookSheets = async (file) => {
             }
           }
 
-          // 2. Fiche incubé verticale
+          // 2. Fiche Option B (Tableau 1 + Tableau 2 superposés) ou Fiche verticale
           if (sClean.includes('info') || sClean.includes('general') || sClean.includes('incube')) {
+            const stacked = parseStackedOptionBSheet(ws, XLSX);
+            if (stacked && stacked.length > 0) {
+              sheets[sheetName] = stacked;
+              continue;
+            }
             const vert = extractVerticalIncubeInfo(ws, XLSX);
             if (vert && (vert.nom_incube || vert.pp_numero || vert.raison_sociale)) {
               sheets[sheetName] = [vert];
@@ -879,13 +1378,9 @@ export const exportFullIncubeTemplate = async () => {
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
   };
 
-  // 1. Infos Générales
-  addStyledSheet("1. Infos Générales", [
-    "Nom de l'incubé *", "CIN", "N° PP", "Email", "Téléphone", "Genre", "Date de naissance", "Âge",
-    "Niveau d'étude", "Situation familiale", "Raison sociale", "Statut juridique", "RC", "Phase du projet",
-    "Secteur d'activité", "Province", "Ville", "Promotion", "Accompagnateur", "Date de démarrage",
-    "N° Badge RFID", "Associés"
-  ]);
+  // 1. Infos Générales & Associés (Option B superposée 100% vierge)
+  const wsOptionB = buildOptionBSheet([], true, XLSX);
+  XLSX.utils.book_append_sheet(wb, wsOptionB, "1. Infos Générales");
 
   // 2. Matériel
   addStyledSheet("2. Matériel", [
@@ -919,18 +1414,13 @@ export const exportFullIncubeTemplate = async () => {
     "Mois *", "Année *", "Heures présence", "Taux présence (%)", "Initiatives", "Observations"
   ]);
 
-  // 8. Associés
-  addStyledSheet("8. Associés", [
-    "Nom & prénom *", "CIN", "Fonction", "Tel"
-  ]);
-
-  // 9. Fiche Technique
-  addStyledSheet("9. Fiche Technique", [
+  // 8. Fiche Technique
+  addStyledSheet("8. Fiche Technique", [
     "N° Ordre", "Date", "Statut Juridique", "État d'avancement", "Anomalie signalée", "Déclaration d'échec", "Observations"
   ]);
 
-  // 10. Formations & Ateliers
-  addStyledSheet("10. Formations", [
+  // 9. Formations & Ateliers
+  addStyledSheet("9. Formations", [
     "Thème *", "Formateur", "Date formation", "Heures", "Présence", "Attestation"
   ]);
 
@@ -1337,64 +1827,13 @@ export const parseGlobalPromotionWorkbook = (allSheets, fileName = '') => {
   return uniqueItems;
 };
 
-// Exporter la liste des incubés existants vers un classeur Excel propre, bien structuré et aéré
+// Exporter la liste des incubés existants vers un classeur Excel officiel Option B (Tableau 1 Porteurs & Tableau 2 Associés)
 export const exportIncubesListToExcel = async (incubesList = [], filename = 'annuaire_incubes.xlsx') => {
   const XLSX = await loadXLSX();
   if (!incubesList || incubesList.length === 0) {
     throw new Error("Aucun incubé à exporter");
   }
 
-  const data = incubesList.map((inc, index) => {
-    let nbAssocies = 0;
-    try {
-      const arr = typeof inc.associes === 'string' ? JSON.parse(inc.associes) : inc.associes;
-      if (Array.isArray(arr)) nbAssocies = arr.length;
-    } catch (e) { nbAssocies = 0; }
-
-    return {
-      "N°": index + 1,
-      "Nom de l'incubé": inc.nom_incube || '',
-      "CNI / CIN": inc.cin || '',
-      "N° PP": inc.pp_numero || '',
-      "Email": inc.email || '',
-      "Téléphone": inc.telephone || '',
-      "Raison sociale": inc.raison_sociale || '',
-      "Phase du projet": inc.phase_projet || '',
-      "Statut juridique": inc.statut_juridique || '',
-      "Registre du Commerce (RC)": inc.rc || '',
-      "Secteur d'activité": inc.secteur_activite || '',
-      "Promotion": inc.promotion || '',
-      "Accompagnateur": inc.accompagnateurAdmin 
-        ? `${inc.accompagnateurAdmin.prenom} ${inc.accompagnateurAdmin.nom}`.trim() 
-        : (inc.accompagnateur || ''),
-      "Date de démarrage": inc.date_demarrage ? String(inc.date_demarrage).split('T')[0] : '',
-      "Ville": inc.ville || '',
-      "Province": inc.province || '',
-      "Genre": inc.genre || '',
-      "Date de naissance": inc.date_naissance ? String(inc.date_naissance).split('T')[0] : '',
-      "Âge": inc.age || '',
-      "Situation familiale": inc.situation_familiale || '',
-      "Niveau d'étude": inc.niveau_etude || '',
-      "N° Badge RFID": inc.badge_id || '',
-      "Nb Associés": nbAssocies,
-      "Compte Portail": inc.compteUtilisateur ? (inc.compteUtilisateur.actif ? 'Actif' : 'En attente') : (inc.email ? 'Non activé' : 'Sans email'),
-      "Statut": inc.est_suspendu ? 'Suspendu' : 'Actif'
-    };
-  });
-
-  const ws = XLSX.utils.json_to_sheet(data);
-  const keys = Object.keys(data[0]);
-  ws['!cols'] = keys.map(k => {
-    const maxValLen = Math.max(
-      ...data.map(row => (row[k] !== undefined && row[k] !== null ? String(row[k]).length : 0))
-    );
-    return { wch: Math.max(k.length + 4, maxValLen + 3, 14) };
-  });
-
-  // Appliquer le style visuel officiel IDS (Bleu marine, en-tête figé, bordures, zébrures)
-  applyIdsTableStyle(ws, data.length, false);
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Incubés IDS");
+  const wb = buildOptionBWorkbook(incubesList, false, XLSX);
   XLSX.writeFile(wb, filename);
 };

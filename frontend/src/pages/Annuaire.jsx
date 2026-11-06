@@ -232,6 +232,15 @@ export default function Annuaire() {
       date_demarrage: row.date_demarrage || prev.date_demarrage,
       promotion: row.promotion || row.promo || prev.promotion,
       secteur_activite: row.secteur_activite || row.secteur || prev.secteur_activite,
+      rc: row.rc || row.registre_commerce || prev.rc,
+      province: row.province || prev.province,
+      ville: row.ville || prev.ville,
+      genre: row.genre || prev.genre,
+      date_naissance: row.date_naissance || prev.date_naissance,
+      age: row.age || prev.age,
+      niveau_etude: row.niveau_etude || prev.niveau_etude,
+      badge_id: row.badge_id || prev.badge_id,
+      associes: (Array.isArray(row.associes) && row.associes.length > 0) ? row.associes : prev.associes,
     }));
     toast.success(`Champs remplis pour ${row.nom_incube || "l'incubé"} !`);
   };

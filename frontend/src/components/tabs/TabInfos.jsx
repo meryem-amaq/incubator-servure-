@@ -145,6 +145,9 @@ export default function TabInfos({ incube, onUpdate }) {
       promotion: row.promotion || row.promo || prev.promotion,
       age: row.date_naissance ? calculateAge(row.date_naissance) : (row.age || prev.age),
       date_naissance: row.date_naissance || prev.date_naissance,
+      niveau_etude: row.niveau_etude || prev.niveau_etude,
+      badge_id: row.badge_id || prev.badge_id,
+      associes: (Array.isArray(row.associes) && row.associes.length > 0) ? row.associes : prev.associes,
     }));
     toast.success('Champs mis à jour depuis le fichier Excel ! Cliquez sur Enregistrer.');
   };
