@@ -407,7 +407,7 @@ export default function TabInfos({ incube, onUpdate }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="label">Nom de l'incubé *</label>
               <input
@@ -415,18 +415,6 @@ export default function TabInfos({ incube, onUpdate }) {
                 value={form.nom_incube || ''}
                 onChange={f('nom_incube')}
                 required
-              />
-            </div>
-            <div>
-              <label className="label">🪪 CNI / CIN (Carte d'Identité)</label>
-              <input
-                className="input uppercase font-mono tracking-wider font-semibold"
-                placeholder="Ex: AB123456"
-                value={form.cin || ''}
-                onChange={(e) => {
-                  const val = e.target.value.toUpperCase();
-                  setForm(prev => ({ ...prev, cin: val }));
-                }}
               />
             </div>
             <div>

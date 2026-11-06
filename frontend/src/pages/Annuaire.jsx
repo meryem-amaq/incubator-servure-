@@ -1164,7 +1164,7 @@ export default function Annuaire() {
                   <div className="mt-3.5 space-y-1.5 text-xs">
                     <div className="grid grid-cols-2 gap-x-2">
                       <div className="min-w-0"><span className="text-slate-500 dark:text-dark-500">Statut :</span> <span className="text-slate-700 dark:text-dark-300 font-medium">{inc.statut_juridique || '—'}</span></div>
-                      <div className="min-w-0"><span className="text-slate-500 dark:text-dark-500">{inc.cin ? 'CNI :' : 'N° PP :'}</span> <span className="text-slate-700 dark:text-dark-300 font-medium font-mono">{inc.cin || inc.pp_numero || '—'}</span></div>
+                      <div className="min-w-0"><span className="text-slate-500 dark:text-dark-500">N° PP :</span> <span className="text-slate-700 dark:text-dark-300 font-medium">{inc.pp_numero || '—'}</span></div>
                     </div>
                     <div className="grid grid-cols-2 gap-x-2">
                       <div className="min-w-0"><span className="text-slate-500 dark:text-dark-500">Début :</span> <span className="text-slate-700 dark:text-dark-300 font-medium">{inc.date_demarrage ? new Date(inc.date_demarrage).toLocaleDateString('fr-FR') : '—'}</span></div>
@@ -1459,9 +1459,8 @@ export default function Annuaire() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div><label className="label">Nom de l'incubé *</label><input className="input" placeholder="Ex: Mohamed Alami" value={form.nom_incube} onChange={e => setForm({ ...form, nom_incube: e.target.value })} required /></div>
-                  <div><label className="label">🪪 CNI / CIN</label><input className="input uppercase font-mono tracking-wider font-semibold" placeholder="Ex: AB123456" value={form.cin || ''} onChange={e => setForm({ ...form, cin: e.target.value.toUpperCase() })} /></div>
                   <div><label className="label">N° PP</label><input className="input" placeholder="Ex: PP-2024-001" value={form.pp_numero} onChange={e => setForm({ ...form, pp_numero: e.target.value })} /></div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
