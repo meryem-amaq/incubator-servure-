@@ -929,6 +929,10 @@ exports.create = async (req, res) => {
     delete data.photo;
     delete data.password;
 
+    if (data.cin !== undefined) {
+      data.cin = data.cin ? String(data.cin).trim().toUpperCase() : null;
+    }
+
     // --- Validation Badge RFID & Auto-attribution Matricule (Étape 1 : Création Startup) ---
     if (data.badge_id && String(data.badge_id).trim()) {
       data.badge_id = tourniquetService.normalizeBadgeId(data.badge_id);
@@ -1032,6 +1036,7 @@ exports.bulkCreate = async (req, res) => {
 
       toInsert.push({
         nom_incube: String(item.nom_incube).trim(),
+        cin: item.cin ? String(item.cin).trim().toUpperCase() : (item.cni ? String(item.cni).trim().toUpperCase() : null),
         email: item.email || item.mail || null,
         telephone: item.telephone || item.tel || null,
         raison_sociale: item.raison_sociale || '',
@@ -1100,6 +1105,9 @@ exports.update = async (req, res) => {
     }
 
     // Nettoyer les valeurs vides pour la base de données
+    if (data.cin !== undefined) {
+      data.cin = data.cin ? String(data.cin).trim().toUpperCase() : null;
+    }
     if (data.date_demarrage === '' || data.date_demarrage === 'null') {
       data.date_demarrage = null;
     }

@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Search, Plus, Users, Briefcase, TrendingUp, Filter, X, Camera, Upload, FileSpreadsheet, Calendar, AlertCircle, CheckCircle2, XCircle, Clock, Check, Bell, BellRing, RotateCw, UserCheck, KeyRound, Mail, GraduationCap, ClipboardList, Eye, UserX } from 'lucide-react';
+import { Search, Plus, Users, Briefcase, TrendingUp, Filter, X, Camera, Upload, FileSpreadsheet, Download, Calendar, AlertCircle, CheckCircle2, XCircle, Clock, Check, Bell, BellRing, RotateCw, UserCheck, KeyRound, Mail, GraduationCap, ClipboardList, Eye, UserX } from 'lucide-react';
 import api, { getPhotoUrl } from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import ExcelImportModal from '../components/common/ExcelImportModal';
 import ExcelGlobalImportModal from '../components/common/ExcelGlobalImportModal';
+import { exportIncubesListToExcel } from '../utils/excelHelper';
 import { SECTEURS_ACTIVITE } from '../data/constants';
 import toast from 'react-hot-toast';
 
@@ -111,6 +112,7 @@ export default function Annuaire() {
   const [activatingEmail, setActivatingEmail] = useState(false);
   const [form, setForm] = useState({
     nom_incube: '',
+    cin: '',
     email: '',
     telephone: '',
     raison_sociale: '',
@@ -217,6 +219,7 @@ export default function Annuaire() {
     setForm(prev => ({
       ...prev,
       nom_incube: row.nom_incube || prev.nom_incube,
+      cin: row.cin || row.cni || prev.cin,
       email: row.email || row.mail || prev.email,
       telephone: row.telephone || row.tel || prev.telephone,
       raison_sociale: row.raison_sociale || prev.raison_sociale,
@@ -486,6 +489,7 @@ export default function Annuaire() {
   const filtered = incubes.filter(i => {
     const matchesSearch = !search || 
       i.nom_incube?.toLowerCase().includes(search.toLowerCase()) ||
+      i.cin?.toLowerCase().includes(search.toLowerCase()) ||
       i.raison_sociale?.toLowerCase().includes(search.toLowerCase()) ||
       i.pp_numero?.toLowerCase().includes(search.toLowerCase()) ||
       i.promotion?.toLowerCase().includes(search.toLowerCase()) ||
@@ -955,6 +959,27 @@ export default function Annuaire() {
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
+            className="btn btn-secondary btn-sm flex items-center gap-1 border-blue-500/40 text-blue-700 dark:text-blue-400 hover:bg-blue-500/10 font-bold !py-1.5 !px-2.5 !text-xs rounded-xl shadow-xs whitespace-nowrap"
+            onClick={async () => {
+              try {
+                if (filtered.length === 0) {
+                  toast.error("Aucun incubé à exporter");
+                  return;
+                }
+                toast.loading("Génération du fichier Excel...", { id: 'export-excel' });
+                await exportIncubesListToExcel(filtered, `annuaire_incubes_${new Date().toISOString().split('T')[0]}.xlsx`);
+                toast.success(`${filtered.length} incubé(s) exporté(s) avec succès !`, { id: 'export-excel' });
+              } catch (e) {
+                toast.error(e.message || "Erreur lors de l'export Excel", { id: 'export-excel' });
+              }
+            }}
+            title="Exporter la sélection actuelle des incubés vers Excel (format propre et aéré)"
+          >
+            <Download size={14} className="text-blue-500" />
+            <span>Exporter ({filtered.length})</span>
+          </button>
+          <button
+            type="button"
             className="btn btn-secondary btn-sm flex items-center gap-1 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 font-bold !py-1.5 !px-2.5 !text-xs rounded-xl shadow-xs whitespace-nowrap"
             onClick={() => setShowExcelModal(true)}
             title="Importer une liste complète d'incubés depuis un fichier Excel"
@@ -1139,7 +1164,7 @@ export default function Annuaire() {
                   <div className="mt-3.5 space-y-1.5 text-xs">
                     <div className="grid grid-cols-2 gap-x-2">
                       <div className="min-w-0"><span className="text-slate-500 dark:text-dark-500">Statut :</span> <span className="text-slate-700 dark:text-dark-300 font-medium">{inc.statut_juridique || '—'}</span></div>
-                      <div className="min-w-0"><span className="text-slate-500 dark:text-dark-500">N° PP :</span> <span className="text-slate-700 dark:text-dark-300 font-medium">{inc.pp_numero || '—'}</span></div>
+                      <div className="min-w-0"><span className="text-slate-500 dark:text-dark-500">{inc.cin ? 'CNI :' : 'N° PP :'}</span> <span className="text-slate-700 dark:text-dark-300 font-medium font-mono">{inc.cin || inc.pp_numero || '—'}</span></div>
                     </div>
                     <div className="grid grid-cols-2 gap-x-2">
                       <div className="min-w-0"><span className="text-slate-500 dark:text-dark-500">Début :</span> <span className="text-slate-700 dark:text-dark-300 font-medium">{inc.date_demarrage ? new Date(inc.date_demarrage).toLocaleDateString('fr-FR') : '—'}</span></div>
@@ -1434,8 +1459,9 @@ export default function Annuaire() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div><label className="label">Nom de l'incubé *</label><input className="input" placeholder="Ex: Mohamed Alami" value={form.nom_incube} onChange={e => setForm({ ...form, nom_incube: e.target.value })} required /></div>
+                  <div><label className="label">🪪 CNI / CIN</label><input className="input uppercase font-mono tracking-wider font-semibold" placeholder="Ex: AB123456" value={form.cin || ''} onChange={e => setForm({ ...form, cin: e.target.value.toUpperCase() })} /></div>
                   <div><label className="label">N° PP</label><input className="input" placeholder="Ex: PP-2024-001" value={form.pp_numero} onChange={e => setForm({ ...form, pp_numero: e.target.value })} /></div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

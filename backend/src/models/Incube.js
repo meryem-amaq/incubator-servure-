@@ -7,6 +7,7 @@ const Incube = sequelize.define('Incube', {
   user_id: { type: DataTypes.INTEGER, allowNull: true, unique: true },
   admin_id: { type: DataTypes.INTEGER, allowNull: true },
   photo_path: { type: DataTypes.TEXT('medium') },
+  cin: { type: DataTypes.STRING(50), allowNull: true },
   pp_numero: { type: DataTypes.STRING(50) },
   nom_incube: { type: DataTypes.STRING(200), allowNull: false },
   email: { type: DataTypes.STRING(150), allowNull: true },

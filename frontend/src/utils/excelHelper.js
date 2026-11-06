@@ -70,6 +70,7 @@ export const formatExcelDate = (val) => {
 export const MAPPINGS = {
   incube: {
     nom_incube: ['nom_incube', 'nom', 'nomdelincube', 'nomincube', 'porteur', 'nomporteur', 'nomcomplet', 'nometprenom'],
+    cin: ['cin', 'cni', 'cnie', 'cartenationale', 'cartenationaledidentite', 'cinporteur', 'numcin', 'nocin', 'numcni', 'nocni', 'identite', 'pieceidentite'],
     email: ['email', 'mail', 'courriel', 'adresseemail', 'e-mail'],
     telephone: ['telephone', 'tel', 'gsm', 'mobile', 'phone', 'contact'],
     genre: ['genre', 'sexe', 'civilite'],
@@ -582,27 +583,49 @@ export const downloadTemplate = async (type) => {
       data: [
         {
           "Nom de l'incubé": "Mohamed Alami",
-          "Raison sociale": "BioTech Solutions SARL",
-          "Phase du projet": "Idéation",
-          "Statut juridique": "SARL",
+          "CNI / CIN": "AB123456",
           "N° PP": "PP-2025-001",
+          "Email": "mohamed.alami@biotech.ma",
+          "Téléphone": "0661234567",
+          "Genre": "Homme",
+          "Date de naissance": "1994-05-12",
+          "Âge": 31,
+          "Niveau d'étude": "Master 2",
           "Situation familiale": "Marié(e)",
-          "Promotion": "Promotion 1",
+          "Raison sociale": "BioTech Solutions SARL",
+          "Statut juridique": "SARL",
+          "RC": "124580",
+          "Phase du projet": "Idéation",
           "Secteur d'activité": "Intelligence Artificielle",
+          "Promotion": "Promotion 1",
           "Accompagnateur": "Karim Benali",
-          "Date de démarrage": "2025-01-15"
+          "Date de démarrage": "2025-01-15",
+          "Ville": "Casablanca",
+          "Province": "Casablanca",
+          "N° Badge RFID": "0012345678"
         },
         {
           "Nom de l'incubé": "Fatima Zahra Mansouri",
+          "CNI / CIN": "CD987654",
+          "N° PP": "PP-2025-002",
+          "Email": "fatima.mansouri@ecopack.ma",
+          "Téléphone": "0662345678",
+          "Genre": "Femme",
+          "Date de naissance": "1997-11-23",
+          "Âge": 28,
+          "Niveau d'étude": "Licence / Bac+3",
+          "Situation familiale": "Célibataire",
           "Raison sociale": "EcoPack Maroc",
           "Phase du projet": "Lancement",
           "Statut juridique": "Auto-entrepreneur",
-          "N° PP": "PP-2025-002",
-          "Situation familiale": "Célibataire",
-          "Promotion": "Promotion 2",
+          "RC": "985412",
           "Secteur d'activité": "GREEN-TECH",
+          "Promotion": "Promotion 2",
           "Accompagnateur": "Nadia Tazi",
-          "Date de démarrage": "2025-02-01"
+          "Date de démarrage": "2025-02-01",
+          "Ville": "Rabat",
+          "Province": "Rabat",
+          "N° Badge RFID": "0087654321"
         }
       ]
     },
@@ -775,6 +798,18 @@ export const downloadTemplate = async (type) => {
   if (!tpl) return;
 
   const ws = XLSX.utils.json_to_sheet(tpl.data);
+
+  // Auto-ajuster proprement la largeur de chaque colonne
+  if (tpl.data && tpl.data.length > 0) {
+    const keys = Object.keys(tpl.data[0]);
+    ws['!cols'] = keys.map(k => {
+      const maxValLen = Math.max(
+        ...tpl.data.map(row => (row[k] !== undefined && row[k] !== null ? String(row[k]).length : 0))
+      );
+      return { wch: Math.max(k.length + 4, maxValLen + 3, 14) };
+    });
+  }
+
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, tpl.sheetName);
   XLSX.writeFile(wb, tpl.filename);
@@ -833,6 +868,7 @@ export const exportFullIncubeTemplate = async () => {
   const wsInfos = XLSX.utils.json_to_sheet([
     {
       "Nom de l'incubé": "Mohamed Alami",
+      "CNI / CIN": "AB123456",
       "Email": "mohamed.alami@biotech.ma",
       "Téléphone": "0661234567",
       "Genre": "Homme",
@@ -1088,6 +1124,7 @@ export const exportGlobalPromotionTemplate = async () => {
   const wsIncubes = XLSX.utils.json_to_sheet([
     {
       "Nom de l'incubé": "Mohamed Alami",
+      "CNI / CIN": "AB123456",
       "Email": "mohamed.alami@biotech.ma",
       "Téléphone": "0661234567",
       "Genre": "Homme",
@@ -1111,6 +1148,7 @@ export const exportGlobalPromotionTemplate = async () => {
     },
     {
       "Nom de l'incubé": "Fatima Zahra Mansouri",
+      "CNI / CIN": "CD987654",
       "Email": "fatima.mansouri@ecopack.ma",
       "Téléphone": "0662345678",
       "Genre": "Femme",
@@ -1599,4 +1637,63 @@ export const parseGlobalPromotionWorkbook = (allSheets, fileName = '') => {
 
   // Renvoyer la liste dédoublonnée des incubés avec leurs détails
   return uniqueItems;
+};
+
+// Exporter la liste des incubés existants vers un classeur Excel propre, bien structuré et aéré
+export const exportIncubesListToExcel = async (incubesList = [], filename = 'annuaire_incubes.xlsx') => {
+  const XLSX = await loadXLSX();
+  if (!incubesList || incubesList.length === 0) {
+    throw new Error("Aucun incubé à exporter");
+  }
+
+  const data = incubesList.map((inc, index) => {
+    let nbAssocies = 0;
+    try {
+      const arr = typeof inc.associes === 'string' ? JSON.parse(inc.associes) : inc.associes;
+      if (Array.isArray(arr)) nbAssocies = arr.length;
+    } catch (e) { nbAssocies = 0; }
+
+    return {
+      "N°": index + 1,
+      "Nom de l'incubé": inc.nom_incube || '',
+      "CNI / CIN": inc.cin || '',
+      "N° PP": inc.pp_numero || '',
+      "Email": inc.email || '',
+      "Téléphone": inc.telephone || '',
+      "Raison sociale": inc.raison_sociale || '',
+      "Phase du projet": inc.phase_projet || '',
+      "Statut juridique": inc.statut_juridique || '',
+      "Registre du Commerce (RC)": inc.rc || '',
+      "Secteur d'activité": inc.secteur_activite || '',
+      "Promotion": inc.promotion || '',
+      "Accompagnateur": inc.accompagnateurAdmin 
+        ? `${inc.accompagnateurAdmin.prenom} ${inc.accompagnateurAdmin.nom}`.trim() 
+        : (inc.accompagnateur || ''),
+      "Date de démarrage": inc.date_demarrage ? String(inc.date_demarrage).split('T')[0] : '',
+      "Ville": inc.ville || '',
+      "Province": inc.province || '',
+      "Genre": inc.genre || '',
+      "Date de naissance": inc.date_naissance ? String(inc.date_naissance).split('T')[0] : '',
+      "Âge": inc.age || '',
+      "Situation familiale": inc.situation_familiale || '',
+      "Niveau d'étude": inc.niveau_etude || '',
+      "N° Badge RFID": inc.badge_id || '',
+      "Nb Associés": nbAssocies,
+      "Compte Portail": inc.compteUtilisateur ? (inc.compteUtilisateur.actif ? 'Actif' : 'En attente') : (inc.email ? 'Non activé' : 'Sans email'),
+      "Statut": inc.est_suspendu ? 'Suspendu' : 'Actif'
+    };
+  });
+
+  const ws = XLSX.utils.json_to_sheet(data);
+  const keys = Object.keys(data[0]);
+  ws['!cols'] = keys.map(k => {
+    const maxValLen = Math.max(
+      ...data.map(row => (row[k] !== undefined && row[k] !== null ? String(row[k]).length : 0))
+    );
+    return { wch: Math.max(k.length + 4, maxValLen + 3, 12) };
+  });
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Incubés IDS");
+  XLSX.writeFile(wb, filename);
 };
