@@ -7,9 +7,9 @@ import { getJourFerieInfo } from '../utils/joursFeries';
 
 export const SOUS_SALLES = {
   salle_reunion: [
-    { id: 'Salle 1', nom: 'Salle 1', description: 'Salle de réunion 1 (6-8 pers.)' },
-    { id: 'Salle 2', nom: 'Salle 2', description: 'Salle de réunion 2 (6-8 pers.)' },
-    { id: 'Salle 3', nom: 'Salle 3', description: 'Salle 3 (Grande salle 20+ pers.)' }
+    { id: 'Salle 1', nom: 'Salle 1', description: 'Salle de réunion 1' },
+    { id: 'Salle 2', nom: 'Salle 2', description: 'Salle de réunion 2' },
+    { id: 'Salle 3', nom: 'Salle 3', description: 'Grande salle de réunion' }
   ],
   fablab: [
     { id: 'Fablab 1', nom: 'Fablab 1 (Étage)', description: 'Atelier Principal • Impression 3D & Laser' },
@@ -570,7 +570,7 @@ export default function ReservationEspacePublique() {
                 >
                   {sousSallesList.map(s => (
                     <option key={s.id} value={s.id} className="bg-slate-900 text-white">
-                      {s.nom} — {s.description}
+                      {s.description || s.nom}
                     </option>
                   ))}
                 </select>
