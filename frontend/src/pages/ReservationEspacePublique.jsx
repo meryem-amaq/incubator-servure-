@@ -855,16 +855,16 @@ export default function ReservationEspacePublique() {
           ) : (
             <div className="space-y-1 pt-1 border-t border-slate-800">
               <label className="block text-xs font-bold text-slate-300 mb-1">
-                {espaceKey === 'salle_reunion'
-                  ? 'Objet de la réunion / Ordre du jour *'
-                  : 'Projet à réaliser / Objectif de la session *'}
+                {espaceKey === 'fablab'
+                  ? 'Projet à réaliser *'
+                  : 'Objet de la réservation *'}
               </label>
               <textarea
                 required
                 rows={2}
-                placeholder={espaceKey === 'salle_reunion'
-                  ? "Précisez l'objet de votre réunion ou les points à l'ordre du jour..."
-                  : "Décrivez les travaux ou le prototypage à réaliser lors de votre session au FabLab..."}
+                placeholder={espaceKey === 'fablab'
+                  ? "Décrivez le projet ou les travaux à réaliser lors de votre session au FabLab..."
+                  : "Précisez l'objet de votre réservation..."}
                 value={form.motif}
                 onChange={e => setForm({ ...form, motif: e.target.value })}
                 className="w-full bg-slate-800/80 border border-slate-700 text-white text-xs rounded-xl p-2.5 focus:border-amber-500 outline-none placeholder:text-slate-500"
@@ -1011,7 +1011,7 @@ export default function ReservationEspacePublique() {
                   </div>
 
                   {/* GUIDE SCROLL / STATUT DE LECTURE */}
-                  {!hasReadToBottom ? (
+                  {!hasReadToBottom && (
                     <div className="flex items-center justify-between text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5">
                       <div className="flex items-center gap-1.5">
                         <span className="animate-bounce">👇</span>
@@ -1029,11 +1029,6 @@ export default function ReservationEspacePublique() {
                       >
                         Aller en bas ↓
                       </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-2.5 animate-fadeIn">
-                      <span>✅</span>
-                      <span className="font-semibold">Règlement lu jusqu'au bout. Vous pouvez maintenant cocher la case d'acceptation ci-dessous.</span>
                     </div>
                   )}
                 </>
