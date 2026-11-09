@@ -850,25 +850,13 @@ export function KpiEconomique({ stats, section = 'all' }) {
 
   const renderAnalyseFinanciere = () => (
     <div className="card p-5 flex flex-col min-w-0 hover:border-emerald-500/40 transition-all shadow-sm">
-        <div className="flex flex-col gap-2.5 mb-4 pb-3 border-b border-slate-100 dark:border-dark-700/60">
-          {/* Ligne 1 : Titre principal à gauche <---> Légende Gains / Pertes à droite */}
-          <div className="flex items-center justify-between gap-3 min-w-0">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100 dark:border-dark-700/60">
+          {/* Bloc Gauche : Titre et Sous-titre */}
+          <div className="min-w-0">
             <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white uppercase tracking-tight whitespace-nowrap">
               ANALYSE FINANCIÈRE GLOBALE
             </h3>
-            <div className="inline-flex items-center gap-2.5 text-xs font-semibold bg-slate-50 dark:bg-dark-900/70 px-3 py-1 rounded-xl border border-slate-200/80 dark:border-dark-700/60 shrink-0 shadow-2xs">
-              <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm"></span> Gains
-              </span>
-              <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400 font-bold">
-                <span className="w-2 h-2 rounded-full bg-red-500 shadow-sm"></span> Pertes
-              </span>
-            </div>
-          </div>
-
-          {/* Ligne 2 : Sous-titre descriptif à gauche <---> Filtres déroulants à droite */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 min-w-0">
-            <p className="text-xs text-slate-500 dark:text-dark-400 truncate min-w-0">
+            <p className="text-xs text-slate-500 dark:text-dark-400 mt-1 truncate min-w-0">
               Gains et Pertes cumulés pour {selectedPeriod === 'annuel' ? 'les 12 mois de' : `le trimestre ${selectedPeriod} de`} l'année {selectedYear}
               {selectedStatut !== 'tous' ? (
                 <span className="font-bold text-emerald-600 dark:text-emerald-400"> — Statut : {selectedStatut}</span>
@@ -876,94 +864,104 @@ export function KpiEconomique({ stats, section = 'all' }) {
                 <span> — Tous les statuts juridiques</span>
               )}
             </p>
+          </div>
 
-            {/* Contrôles : Filtre Année, Filtre Statut Juridique, Filtre Période */}
-            <div className="flex items-center gap-2 shrink-0 flex-wrap">
-              {/* Sélecteur d'année sous forme de liste déroulante */}
-              <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-dark-900/80 px-2.5 py-1.5 rounded-xl border border-slate-200/80 dark:border-dark-700/60 shadow-xs hover:border-emerald-500/50 transition-colors">
-                <span className="text-xs font-semibold text-slate-500 dark:text-dark-400">Année :</span>
-                <div className="relative flex items-center">
-                  <select
-                    id="select-annee-financiere"
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(Number(e.target.value))}
-                    className="appearance-none bg-transparent text-slate-900 dark:text-white text-xs font-extrabold focus:outline-none cursor-pointer pr-4 pl-0.5 py-0.5"
-                  >
-                    {anneesDisponibles.map(yr => (
+          {/* Bloc Droite : Les filtres placés entre le titre et les deux couleurs (Gains / Pertes) */}
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            {/* 1. Sélecteur d'année */}
+            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-dark-900/80 px-2.5 py-1.5 rounded-xl border border-slate-200/80 dark:border-dark-700/60 shadow-xs hover:border-emerald-500/50 transition-colors">
+              <span className="text-xs font-semibold text-slate-500 dark:text-dark-400">Année :</span>
+              <div className="relative flex items-center">
+                <select
+                  id="select-annee-financiere"
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  className="appearance-none bg-transparent text-slate-900 dark:text-white text-xs font-extrabold focus:outline-none cursor-pointer pr-4 pl-0.5 py-0.5"
+                >
+                  {anneesDisponibles.map(yr => (
+                    <option
+                      key={yr}
+                      value={yr}
+                      className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white font-semibold py-1"
+                    >
+                      {yr}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute right-0 flex items-center text-slate-500 dark:text-dark-400">
+                  <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 20 20">
+                    <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Filtre Statut Juridique */}
+            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-dark-900/80 px-2.5 py-1.5 rounded-xl border border-slate-200/80 dark:border-dark-700/60 shadow-xs hover:border-blue-500/50 transition-colors">
+              <span className="text-xs font-semibold text-slate-500 dark:text-dark-400">Statut :</span>
+              <div className="relative flex items-center">
+                <select
+                  id="select-statut-financier"
+                  value={selectedStatut}
+                  onChange={(e) => setSelectedStatut(e.target.value)}
+                  className="appearance-none bg-transparent text-slate-900 dark:text-white text-xs font-extrabold focus:outline-none cursor-pointer pr-4 pl-0.5 py-0.5 max-w-[170px] truncate"
+                >
+                  <option value="tous" className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white font-semibold py-1">
+                    Tous ({formatDH(totalTousGainsForYear)})
+                  </option>
+                  {statutsDisponibles.map(st => {
+                    const stGains = totalsByStatutForYear[st] || 0;
+                    return (
                       <option
-                        key={yr}
-                        value={yr}
+                        key={st}
+                        value={st}
                         className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white font-semibold py-1"
                       >
-                        {yr}
+                        {st} ({formatDH(stGains)})
                       </option>
-                    ))}
-                  </select>
-                  <div className="pointer-events-none absolute right-0 flex items-center text-slate-500 dark:text-dark-400">
-                    <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 20 20">
-                      <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-                    </svg>
-                  </div>
+                    );
+                  })}
+                </select>
+                <div className="pointer-events-none absolute right-0 flex items-center text-slate-500 dark:text-dark-400">
+                  <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 20 20">
+                    <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                  </svg>
                 </div>
               </div>
+            </div>
 
-              {/* Filtre Statut Juridique */}
-              <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-dark-900/80 px-2.5 py-1.5 rounded-xl border border-slate-200/80 dark:border-dark-700/60 shadow-xs hover:border-blue-500/50 transition-colors">
-                <span className="text-xs font-semibold text-slate-500 dark:text-dark-400">Statut :</span>
-                <div className="relative flex items-center">
-                  <select
-                    id="select-statut-financier"
-                    value={selectedStatut}
-                    onChange={(e) => setSelectedStatut(e.target.value)}
-                    className="appearance-none bg-transparent text-slate-900 dark:text-white text-xs font-extrabold focus:outline-none cursor-pointer pr-4 pl-0.5 py-0.5 max-w-[170px] truncate"
-                  >
-                    <option value="tous" className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white font-semibold py-1">
-                      Tous ({formatDH(totalTousGainsForYear)})
-                    </option>
-                    {statutsDisponibles.map(st => {
-                      const stGains = totalsByStatutForYear[st] || 0;
-                      return (
-                        <option
-                          key={st}
-                          value={st}
-                          className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white font-semibold py-1"
-                        >
-                          {st} ({formatDH(stGains)})
-                        </option>
-                      );
-                    })}
-                  </select>
-                  <div className="pointer-events-none absolute right-0 flex items-center text-slate-500 dark:text-dark-400">
-                    <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 20 20">
-                      <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-                    </svg>
-                  </div>
+            {/* 3. Filtre Période */}
+            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-dark-900/80 px-2.5 py-1.5 rounded-xl border border-slate-200/80 dark:border-dark-700/60 shadow-xs hover:border-indigo-500/50 transition-colors">
+              <span className="text-xs font-semibold text-slate-500 dark:text-dark-400">Période :</span>
+              <div className="relative flex items-center">
+                <select
+                  id="select-periode-financiere"
+                  value={selectedPeriod}
+                  onChange={(e) => setSelectedPeriod(e.target.value)}
+                  className="appearance-none bg-transparent text-slate-900 dark:text-white text-xs font-extrabold focus:outline-none cursor-pointer pr-4 pl-0.5 py-0.5"
+                >
+                  <option value="annuel" className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white font-semibold py-1">Annuel</option>
+                  <option value="T1" className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white font-semibold py-1">T1</option>
+                  <option value="T2" className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white font-semibold py-1">T2</option>
+                  <option value="T3" className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white font-semibold py-1">T3</option>
+                  <option value="T4" className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white font-semibold py-1">T4</option>
+                </select>
+                <div className="pointer-events-none absolute right-0 flex items-center text-slate-500 dark:text-dark-400">
+                  <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 20 20">
+                    <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                  </svg>
                 </div>
               </div>
+            </div>
 
-              {/* Filtre Période */}
-              <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-dark-900/80 px-2.5 py-1.5 rounded-xl border border-slate-200/80 dark:border-dark-700/60 shadow-xs hover:border-indigo-500/50 transition-colors">
-                <span className="text-xs font-semibold text-slate-500 dark:text-dark-400">Période :</span>
-                <div className="relative flex items-center">
-                  <select
-                    id="select-periode-financiere"
-                    value={selectedPeriod}
-                    onChange={(e) => setSelectedPeriod(e.target.value)}
-                    className="appearance-none bg-transparent text-slate-900 dark:text-white text-xs font-extrabold focus:outline-none cursor-pointer pr-4 pl-0.5 py-0.5"
-                  >
-                    <option value="annuel" className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white font-semibold py-1">Annuel</option>
-                    <option value="T1" className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white font-semibold py-1">T1</option>
-                    <option value="T2" className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white font-semibold py-1">T2</option>
-                    <option value="T3" className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white font-semibold py-1">T3</option>
-                    <option value="T4" className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white font-semibold py-1">T4</option>
-                  </select>
-                  <div className="pointer-events-none absolute right-0 flex items-center text-slate-500 dark:text-dark-400">
-                    <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 20 20">
-                      <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
+            {/* 4. Les deux couleurs (Gains / Pertes) tout à droite */}
+            <div className="inline-flex items-center gap-2.5 text-xs font-semibold bg-slate-50 dark:bg-dark-900/70 px-2.5 py-1.5 rounded-xl border border-slate-200/80 dark:border-dark-700/60 shrink-0 shadow-2xs">
+              <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm"></span> Gains
+              </span>
+              <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400 font-bold">
+                <span className="w-2 h-2 rounded-full bg-red-500 shadow-sm"></span> Pertes
+              </span>
             </div>
           </div>
         </div>
