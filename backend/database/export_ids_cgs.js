@@ -84,7 +84,9 @@ async function exportDatabase() {
 
         const columns = Object.keys(rows[0]).map(c => `\`${c}\``).join(', ');
 
-        const chunkSize = 200;
+        // Pour les tables avec photos base64 (incubes, users), insérer 1 ligne par requête
+        // pour éviter tout dépassement de max_allowed_packet dans MySQL
+        const chunkSize = (table === 'incubes' || table === 'users') ? 1 : 100;
         for (let i = 0; i < rows.length; i += chunkSize) {
           const chunk = rows.slice(i, i + chunkSize);
           const valuesSql = chunk.map(row => {
@@ -129,3 +131,4 @@ async function exportDatabase() {
 }
 
 exportDatabase();
+
