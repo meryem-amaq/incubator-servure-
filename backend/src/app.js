@@ -222,32 +222,42 @@ app.get('/api/backups/download/:filename', auth, requireAdminOnly, (req, res) =>
 // Envoyer un RAPPEL d'atelier par email aux participants (ADMIN)
 app.post(['/api/evenements/:id/rappel', '/api/presence/atelier/:id/rappel'], auth, requireStaff, async (req, res) => {
   try {
-    const { Incube } = require('./models');
+    const { Incube, Atelier } = require('./models');
     const atelierId = req.params.id;
     const { evenement = {}, incubeIds } = req.body;
+
+    let dbAtelier = null;
+    if (atelierId && Atelier) {
+      try {
+        dbAtelier = await Atelier.findByPk(atelierId);
+      } catch (e) {
+        console.warn('Erreur récupération atelier en BDD:', e.message);
+      }
+    }
 
     let targetIncubes = [];
     if (Array.isArray(incubeIds) && incubeIds.length > 0) {
       const { Op } = require('sequelize');
       targetIncubes = await Incube.findAll({
         where: { id: { [Op.in]: incubeIds } },
-        attributes: ['id', 'nom_incube', 'email']
+        attributes: ['id', 'nom_incube', 'email', 'statut_creation', 'phase', 'promotion']
       });
     } else {
       targetIncubes = await Incube.findAll({
-        attributes: ['id', 'nom_incube', 'email']
+        attributes: ['id', 'nom_incube', 'email', 'statut_creation', 'phase', 'promotion']
       });
     }
 
     const eventData = {
       id: atelierId,
-      titre: evenement.titre || req.body.titre || 'Atelier & Formation IDS',
-      formateur: evenement.formateur || req.body.formateur || 'Intervenant IDS',
-      date: evenement.date || req.body.date || new Date().toISOString().split('T')[0],
-      heureDebut: evenement.heureDebut || req.body.heureDebut || '09:30',
-      heureFin: evenement.heureFin || req.body.heureFin || '12:30',
-      duree: evenement.duree || req.body.duree || '3h00',
-      description: evenement.description || req.body.description || ''
+      titre: evenement.titre || (dbAtelier ? dbAtelier.titre : null) || req.body.titre || 'Atelier & Formation IDS',
+      formateur: evenement.formateur || (dbAtelier ? (dbAtelier.intervenant || dbAtelier.formateur) : null) || req.body.formateur || 'Intervenant IDS',
+      intervenant: evenement.intervenant || (dbAtelier ? dbAtelier.intervenant : null) || req.body.intervenant || null,
+      date: evenement.date || (dbAtelier ? dbAtelier.date : null) || req.body.date || new Date().toISOString().split('T')[0],
+      heureDebut: evenement.heureDebut || (dbAtelier ? dbAtelier.heureDebut : null) || req.body.heureDebut || '09:30',
+      heureFin: evenement.heureFin || (dbAtelier ? dbAtelier.heureFin : null) || req.body.heureFin || '12:30',
+      duree: evenement.duree || (dbAtelier ? dbAtelier.duree : null) || req.body.duree || '3h00',
+      description: evenement.description || (dbAtelier ? dbAtelier.description : null) || req.body.description || ''
     };
 
     let sentCount = 0;
@@ -277,20 +287,29 @@ app.post(['/api/evenements/:id/rappel', '/api/presence/atelier/:id/rappel'], aut
 // Envoyer convocations & rappels d'atelier par email à toute la promotion ou une sélection (ADMIN)
 app.post(['/api/evenements/:id/notifier', '/api/presence/atelier/:id/notifier'], auth, requireStaff, async (req, res) => {
   try {
-    const { Incube } = require('./models');
+    const { Incube, Atelier } = require('./models');
     const atelierId = req.params.id;
     const { evenement = {}, incubeIds } = req.body;
+
+    let dbAtelier = null;
+    if (atelierId && Atelier) {
+      try {
+        dbAtelier = await Atelier.findByPk(atelierId);
+      } catch (e) {
+        console.warn('Erreur récupération atelier en BDD:', e.message);
+      }
+    }
 
     let targetIncubes = [];
     if (Array.isArray(incubeIds) && incubeIds.length > 0) {
       const { Op } = require('sequelize');
       targetIncubes = await Incube.findAll({
         where: { id: { [Op.in]: incubeIds } },
-        attributes: ['id', 'nom_incube', 'email']
+        attributes: ['id', 'nom_incube', 'email', 'statut_creation', 'phase', 'promotion']
       });
     } else {
       targetIncubes = await Incube.findAll({
-        attributes: ['id', 'nom_incube', 'email']
+        attributes: ['id', 'nom_incube', 'email', 'statut_creation', 'phase', 'promotion']
       });
     }
 
@@ -298,13 +317,14 @@ app.post(['/api/evenements/:id/notifier', '/api/presence/atelier/:id/notifier'],
 
     const eventData = {
       id: atelierId,
-      titre: evenement.titre || req.body.titre || 'Atelier & Formation IDS',
-      formateur: evenement.formateur || req.body.formateur || 'Intervenant IDS',
-      date: evenement.date || req.body.date || new Date().toISOString().split('T')[0],
-      heureDebut: evenement.heureDebut || req.body.heureDebut || '09:30',
-      heureFin: evenement.heureFin || req.body.heureFin || '12:30',
-      duree: evenement.duree || req.body.duree || '3h00',
-      description: evenement.description || req.body.description || ''
+      titre: evenement.titre || (dbAtelier ? dbAtelier.titre : null) || req.body.titre || 'Atelier & Formation IDS',
+      formateur: evenement.formateur || (dbAtelier ? (dbAtelier.intervenant || dbAtelier.formateur) : null) || req.body.formateur || 'Intervenant IDS',
+      intervenant: evenement.intervenant || (dbAtelier ? dbAtelier.intervenant : null) || req.body.intervenant || null,
+      date: evenement.date || (dbAtelier ? dbAtelier.date : null) || req.body.date || new Date().toISOString().split('T')[0],
+      heureDebut: evenement.heureDebut || (dbAtelier ? dbAtelier.heureDebut : null) || req.body.heureDebut || '09:30',
+      heureFin: evenement.heureFin || (dbAtelier ? dbAtelier.heureFin : null) || req.body.heureFin || '12:30',
+      duree: evenement.duree || (dbAtelier ? dbAtelier.duree : null) || req.body.duree || '3h00',
+      description: evenement.description || (dbAtelier ? dbAtelier.description : null) || req.body.description || ''
     };
 
     let sentCount = 0;

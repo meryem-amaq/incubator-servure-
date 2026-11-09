@@ -44,6 +44,118 @@ const escapeHtml = (str) => {
 };
 
 /**
+ * Formatage d'une date en français (ex: 2026-11-20 -> "20 novembre 2026")
+ */
+const formatDateFrench = (dateInput) => {
+  if (!dateInput) return 'prochainement';
+  try {
+    if (typeof dateInput === 'string' && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateInput.trim())) {
+      const [d, m, y] = dateInput.trim().split('/');
+      const mois = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+      const mIdx = parseInt(m, 10) - 1;
+      if (mIdx >= 0 && mIdx < 12) {
+        return `${parseInt(d, 10)} ${mois[mIdx]} ${y}`;
+      }
+      return dateInput;
+    }
+
+    const isoDateOnly = String(dateInput).split('T')[0].split(' ')[0].trim();
+    const parts = isoDateOnly.split('-');
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const monthIdx = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      const mois = [
+        'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+        'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'
+      ];
+      if (monthIdx >= 0 && monthIdx < 12 && day > 0 && !isNaN(year)) {
+        return `${day} ${mois[monthIdx]} ${year}`;
+      }
+    }
+
+    const d = new Date(dateInput);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+  } catch (e) {}
+  return String(dateInput);
+};
+
+/**
+ * Détection dynamique du type de parcours : "post-création" ou "pré-création"
+ */
+const detectFormationType = (evenement = {}, incube = {}) => {
+  let rawText = '';
+  if (evenement.description) {
+    if (typeof evenement.description === 'object') {
+      if (evenement.description.typeParcours === 'pre-creation') return 'pré-création';
+      if (evenement.description.typeParcours === 'post-creation') return 'post-création';
+    } else if (typeof evenement.description === 'string') {
+      try {
+        const parsed = JSON.parse(evenement.description);
+        if (parsed.typeParcours === 'pre-creation') return 'pré-création';
+        if (parsed.typeParcours === 'post-creation') return 'post-création';
+      } catch (e) {
+        rawText += ' ' + evenement.description;
+      }
+    }
+  }
+
+  if (evenement.typeParcours === 'pre-creation' || evenement.parcours === 'pre-creation') return 'pré-création';
+  if (evenement.typeParcours === 'post-creation' || evenement.parcours === 'post-creation') return 'post-création';
+
+  rawText += ' ' + (evenement.titre || '');
+
+  const lower = rawText.toLowerCase();
+  if (lower.includes('post-création') || lower.includes('post-creation') || lower.includes('post creation') || lower.includes('post_creation')) {
+    return 'post-création';
+  }
+  if (lower.includes('pré-création') || lower.includes('pre-creation') || lower.includes('pre creation') || lower.includes('pre_creation')) {
+    return 'pré-création';
+  }
+
+  if (incube && incube.phase) {
+    const ph = String(incube.phase).toLowerCase();
+    if (ph.includes('idéation') || ph.includes('ideation')) return 'pré-création';
+    if (ph.includes('lancement') || ph.includes('croissance')) return 'post-création';
+  }
+
+  return 'post-création';
+};
+
+/**
+ * Extraction dynamique et propre du thème de la session de formation
+ */
+const detectFormationTheme = (evenement = {}) => {
+  if (evenement.description) {
+    if (typeof evenement.description === 'object' && evenement.description.moduleName) {
+      return String(evenement.description.moduleName).trim();
+    }
+    if (typeof evenement.description === 'string') {
+      try {
+        const parsed = JSON.parse(evenement.description);
+        if (parsed.moduleName) return String(parsed.moduleName).trim();
+        if (parsed.theme) return String(parsed.theme).trim();
+      } catch (e) {}
+    }
+  }
+
+  const rawTitre = (evenement.titre || '').trim();
+  if (!rawTitre) return 'Gestion des Ressources Humaines';
+
+  let clean = rawTitre.replace(/^\[[^\]]+\]\s*/g, '').trim();
+
+  const codeRegex = /^[A-Za-z0-9_\-\.\/]+\s*[:–—\-]\s*(.+)$/i;
+  const match = clean.match(codeRegex);
+  if (match && match[1]) {
+    clean = match[1].trim();
+  }
+
+  return clean || rawTitre || 'Gestion des Ressources Humaines';
+};
+
+/**
  * Gabarit HTML moderne, épuré et responsive harmonisé avec le style clair de l'application IDS
  */
 const renderEmailTemplate = ({ title, preheader, badgeText, badgeColor = '#0c87eb', contentHtml, ctaText, ctaUrl }) => {
@@ -274,68 +386,94 @@ const sendRdvConfirmationEmail = async (rdv, incube = {}) => {
 };
 
 /**
- * 3. Invitation & Convocation à une Formation / Atelier obligatoire
+ * 3. Invitation & Convocation à une Session de Formation (Pré-création & Post-création)
  */
-const sendFormationInvitationEmail = async (evenement, incube) => {
+const sendFormationInvitationEmail = async (evenement, incube = {}) => {
   const recipient = incube.email || 'incubé@ids.ma';
-  const nomIncube = incube.nom_incube || 'Porteur de Projet';
-  const titre = evenement.titre || 'Atelier & Formation IDS';
-  const formateur = evenement.formateur || 'Intervenant Expert';
-  const dateStr = evenement.date || 'Prochainement';
+  const typeFormation = detectFormationType(evenement, incube);
+  const theme = detectFormationTheme(evenement);
+  const dateFormatted = formatDateFrench(evenement.date);
+  const formateur = evenement.intervenant || evenement.formateur || 'Experts Partenaires IDS';
   const heureDebutStr = evenement.heureDebut || '09:30';
   const heureFinStr = evenement.heureFin || '12:30';
   const duree = evenement.duree || '3h00';
-  const description = evenement.description || '';
-  const emargementUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/presence/${evenement.id}?nom_atelier=${encodeURIComponent(titre)}&date=${encodeURIComponent(dateStr)}&heureDebut=${encodeURIComponent(heureDebutStr)}&heureFin=${encodeURIComponent(heureFinStr)}&duree=${encodeURIComponent(duree)}`;
 
-  const subject = `🎓 Convocation Atelier : ${titre}`;
+  const subject = `🎓 Invitation : Session de formation ${typeFormation} — ${theme}`;
 
-  const safeNom = escapeHtml(nomIncube);
-  const safeTitre = escapeHtml(titre);
+  const safeType = escapeHtml(typeFormation);
+  const safeTheme = escapeHtml(theme);
+  const safeDate = escapeHtml(dateFormatted);
   const safeFormateur = escapeHtml(formateur);
-  const safeDate = escapeHtml(dateStr);
   const safeHeureDebut = escapeHtml(heureDebutStr);
   const safeHeureFin = escapeHtml(heureFinStr);
   const safeDuree = escapeHtml(duree);
-  const safeDesc = escapeHtml(description);
 
   const contentHtml = `
-    <p>Bonjour <strong>${safeNom}</strong>,</p>
-    <p>Vous êtes officiellement invité(e) et convoqué(e) à la session de formation suivante organisée au sein de l'incubateur :</p>
-    
-    <div class="card">
+    <p style="margin: 0 0 16px 0; font-size: 15px; color: #1e293b;">Bonjour à toutes et à tous,</p>
+
+    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      Nous avons le plaisir de vous convier à la session de formation <strong>${safeType}</strong>, qui se déroulera le <strong>${safeDate}</strong> sous le thème <strong>${safeTheme}</strong>.
+    </p>
+
+    <div class="card" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 20px; margin: 20px 0;">
       <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-        <tr><td style="padding: 7px 0; color: #64748b; font-weight: 600; width: 35%;">Atelier :</td><td style="padding: 7px 0; font-weight: 800; color: #00254d;">${safeTitre}</td></tr>
-        <tr><td style="padding: 7px 0; color: #64748b; font-weight: 600;">Intervenant :</td><td style="padding: 7px 0; font-weight: 700; color: #0c87eb;">${safeFormateur}</td></tr>
-        <tr><td style="padding: 7px 0; color: #64748b; font-weight: 600;">Date de début :</td><td style="padding: 7px 0; font-weight: 800; color: #0c87eb;">${safeDate} à ${safeHeureDebut}</td></tr>
-        <tr><td style="padding: 7px 0; color: #64748b; font-weight: 600;">Horaires & Durée :</td><td style="padding: 7px 0; font-weight: 700; color: #00254d;">${safeHeureDebut} - ${safeHeureFin} (${safeDuree})</td></tr>
-        <tr><td style="padding: 7px 0; color: #64748b; font-weight: 600;">Émargement :</td><td style="padding: 7px 0; font-weight: 700; color: #00254d;">Feuille de présence numérique obligatoire</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600; width: 35%;">Thème :</td><td style="padding: 6px 0; font-weight: 800; color: #00254d;">${safeTheme}</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Parcours :</td><td style="padding: 6px 0; font-weight: 700; color: #0c87eb; text-transform: capitalize;">Session de formation ${safeType}</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Date :</td><td style="padding: 6px 0; font-weight: 800; color: #0c87eb;">${safeDate}</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Horaires :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeHeureDebut} - ${safeHeureFin} (${safeDuree})</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Intervenant :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeFormateur}</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Lieu :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">Incubateur IDS — Salle de formation</td></tr>
       </table>
     </div>
 
-    ${description ? `
-      <div class="card" style="border-left: 4px solid #0c87eb; background: #f0f7ff; border-top: 1px solid #e0effe; border-right: 1px solid #e0effe; border-bottom: 1px solid #e0effe; margin: 16px 0;">
-        <strong style="color: #0054a3; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 6px;">Description de l'Atelier :</strong>
-        <p style="margin: 0; color: #334155; font-size: 13px; line-height: 1.6; white-space: pre-line;">${safeDesc}</p>
-      </div>
-    ` : ''}
+    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      Cette session, animée par des experts partenaires, constitue une étape clé de votre parcours d’incubation. Votre participation est donc indispensable pour valider votre accompagnement au sein de l’IDS-Salé.
+    </p>
 
-    <p style="font-size: 12px; color: #64748b; margin-top: 14px;">ℹ️ L'assiduité aux ateliers est requise dans le cadre du programme d'accompagnement de l'incubateur.</p>
+    <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      Nous comptons sur votre motivation et votre implication.
+    </p>
+
+    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #334155;">
+      <p style="margin: 0 0 4px 0;">Bien cordialement,</p>
+      <p style="margin: 0 0 4px 0; color: #94a3b8;">----</p>
+      <p style="margin: 0; font-weight: 800; color: #00254d;">Equipe IDS – Salé</p>
+    </div>
   `;
 
   const html = renderEmailTemplate({
-    title: `Convocation Atelier : ${safeTitre}`,
-    preheader: `Atelier le ${safeDate} à ${safeHeureDebut} avec ${safeFormateur}`,
-    badgeText: 'Session de Formation',
+    title: `Session de Formation ${safeType} : ${safeTheme}`,
+    preheader: `Convocation le ${safeDate} sous le thème ${safeTheme}`,
+    badgeText: `Formation ${typeFormation === 'pré-création' ? 'Pré-Création' : 'Post-Création'}`,
     badgeColor: '#0c87eb',
     contentHtml
   });
+
+  const text = `Bonjour à toutes et à tous,
+
+Nous avons le plaisir de vous convier à la session de formation ${typeFormation}, qui se déroulera le ${dateFormatted} sous le thème ${theme}.
+
+Détails de la session :
+- Thème : ${theme}
+- Parcours : Session de formation ${typeFormation}
+- Date : ${dateFormatted}
+- Horaires : ${heureDebutStr} - ${heureFinStr} (${duree})
+- Intervenant : ${formateur}
+- Lieu : Incubateur IDS — Salle de formation
+
+Cette session, animée par des experts partenaires, constitue une étape clé de votre parcours d’incubation. Votre participation est donc indispensable pour valider votre accompagnement au sein de l’IDS-Salé.
+
+Nous comptons sur votre motivation et votre implication.
+
+Bien cordialement,
+----
+Equipe IDS – Salé`;
 
   return await sendEmail({
     to: recipient,
     subject,
     html,
-    text: `Bonjour ${nomIncube}, vous êtes invité(e) à l'atelier "${titre}" animé par ${formateur} le ${dateStr} à ${heureDebutStr} (Horaires : ${heureDebutStr} - ${heureFinStr}, Durée : ${duree}). Lien : ${emargementUrl}`
+    text
   });
 };
 
@@ -438,61 +576,94 @@ const sendWelcomeEmail = async (incube, passwordInitial = null) => {
 };
 
 /**
- * 6. Rappel Automatique d'Atelier (24h ou 2h avant la session)
+ * 6. Rappel Automatique d'Atelier / Formation (24h ou 2h avant la session)
  */
-const sendWorkshopReminderEmail = async (evenement, incube) => {
+const sendWorkshopReminderEmail = async (evenement, incube = {}) => {
   const recipient = incube.email || 'incubé@ids.ma';
-  const nomIncube = incube.nom_incube || 'Porteur de Projet';
-  const titre = evenement.titre || 'Atelier IDS';
-  const formateur = evenement.formateur || 'Intervenant Expert';
-  const dateStr = evenement.date || 'Aujourd\'hui';
+  const typeFormation = detectFormationType(evenement, incube);
+  const theme = detectFormationTheme(evenement);
+  const dateFormatted = formatDateFrench(evenement.date);
+  const formateur = evenement.intervenant || evenement.formateur || 'Experts Partenaires IDS';
   const heureDebutStr = evenement.heureDebut || '09:30';
   const heureFinStr = evenement.heureFin || '12:30';
   const duree = evenement.duree || '3h00';
-  const emargementUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/presence/${evenement.id}?nom_atelier=${encodeURIComponent(titre)}&date=${encodeURIComponent(dateStr)}&heureDebut=${encodeURIComponent(heureDebutStr)}&heureFin=${encodeURIComponent(heureFinStr)}&duree=${encodeURIComponent(duree)}`;
 
-  const subject = `🔔 RAPPEL : Votre atelier "${titre}" approche !`;
+  const subject = `🔔 RAPPEL : Session de formation ${typeFormation} — ${theme}`;
 
-  const safeNom = escapeHtml(nomIncube);
-  const safeTitre = escapeHtml(titre);
+  const safeType = escapeHtml(typeFormation);
+  const safeTheme = escapeHtml(theme);
+  const safeDate = escapeHtml(dateFormatted);
   const safeFormateur = escapeHtml(formateur);
-  const safeDate = escapeHtml(dateStr);
   const safeHeureDebut = escapeHtml(heureDebutStr);
   const safeHeureFin = escapeHtml(heureFinStr);
   const safeDuree = escapeHtml(duree);
 
   const contentHtml = `
-    <p>Bonjour <strong>${safeNom}</strong>,</p>
-    <p>Ceci est un rappel amical concernant l'atelier de formation auquel vous êtes convié(e) :</p>
-    
-    <div class="card">
+    <p style="margin: 0 0 16px 0; font-size: 15px; color: #1e293b;">Bonjour à toutes et à tous,</p>
+
+    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      Ceci est un rappel concernant votre session de formation <strong>${safeType}</strong>, qui se déroulera le <strong>${safeDate}</strong> sous le thème <strong>${safeTheme}</strong>.
+    </p>
+
+    <div class="card" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 20px; margin: 20px 0;">
       <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-        <tr><td style="padding: 7px 0; color: #64748b; font-weight: 600; width: 35%;">Formation :</td><td style="padding: 7px 0; font-weight: 800; color: #00254d;">${safeTitre}</td></tr>
-        <tr><td style="padding: 7px 0; color: #64748b; font-weight: 600;">Intervenant :</td><td style="padding: 7px 0; font-weight: 700; color: #0c87eb;">${safeFormateur}</td></tr>
-        <tr><td style="padding: 7px 0; color: #64748b; font-weight: 600;">Date de début :</td><td style="padding: 7px 0; font-weight: 800; color: #0c87eb;">${safeDate} à ${safeHeureDebut}</td></tr>
-        <tr><td style="padding: 7px 0; color: #64748b; font-weight: 600;">Horaires & Durée :</td><td style="padding: 7px 0; font-weight: 700; color: #00254d;">${safeHeureDebut} - ${safeHeureFin} (${safeDuree})</td></tr>
-        <tr><td style="padding: 7px 0; color: #64748b; font-weight: 600;">Lieu :</td><td style="padding: 7px 0; font-weight: 700; color: #00254d;">Incubateur IDS — Salle de formation</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600; width: 35%;">Thème :</td><td style="padding: 6px 0; font-weight: 800; color: #00254d;">${safeTheme}</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Parcours :</td><td style="padding: 6px 0; font-weight: 700; color: #0c87eb; text-transform: capitalize;">Session de formation ${safeType}</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Date :</td><td style="padding: 6px 0; font-weight: 800; color: #0c87eb;">${safeDate}</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Horaires :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeHeureDebut} - ${safeHeureFin} (${safeDuree})</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Intervenant :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeFormateur}</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Lieu :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">Incubateur IDS — Salle de formation</td></tr>
       </table>
     </div>
 
-    <p style="font-size: 12px; color: #64748b; margin-top: 14px;">
-      💡 Pensez à vous munir de votre smartphone pour scanner le QR Code de présence à l'entrée de la salle ou utiliser le lien ci-dessous.
+    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      Cette session, animée par des experts partenaires, constitue une étape clé de votre parcours d’incubation. Votre participation est donc indispensable pour valider votre accompagnement au sein de l’IDS-Salé.
     </p>
+
+    <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      Nous comptons sur votre motivation et votre implication.
+    </p>
+
+    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #334155;">
+      <p style="margin: 0 0 4px 0;">Bien cordialement,</p>
+      <p style="margin: 0 0 4px 0; color: #94a3b8;">----</p>
+      <p style="margin: 0; font-weight: 800; color: #00254d;">Equipe IDS – Salé</p>
+    </div>
   `;
 
   const html = renderEmailTemplate({
-    title: `Rappel Atelier : ${safeTitre}`,
-    preheader: `Votre session "${safeTitre}" commence à ${safeHeureDebut}`,
-    badgeText: 'Rappel de Session',
+    title: `Rappel : Formation ${safeType} — ${safeTheme}`,
+    preheader: `Votre session débute le ${safeDate} sous le thème ${safeTheme}`,
+    badgeText: `Rappel • Formation ${typeFormation === 'pré-création' ? 'Pré-Création' : 'Post-Création'}`,
     badgeColor: '#0c87eb',
     contentHtml
   });
+
+  const text = `Bonjour à toutes et à tous,
+
+Ceci est un rappel concernant votre session de formation ${typeFormation}, qui se déroulera le ${dateFormatted} sous le thème ${theme}.
+
+Détails de la session :
+- Thème : ${theme}
+- Parcours : Session de formation ${typeFormation}
+- Date : ${dateFormatted}
+- Horaires : ${heureDebutStr} - ${heureFinStr} (${duree})
+- Intervenant : ${formateur}
+- Lieu : Incubateur IDS — Salle de formation
+
+Cette session, animée par des experts partenaires, constitue une étape clé de votre parcours d’incubation. Votre participation est donc indispensable pour valider votre accompagnement au sein de l’IDS-Salé.
+
+Nous comptons sur votre motivation et votre implication.
+
+Bien cordialement,
+----
+Equipe IDS – Salé`;
 
   return await sendEmail({
     to: recipient,
     subject,
     html,
-    text: `Bonjour ${nomIncube}, rappel pour l'atelier "${titre}" animé par ${formateur} le ${dateStr} (${duree}). Lien d'émargement : ${emargementUrl}`
+    text
   });
 };
 
@@ -727,5 +898,8 @@ module.exports = {
   sendWorkshopReminderEmail,
   sendReservationReminderEmail,
   sendForgotPasswordEmail,
-  sendPasswordResetByAdminEmail
+  sendPasswordResetByAdminEmail,
+  formatDateFrench,
+  detectFormationType,
+  detectFormationTheme
 };
