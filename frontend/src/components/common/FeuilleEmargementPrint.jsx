@@ -15,12 +15,25 @@ export default function FeuilleEmargementPrint({
 
   const presentsCount = presences.filter(p => p.present).length;
   const totalCount = presences.length;
-  const dateStr = atelier.date ? new Date(atelier.date).toLocaleDateString('fr-FR', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  }) : 'Date non définie';
+
+  let meta = {};
+  try {
+    meta = typeof atelier.description === 'object' ? (atelier.description || {}) : JSON.parse(atelier.description || '{}');
+  } catch (e) {
+    meta = {};
+  }
+  const dateFinVal = meta.dateFin || atelier.dateFin;
+
+  const dateStr = atelier.date ? (
+    dateFinVal && dateFinVal !== atelier.date ? (
+      `Du ${new Date(atelier.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} au ${new Date(dateFinVal).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`
+    ) : new Date(atelier.date).toLocaleDateString('fr-FR', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+  ) : 'Date non définie';
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center p-2 sm:p-4 overflow-y-auto">

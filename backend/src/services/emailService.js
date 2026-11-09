@@ -83,6 +83,66 @@ const formatDateFrench = (dateInput) => {
 };
 
 /**
+ * Formatage d'une date ou d'un intervalle de dates en français
+ * - Si 1 seul jour : phrase = "le 25 novembre 2026", display = "25 novembre 2026"
+ * - Si plusieurs jours : phrase = "du 25 au 27 novembre 2026", display = "Du 25 au 27 novembre 2026"
+ */
+const formatDateIntervalFrench = (dateStart, dateEnd) => {
+  if (!dateStart) return { textPhrase: 'prochainement', display: 'Prochainement' };
+
+  const startFormatted = formatDateFrench(dateStart);
+  if (!dateEnd || dateEnd === dateStart) {
+    return {
+      textPhrase: `le ${startFormatted}`,
+      display: startFormatted
+    };
+  }
+
+  const sIso = String(dateStart).split('T')[0].split(' ')[0].trim();
+  const eIso = String(dateEnd).split('T')[0].split(' ')[0].trim();
+  const sParts = sIso.split('-');
+  const eParts = eIso.split('-');
+
+  if (sParts.length === 3 && eParts.length === 3) {
+    const sYear = parseInt(sParts[0], 10);
+    const sMonth = parseInt(sParts[1], 10) - 1;
+    const sDay = parseInt(sParts[2], 10);
+
+    const eYear = parseInt(eParts[0], 10);
+    const eMonth = parseInt(eParts[1], 10) - 1;
+    const eDay = parseInt(eParts[2], 10);
+
+    const mois = [
+      'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+      'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'
+    ];
+
+    if (sYear === eYear && sMonth === eMonth) {
+      return {
+        textPhrase: `du ${sDay} au ${eDay} ${mois[sMonth]} ${sYear}`,
+        display: `Du ${sDay} au ${eDay} ${mois[sMonth]} ${sYear}`
+      };
+    } else if (sYear === eYear) {
+      return {
+        textPhrase: `du ${sDay} ${mois[sMonth]} au ${eDay} ${mois[eMonth]} ${sYear}`,
+        display: `Du ${sDay} ${mois[sMonth]} au ${eDay} ${mois[eMonth]} ${sYear}`
+      };
+    } else {
+      return {
+        textPhrase: `du ${sDay} ${mois[sMonth]} ${sYear} au ${eDay} ${mois[eMonth]} ${eYear}`,
+        display: `Du ${sDay} ${mois[sMonth]} ${sYear} au ${eDay} ${mois[eMonth]} ${eYear}`
+      };
+    }
+  }
+
+  const endFormatted = formatDateFrench(dateEnd);
+  return {
+    textPhrase: `du ${startFormatted} au ${endFormatted}`,
+    display: `Du ${startFormatted} au ${endFormatted}`
+  };
+};
+
+/**
  * Détection dynamique du type de parcours : "post-création" ou "pré-création"
  */
 const detectFormationType = (evenement = {}, incube = {}) => {
@@ -392,7 +452,16 @@ const sendFormationInvitationEmail = async (evenement, incube = {}) => {
   const recipient = incube.email || 'incubé@ids.ma';
   const typeFormation = detectFormationType(evenement, incube);
   const theme = detectFormationTheme(evenement);
-  const dateFormatted = formatDateFrench(evenement.date);
+
+  let dateFin = evenement.dateFin || evenement.date_fin || null;
+  if (!dateFin && evenement.description) {
+    try {
+      const parsed = typeof evenement.description === 'object' ? evenement.description : JSON.parse(evenement.description);
+      dateFin = parsed.dateFin || parsed.date_fin || null;
+    } catch (e) {}
+  }
+
+  const { textPhrase: datePhrase, display: dateDisplay } = formatDateIntervalFrench(evenement.date, dateFin);
   const formateur = evenement.intervenant || evenement.formateur || 'Experts Partenaires IDS';
   const heureDebutStr = evenement.heureDebut || '09:30';
   const heureFinStr = evenement.heureFin || '12:30';
@@ -402,7 +471,7 @@ const sendFormationInvitationEmail = async (evenement, incube = {}) => {
 
   const safeType = escapeHtml(typeFormation);
   const safeTheme = escapeHtml(theme);
-  const safeDate = escapeHtml(dateFormatted);
+  const safeDateDisplay = escapeHtml(dateDisplay);
   const safeFormateur = escapeHtml(formateur);
   const safeHeureDebut = escapeHtml(heureDebutStr);
   const safeHeureFin = escapeHtml(heureFinStr);
@@ -412,14 +481,14 @@ const sendFormationInvitationEmail = async (evenement, incube = {}) => {
     <p style="margin: 0 0 16px 0; font-size: 15px; color: #1e293b;">Bonjour à toutes et à tous,</p>
 
     <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #334155;">
-      Nous avons le plaisir de vous convier à la session de formation <strong>${safeType}</strong>, qui se déroulera le <strong>${safeDate}</strong> sous le thème <strong>${safeTheme}</strong>.
+      Nous avons le plaisir de vous convier à la session de formation <strong>${safeType}</strong>, qui se déroulera ${escapeHtml(datePhrase)} sous le thème <strong>${safeTheme}</strong>.
     </p>
 
     <div class="card" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 20px; margin: 20px 0;">
       <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
         <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600; width: 35%;">Thème :</td><td style="padding: 6px 0; font-weight: 800; color: #00254d;">${safeTheme}</td></tr>
         <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Parcours :</td><td style="padding: 6px 0; font-weight: 700; color: #0c87eb; text-transform: capitalize;">Session de formation ${safeType}</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Date :</td><td style="padding: 6px 0; font-weight: 800; color: #0c87eb;">${safeDate}</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Date :</td><td style="padding: 6px 0; font-weight: 800; color: #0c87eb;">${safeDateDisplay}</td></tr>
         <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Horaires :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeHeureDebut} - ${safeHeureFin} (${safeDuree})</td></tr>
         <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Intervenant :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeFormateur}</td></tr>
         <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Lieu :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">Incubateur IDS — Salle de formation</td></tr>
@@ -443,7 +512,7 @@ const sendFormationInvitationEmail = async (evenement, incube = {}) => {
 
   const html = renderEmailTemplate({
     title: `Session de Formation ${safeType} : ${safeTheme}`,
-    preheader: `Convocation le ${safeDate} sous le thème ${safeTheme}`,
+    preheader: `Convocation ${datePhrase} sous le thème ${safeTheme}`,
     badgeText: `Formation ${typeFormation === 'pré-création' ? 'Pré-Création' : 'Post-Création'}`,
     badgeColor: '#0c87eb',
     contentHtml
@@ -451,12 +520,12 @@ const sendFormationInvitationEmail = async (evenement, incube = {}) => {
 
   const text = `Bonjour à toutes et à tous,
 
-Nous avons le plaisir de vous convier à la session de formation ${typeFormation}, qui se déroulera le ${dateFormatted} sous le thème ${theme}.
+Nous avons le plaisir de vous convier à la session de formation ${typeFormation}, qui se déroulera ${datePhrase} sous le thème ${theme}.
 
 Détails de la session :
 - Thème : ${theme}
 - Parcours : Session de formation ${typeFormation}
-- Date : ${dateFormatted}
+- Date : ${dateDisplay}
 - Horaires : ${heureDebutStr} - ${heureFinStr} (${duree})
 - Intervenant : ${formateur}
 - Lieu : Incubateur IDS — Salle de formation
@@ -582,7 +651,16 @@ const sendWorkshopReminderEmail = async (evenement, incube = {}) => {
   const recipient = incube.email || 'incubé@ids.ma';
   const typeFormation = detectFormationType(evenement, incube);
   const theme = detectFormationTheme(evenement);
-  const dateFormatted = formatDateFrench(evenement.date);
+
+  let dateFin = evenement.dateFin || evenement.date_fin || null;
+  if (!dateFin && evenement.description) {
+    try {
+      const parsed = typeof evenement.description === 'object' ? evenement.description : JSON.parse(evenement.description);
+      dateFin = parsed.dateFin || parsed.date_fin || null;
+    } catch (e) {}
+  }
+
+  const { textPhrase: datePhrase, display: dateDisplay } = formatDateIntervalFrench(evenement.date, dateFin);
   const formateur = evenement.intervenant || evenement.formateur || 'Experts Partenaires IDS';
   const heureDebutStr = evenement.heureDebut || '09:30';
   const heureFinStr = evenement.heureFin || '12:30';
@@ -592,7 +670,7 @@ const sendWorkshopReminderEmail = async (evenement, incube = {}) => {
 
   const safeType = escapeHtml(typeFormation);
   const safeTheme = escapeHtml(theme);
-  const safeDate = escapeHtml(dateFormatted);
+  const safeDateDisplay = escapeHtml(dateDisplay);
   const safeFormateur = escapeHtml(formateur);
   const safeHeureDebut = escapeHtml(heureDebutStr);
   const safeHeureFin = escapeHtml(heureFinStr);
@@ -602,14 +680,14 @@ const sendWorkshopReminderEmail = async (evenement, incube = {}) => {
     <p style="margin: 0 0 16px 0; font-size: 15px; color: #1e293b;">Bonjour à toutes et à tous,</p>
 
     <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #334155;">
-      Ceci est un rappel concernant votre session de formation <strong>${safeType}</strong>, qui se déroulera le <strong>${safeDate}</strong> sous le thème <strong>${safeTheme}</strong>.
+      Ceci est un rappel concernant votre session de formation <strong>${safeType}</strong>, qui se déroulera ${escapeHtml(datePhrase)} sous le thème <strong>${safeTheme}</strong>.
     </p>
 
     <div class="card" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 20px; margin: 20px 0;">
       <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
         <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600; width: 35%;">Thème :</td><td style="padding: 6px 0; font-weight: 800; color: #00254d;">${safeTheme}</td></tr>
         <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Parcours :</td><td style="padding: 6px 0; font-weight: 700; color: #0c87eb; text-transform: capitalize;">Session de formation ${safeType}</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Date :</td><td style="padding: 6px 0; font-weight: 800; color: #0c87eb;">${safeDate}</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Date :</td><td style="padding: 6px 0; font-weight: 800; color: #0c87eb;">${safeDateDisplay}</td></tr>
         <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Horaires :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeHeureDebut} - ${safeHeureFin} (${safeDuree})</td></tr>
         <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Intervenant :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeFormateur}</td></tr>
         <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Lieu :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">Incubateur IDS — Salle de formation</td></tr>
@@ -633,7 +711,7 @@ const sendWorkshopReminderEmail = async (evenement, incube = {}) => {
 
   const html = renderEmailTemplate({
     title: `Rappel : Formation ${safeType} — ${safeTheme}`,
-    preheader: `Votre session débute le ${safeDate} sous le thème ${safeTheme}`,
+    preheader: `Votre session débute ${datePhrase} sous le thème ${safeTheme}`,
     badgeText: `Rappel • Formation ${typeFormation === 'pré-création' ? 'Pré-Création' : 'Post-Création'}`,
     badgeColor: '#0c87eb',
     contentHtml
@@ -641,12 +719,12 @@ const sendWorkshopReminderEmail = async (evenement, incube = {}) => {
 
   const text = `Bonjour à toutes et à tous,
 
-Ceci est un rappel concernant votre session de formation ${typeFormation}, qui se déroulera le ${dateFormatted} sous le thème ${theme}.
+Ceci est un rappel concernant votre session de formation ${typeFormation}, qui se déroulera ${datePhrase} sous le thème ${theme}.
 
 Détails de la session :
 - Thème : ${theme}
 - Parcours : Session de formation ${typeFormation}
-- Date : ${dateFormatted}
+- Date : ${dateDisplay}
 - Horaires : ${heureDebutStr} - ${heureFinStr} (${duree})
 - Intervenant : ${formateur}
 - Lieu : Incubateur IDS — Salle de formation
@@ -900,6 +978,7 @@ module.exports = {
   sendForgotPasswordEmail,
   sendPasswordResetByAdminEmail,
   formatDateFrench,
+  formatDateIntervalFrench,
   detectFormationType,
   detectFormationTheme
 };

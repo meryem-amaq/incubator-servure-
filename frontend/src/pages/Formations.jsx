@@ -533,6 +533,7 @@ export default function Formations() {
     collaborateur: DEFAULT_COLLABORATEURS[0],
     customFormateur: '',
     date: new Date().toISOString().split('T')[0],
+    dateFin: '',
     heureDebut: '09:30',
     heureFin: '12:30',
     duree: '3h00',
@@ -561,6 +562,7 @@ export default function Formations() {
       collaborateur: DEFAULT_COLLABORATEURS[0],
       customFormateur: '',
       date: new Date().toISOString().split('T')[0],
+      dateFin: '',
       heureDebut: '09:30',
       heureFin: '12:30',
       duree: chosenMod ? chosenMod.duree : '3h00',
@@ -628,6 +630,7 @@ export default function Formations() {
         formateur: resolvedFormateur,
         intervenant: formationForm.collaborateur, // Le Collaborateur IDS
         date: formationForm.date,
+        dateFin: formationForm.dateFin || null,
         heureDebut: formationForm.heureDebut,
         heureFin: formationForm.heureFin,
         duree: formationForm.duree || '3h00',
@@ -637,7 +640,9 @@ export default function Formations() {
           moduleName: modName,
           collaborateur: formationForm.collaborateur,
           salle: formationForm.salle,
-          invitesIds: formationForm.selectedIncubes
+          invitesIds: formationForm.selectedIncubes,
+          dateDebut: formationForm.date,
+          dateFin: formationForm.dateFin || null
         }),
         statutOuverture: 'auto'
       };
@@ -686,6 +691,7 @@ export default function Formations() {
     const rawModuleCode = meta.moduleCode || '';
     const initialFormateur = formation.formateur || 'Intervenant IDS';
     const initialCollab = meta.collaborateur || formation.intervenant || DEFAULT_COLLABORATEURS[0];
+    const initialDateFin = meta.dateFin || formation.dateFin || '';
 
     let invites = [];
     if (Array.isArray(meta.invitesIds) && meta.invitesIds.length > 0) {
@@ -700,6 +706,7 @@ export default function Formations() {
       formateur: initialFormateur,
       collaborateur: initialCollab,
       date: formation.date ? formation.date.substring(0, 10) : '',
+      dateFin: initialDateFin ? initialDateFin.substring(0, 10) : '',
       heureDebut: formation.heureDebut || '09:30',
       heureFin: formation.heureFin || '12:30',
       duree: formation.duree || '3h00',
@@ -764,6 +771,7 @@ export default function Formations() {
         formateur: editFormationForm.formateur,
         intervenant: editFormationForm.collaborateur,
         date: editFormationForm.date,
+        dateFin: editFormationForm.dateFin || null,
         heureDebut: editFormationForm.heureDebut,
         heureFin: editFormationForm.heureFin,
         duree: editFormationForm.duree || '3h00',
@@ -773,7 +781,9 @@ export default function Formations() {
           moduleName: modName,
           collaborateur: editFormationForm.collaborateur,
           salle: editFormationForm.salle,
-          invitesIds: editFormationForm.selectedIncubes
+          invitesIds: editFormationForm.selectedIncubes,
+          dateDebut: editFormationForm.date,
+          dateFin: editFormationForm.dateFin || null
         })
       };
 
@@ -1064,7 +1074,15 @@ export default function Formations() {
                         <td className="py-4 px-4 align-top whitespace-nowrap">
                           <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                             <Calendar size={13} className="text-emerald-600 shrink-0" />
-                            <span>{formation.date ? new Date(formation.date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : 'Date non définie'}</span>
+                            <span>
+                              {formation.date ? (
+                                (meta.dateFin || formation.dateFin) && (meta.dateFin || formation.dateFin) !== formation.date ? (
+                                  `Du ${new Date(formation.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} au ${new Date(meta.dateFin || formation.dateFin).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                                ) : (
+                                  new Date(formation.date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+                                )
+                              ) : 'Date non définie'}
+                            </span>
                           </div>
                           <div className="text-slate-500 dark:text-dark-300 text-[11px] flex items-center gap-1 mt-1 font-mono">
                             <Clock size={11} className="text-slate-400" />
@@ -1401,34 +1419,57 @@ export default function Formations() {
                   />
                 </div>
 
-                {/* Collaborateur IDS */}
+                {/* Collaborateur IDS (Champ libre pour écrire les noms) */}
                 <div>
                   <label className="text-xs font-bold text-slate-700 dark:text-dark-200 block mb-1 uppercase tracking-wider">
                     3. Collaborateur Référent <span className="text-rose-500">*</span>
                   </label>
-                  <select
+                  <input
+                    type="text"
+                    required
                     value={formationForm.collaborateur}
                     onChange={e => setFormationForm(p => ({ ...p, collaborateur: e.target.value }))}
-                    className="input !py-2 !text-xs w-full font-bold bg-white dark:bg-dark-800 cursor-pointer"
-                  >
+                    placeholder="Saisir le(s) nom(s) du collaborateur..."
+                    list="collaborateurs-suggestions-add"
+                    className="input !py-2 !text-xs w-full font-bold bg-white dark:bg-dark-800"
+                  />
+                  <datalist id="collaborateurs-suggestions-add">
                     {DEFAULT_COLLABORATEURS.map(c => (
-                      <option key={c} value={c}>{c}</option>
+                      <option key={c} value={c} />
                     ))}
-                  </select>
+                  </datalist>
                 </div>
               </div>
 
-              {/* 3. DATE ET HORAIRE */}
+              {/* 3. DATE ET HORAIRE (Intervalle de dates) */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="col-span-2">
+                <div>
                   <label className="text-xs font-bold text-slate-700 dark:text-dark-200 block mb-1 uppercase tracking-wider">
-                    Date de la formation <span className="text-rose-500">*</span>
+                    Date début <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="date"
                     required
                     value={formationForm.date}
-                    onChange={e => setFormationForm(p => ({ ...p, date: e.target.value }))}
+                    onChange={e => setFormationForm(p => ({
+                      ...p,
+                      date: e.target.value,
+                      dateFin: p.dateFin && p.dateFin < e.target.value ? e.target.value : p.dateFin
+                    }))}
+                    className="input !py-2 !text-xs w-full bg-white dark:bg-dark-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-700 dark:text-dark-200 block mb-1 uppercase tracking-wider">
+                    Date fin <span className="text-slate-400 font-normal text-[10px]">(si &gt; 1 j)</span>
+                  </label>
+                  <input
+                    type="date"
+                    min={formationForm.date}
+                    value={formationForm.dateFin || ''}
+                    onChange={e => setFormationForm(p => ({ ...p, dateFin: e.target.value }))}
+                    placeholder="Optionnel"
                     className="input !py-2 !text-xs w-full bg-white dark:bg-dark-800"
                   />
                 </div>
@@ -1576,6 +1617,23 @@ export default function Formations() {
                   <Mail size={13} className="text-amber-500" />
                   <span>Envoyer automatiquement une convocation par email aux participants</span>
                 </label>
+
+                {formationForm.notifyByEmail && (
+                  <div className="mt-2 p-3 rounded-xl bg-slate-50 dark:bg-dark-800 border border-slate-200 dark:border-dark-700 text-[11px] text-slate-600 dark:text-dark-300 space-y-1">
+                    <p className="font-bold text-slate-800 dark:text-dark-100 flex items-center gap-1.5 text-xs text-primary-600 dark:text-primary-400">
+                      <Mail size={13} /> Modèle d'email officiel envoyé aux incubés :
+                    </p>
+                    <p className="italic text-slate-700 dark:text-dark-200 bg-white dark:bg-dark-900 p-2.5 rounded-lg border border-slate-100 dark:border-dark-800 leading-relaxed font-sans">
+                      « Bonjour à toutes et à tous,<br />
+                      Nous avons le plaisir de vous convier à la session de formation <strong>{selectedParcours === 'pre-creation' ? 'pré-création' : 'post-création'}</strong>, qui se déroulera <strong>{formationForm.dateFin && formationForm.dateFin !== formationForm.date ? `du ${formationForm.date} au ${formationForm.dateFin}` : `le ${formationForm.date}`}</strong> sous le thème <strong>{currentModules.find(m => m.code === formationForm.moduleCode)?.name || formationForm.moduleCode || 'Formation IDS'}</strong>.<br />
+                      Cette session, animée par des experts partenaires, constitue une étape clé de votre parcours d’incubation. Votre participation est donc indispensable pour valider votre accompagnement au sein de l’IDS-Salé.<br />
+                      Nous comptons sur votre motivation et votre implication.<br />
+                      Bien cordialement,<br />
+                      ----<br />
+                      Equipe IDS – Salé »
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Boutons modal */}
@@ -1673,34 +1731,57 @@ export default function Formations() {
                   />
                 </div>
 
-                {/* Collaborateur IDS */}
+                {/* Collaborateur IDS (Champ libre pour écrire les noms) */}
                 <div>
                   <label className="text-xs font-bold text-slate-700 dark:text-dark-200 block mb-1 uppercase tracking-wider">
                     3. Collaborateur Référent <span className="text-rose-500">*</span>
                   </label>
-                  <select
+                  <input
+                    type="text"
+                    required
                     value={editFormationForm.collaborateur}
                     onChange={e => setEditFormationForm(p => ({ ...p, collaborateur: e.target.value }))}
-                    className="input !py-2 !text-xs w-full font-bold bg-white dark:bg-dark-800 cursor-pointer"
-                  >
+                    placeholder="Saisir le(s) nom(s) du collaborateur..."
+                    list="collaborateurs-suggestions-edit"
+                    className="input !py-2 !text-xs w-full font-bold bg-white dark:bg-dark-800"
+                  />
+                  <datalist id="collaborateurs-suggestions-edit">
                     {DEFAULT_COLLABORATEURS.map(c => (
-                      <option key={c} value={c}>{c}</option>
+                      <option key={c} value={c} />
                     ))}
-                  </select>
+                  </datalist>
                 </div>
               </div>
 
-              {/* 3. DATE ET HORAIRE */}
+              {/* 3. DATE ET HORAIRE (Intervalle de dates) */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="col-span-2">
+                <div>
                   <label className="text-xs font-bold text-slate-700 dark:text-dark-200 block mb-1 uppercase tracking-wider">
-                    Date de la formation <span className="text-rose-500">*</span>
+                    Date début <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="date"
                     required
                     value={editFormationForm.date}
-                    onChange={e => setEditFormationForm(p => ({ ...p, date: e.target.value }))}
+                    onChange={e => setEditFormationForm(p => ({
+                      ...p,
+                      date: e.target.value,
+                      dateFin: p.dateFin && p.dateFin < e.target.value ? e.target.value : p.dateFin
+                    }))}
+                    className="input !py-2 !text-xs w-full bg-white dark:bg-dark-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-700 dark:text-dark-200 block mb-1 uppercase tracking-wider">
+                    Date fin <span className="text-slate-400 font-normal text-[10px]">(si &gt; 1 j)</span>
+                  </label>
+                  <input
+                    type="date"
+                    min={editFormationForm.date}
+                    value={editFormationForm.dateFin || ''}
+                    onChange={e => setEditFormationForm(p => ({ ...p, dateFin: e.target.value }))}
+                    placeholder="Optionnel"
                     className="input !py-2 !text-xs w-full bg-white dark:bg-dark-800"
                   />
                 </div>
