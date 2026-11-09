@@ -236,15 +236,20 @@ app.post(['/api/evenements/:id/rappel', '/api/presence/atelier/:id/rappel'], aut
     }
 
     let targetIncubes = [];
+    let cleanIncubeIds = [];
     if (Array.isArray(incubeIds) && incubeIds.length > 0) {
+      cleanIncubeIds = incubeIds.map(id => Number(id)).filter(id => !isNaN(id) && id > 0);
+    }
+
+    if (cleanIncubeIds.length > 0) {
       const { Op } = require('sequelize');
       targetIncubes = await Incube.findAll({
-        where: { id: { [Op.in]: incubeIds } },
-        attributes: ['id', 'nom_incube', 'email', 'statut_creation', 'phase', 'promotion']
+        where: { id: { [Op.in]: cleanIncubeIds } },
+        attributes: ['id', 'nom_incube', 'email', 'statut_juridique', 'phase_projet', 'promotion']
       });
     } else {
       targetIncubes = await Incube.findAll({
-        attributes: ['id', 'nom_incube', 'email', 'statut_creation', 'phase', 'promotion']
+        attributes: ['id', 'nom_incube', 'email', 'statut_juridique', 'phase_projet', 'promotion']
       });
     }
 
@@ -301,15 +306,20 @@ app.post(['/api/evenements/:id/notifier', '/api/presence/atelier/:id/notifier'],
     }
 
     let targetIncubes = [];
+    let cleanIncubeIds = [];
     if (Array.isArray(incubeIds) && incubeIds.length > 0) {
+      cleanIncubeIds = incubeIds.map(id => Number(id)).filter(id => !isNaN(id) && id > 0);
+    }
+
+    if (cleanIncubeIds.length > 0) {
       const { Op } = require('sequelize');
       targetIncubes = await Incube.findAll({
-        where: { id: { [Op.in]: incubeIds } },
-        attributes: ['id', 'nom_incube', 'email', 'statut_creation', 'phase', 'promotion']
+        where: { id: { [Op.in]: cleanIncubeIds } },
+        attributes: ['id', 'nom_incube', 'email', 'statut_juridique', 'phase_projet', 'promotion']
       });
     } else {
       targetIncubes = await Incube.findAll({
-        attributes: ['id', 'nom_incube', 'email', 'statut_creation', 'phase', 'promotion']
+        attributes: ['id', 'nom_incube', 'email', 'statut_juridique', 'phase_projet', 'promotion']
       });
     }
 

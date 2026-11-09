@@ -2330,13 +2330,18 @@ export default function Formations() {
                     type="button"
                     onClick={async () => {
                       try {
-                        await api.post(`/evenements/${formation.id}/notifier`, {
+                        const res = await api.post(`/evenements/${formation.id}/notifier`, {
                           evenement: formation,
                           incubeIds: meta.invitesIds
                         });
-                        toast.success('Convocations par email renvoyées avec succès !');
+                        if (res.data?.success) {
+                          toast.success(`Convocations par email renvoyées (${res.data.sentCount || 0} envoyé(s)) !`);
+                        } else {
+                          toast.success('Convocations par email renvoyées avec succès !');
+                        }
                       } catch (e) {
-                        toast.error("Erreur d'envoi d'email");
+                        console.error('Erreur renvoi convocations:', e);
+                        toast.error(e.response?.data?.message || e.response?.data?.error || "Erreur d'envoi d'email");
                       }
                     }}
                     className="btn btn-secondary btn-sm text-xs flex items-center gap-1.5 px-3 py-2 rounded-xl cursor-pointer"

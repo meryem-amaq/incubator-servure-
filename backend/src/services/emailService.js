@@ -175,8 +175,8 @@ const detectFormationType = (evenement = {}, incube = {}) => {
     return 'pré-création';
   }
 
-  if (incube && incube.phase) {
-    const ph = String(incube.phase).toLowerCase();
+  if (incube && (incube.phase_projet || incube.phase)) {
+    const ph = String(incube.phase_projet || incube.phase).toLowerCase();
     if (ph.includes('idéation') || ph.includes('ideation')) return 'pré-création';
     if (ph.includes('lancement') || ph.includes('croissance')) return 'post-création';
   }
