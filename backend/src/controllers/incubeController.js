@@ -55,11 +55,15 @@ const syncWhitelistCloud = async () => {
 
     // 4. Envoi vers Heroku
     const cloudUrl = (process.env.CLOUD_URL || process.env.CLOUD_API_URL || 'https://ids-production-app-6aba82b6af10.herokuapp.com').replace(/\/+$/, '');
+    const syncSecret = process.env.SYNC_SECRET || process.env.WHITELIST_SECRET || 'ids_secret_sync_key_987654321_secure';
     const response = await fetch(`${cloudUrl}/api/sync/whitelist`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${syncSecret}`
+      },
       body: JSON.stringify({
-        secret: process.env.WHITELIST_SECRET || process.env.SYNC_SECRET || 'MON_SECRET_DE_SYNC_123',
+        secret: syncSecret,
         porteurs
       })
     });
