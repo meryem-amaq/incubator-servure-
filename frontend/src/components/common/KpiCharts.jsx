@@ -1029,23 +1029,20 @@ export function KpiEconomique({ stats, section = 'all' }) {
               </span>
             </div>
 
-            {/* Sélecteur de Période (T1, T2, T3, T4, Annuel) */}
-            <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-dark-900 p-0.5 rounded-lg border border-slate-200 dark:border-dark-700 shrink-0">
-              {['annuel', 'T1', 'T2', 'T3', 'T4'].map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setSelectedPeriod(p)}
-                  className={`px-1.5 sm:px-2 py-0.5 text-[10px] font-extrabold rounded-md transition-all cursor-pointer whitespace-nowrap ${
-                    selectedPeriod === p
-                      ? 'bg-amber-500 text-white shadow-sm'
-                      : 'text-slate-500 hover:text-slate-800 dark:text-dark-400 dark:hover:text-white'
-                  }`}
-                  title={`Filtrer par ${p === 'annuel' ? 'Année complète' : `Trimestre ${p}`}`}
-                >
-                  {p === 'annuel' ? 'Annuel' : p}
-                </button>
-              ))}
+            {/* Sélecteur de Période sous forme de liste déroulante (Libère l'espace) */}
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-dark-900 px-2.5 py-1 rounded-xl border border-slate-200/80 dark:border-dark-700 shadow-2xs shrink-0">
+              <select
+                value={selectedPeriod}
+                onChange={(e) => setSelectedPeriod(e.target.value)}
+                className="bg-transparent text-xs font-bold text-slate-700 dark:text-slate-300 focus:outline-hidden cursor-pointer"
+                title="Filtrer par période"
+              >
+                <option value="annuel" className="bg-white dark:bg-dark-900 text-slate-800 dark:text-white">Annuel</option>
+                <option value="T1" className="bg-white dark:bg-dark-900 text-slate-800 dark:text-white">T1</option>
+                <option value="T2" className="bg-white dark:bg-dark-900 text-slate-800 dark:text-white">T2</option>
+                <option value="T3" className="bg-white dark:bg-dark-900 text-slate-800 dark:text-white">T3</option>
+                <option value="T4" className="bg-white dark:bg-dark-900 text-slate-800 dark:text-white">T4</option>
+              </select>
             </div>
           </div>
 
@@ -1116,23 +1113,20 @@ export function KpiEconomique({ stats, section = 'all' }) {
             </span>
           </button>
 
-          {/* Sélecteur de Période (T1, T2, T3, T4, Annuel) */}
-          <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-dark-900 p-0.5 rounded-lg border border-slate-200 dark:border-dark-700 shrink-0">
-            {['annuel', 'T1', 'T2', 'T3', 'T4'].map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setSelectedPeriod(p)}
-                className={`px-1.5 sm:px-2 py-0.5 text-[10px] font-extrabold rounded-md transition-all cursor-pointer whitespace-nowrap ${
-                  selectedPeriod === p
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-500 hover:text-slate-800 dark:text-dark-400 dark:hover:text-white'
-                }`}
-                title={`Filtrer par ${p === 'annuel' ? 'Année complète' : `Trimestre ${p}`}`}
-              >
-                {p === 'annuel' ? 'Annuel' : p}
-              </button>
-            ))}
+          {/* Sélecteur de Période sous forme de liste déroulante (Libère l'espace) */}
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-dark-900 px-2.5 py-1 rounded-xl border border-slate-200/80 dark:border-dark-700 shadow-2xs shrink-0">
+            <select
+              value={selectedPeriod}
+              onChange={(e) => setSelectedPeriod(e.target.value)}
+              className="bg-transparent text-xs font-bold text-slate-700 dark:text-slate-300 focus:outline-hidden cursor-pointer"
+              title="Filtrer par période"
+            >
+              <option value="annuel" className="bg-white dark:bg-dark-900 text-slate-800 dark:text-white">Annuel</option>
+              <option value="T1" className="bg-white dark:bg-dark-900 text-slate-800 dark:text-white">T1</option>
+              <option value="T2" className="bg-white dark:bg-dark-900 text-slate-800 dark:text-white">T2</option>
+              <option value="T3" className="bg-white dark:bg-dark-900 text-slate-800 dark:text-white">T3</option>
+              <option value="T4" className="bg-white dark:bg-dark-900 text-slate-800 dark:text-white">T4</option>
+            </select>
           </div>
         </div>
 
