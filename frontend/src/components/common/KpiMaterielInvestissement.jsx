@@ -432,30 +432,30 @@ export default function KpiMaterielInvestissement({ stats }) {
             <button
               type="button"
               onClick={() => openModal('Toutes')}
-              className="group flex items-center gap-2.5 text-left cursor-pointer"
+              className="group flex items-center gap-2.5 text-left cursor-pointer min-w-0"
               title="Cliquer sur le titre pour ouvrir la liste des incubés"
             >
               <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20 group-hover:scale-105 transition-transform">
                 <Coins size={20} />
               </div>
-              <div>
-                <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors flex items-center gap-1.5">
+              <div className="min-w-0">
+                <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors flex items-center gap-1.5 whitespace-nowrap">
                   Investissement IDS par Secteur
                   <Eye size={13} className="text-slate-400 group-hover:text-emerald-500 transition-colors shrink-0" />
                 </h2>
-                <p className="text-[11px] text-slate-500 dark:text-dark-400 mt-0.5">
+                <p className="text-[11px] text-slate-500 dark:text-dark-400 mt-0.5 truncate">
                   Budget engagé par IDS pour l'équipement des projets (DH)
                 </p>
               </div>
             </button>
 
             {/* Badges & Filtre Promotion */}
-            <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
-              <span className="text-xs font-black px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+            <div className="flex flex-col sm:items-end gap-1.5 shrink-0 self-end sm:self-center">
+              <span className="text-xs font-black px-2.5 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
                 {formatDH(consolidated.totalIdsVal)}
               </span>
 
-              <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-dark-800 px-2.5 py-1 rounded-xl border border-slate-200/80 dark:border-dark-700 shadow-2xs">
+              <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-dark-800 px-2 py-0.5 rounded-xl border border-slate-200/80 dark:border-dark-700 shadow-2xs">
                 <Filter size={11} className="text-slate-400 shrink-0" />
                 <select
                   value={selectedPromotion}
@@ -530,30 +530,30 @@ export default function KpiMaterielInvestissement({ stats }) {
             <button
               type="button"
               onClick={() => openModal('Toutes')}
-              className="group flex items-center gap-2.5 text-left cursor-pointer"
+              className="group flex items-center gap-2.5 text-left cursor-pointer min-w-0"
               title="Cliquer sur le titre pour ouvrir la liste des incubés"
             >
               <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-500/20 group-hover:scale-105 transition-transform">
                 <Laptop size={20} />
               </div>
-              <div>
-                <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors flex items-center gap-1.5">
+              <div className="min-w-0">
+                <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors flex items-center gap-1.5 whitespace-nowrap">
                   Répartition par Famille d'Équipements
                   <Eye size={13} className="text-slate-400 group-hover:text-indigo-500 transition-colors shrink-0" />
                 </h2>
-                <p className="text-[11px] text-slate-500 dark:text-dark-400 mt-0.5">
+                <p className="text-[11px] text-slate-500 dark:text-dark-400 mt-0.5 truncate">
                   Nombre d'unités concrètes par famille d'articles
                 </p>
               </div>
             </button>
 
             {/* Badges & Filtre Promotion */}
-            <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
-              <span className="text-xs font-black px-2.5 py-1 rounded-lg bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30">
+            <div className="flex flex-col sm:items-end gap-1.5 shrink-0 self-end sm:self-center">
+              <span className="text-xs font-black px-2.5 py-0.5 rounded-lg bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30">
                 {consolidated.totalArticles} unités
               </span>
 
-              <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-dark-800 px-2.5 py-1 rounded-xl border border-slate-200/80 dark:border-dark-700 shadow-2xs">
+              <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-dark-800 px-2 py-0.5 rounded-xl border border-slate-200/80 dark:border-dark-700 shadow-2xs">
                 <Filter size={11} className="text-slate-400 shrink-0" />
                 <select
                   value={selectedPromotion}
