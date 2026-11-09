@@ -1100,22 +1100,21 @@ export function KpiEconomique({ stats, section = 'all' }) {
 
       {/* Chiffre d'Affaires par Statut */}
       <div className="card p-5 flex flex-col min-h-[350px] min-w-0 hover:border-blue-500/40 transition-all shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1">
+        {/* Ligne 1 : Titre + Période */}
+        <div className="flex items-center justify-between gap-2 mb-1">
           <button
             type="button"
             onClick={() => setShowCaStatutModal(true)}
             className="group cursor-pointer select-none text-left"
             title="Cliquer pour afficher la liste des incubés par statut juridique"
           >
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2 group-hover:text-blue-500 transition-colors">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-1.5 group-hover:text-blue-500 transition-colors whitespace-nowrap">
               CHIFFRE D'AFFAIRES PAR STATUT
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/30 group-hover:bg-blue-500 group-hover:text-white transition-all shadow-2xs">
-                <Eye size={11} /> Voir par incubé
-              </span>
             </h3>
           </button>
+
           {/* Sélecteur de Période (T1, T2, T3, T4, Annuel) */}
-          <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-dark-900 p-0.5 rounded-lg border border-slate-200 dark:border-dark-700 self-start sm:self-auto">
+          <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-dark-900 p-0.5 rounded-lg border border-slate-200 dark:border-dark-700 shrink-0">
             {['annuel', 'T1', 'T2', 'T3', 'T4'].map((p) => (
               <button
                 key={p}
@@ -1133,9 +1132,22 @@ export function KpiEconomique({ stats, section = 'all' }) {
             ))}
           </div>
         </div>
-        <p className="text-xs text-slate-500 dark:text-dark-400 mb-3">
-          Répartition financière par statut juridique ({selectedPeriod === 'annuel' ? `Année ${selectedYear}` : `${selectedPeriod} ${selectedYear}`})
-        </p>
+
+        {/* Ligne 2 : Sous-titre descriptif + Bouton Voir par incubé */}
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <p className="text-xs text-slate-500 dark:text-dark-400 truncate">
+            Répartition financière par statut juridique ({selectedPeriod === 'annuel' ? `Année ${selectedYear}` : `${selectedPeriod} ${selectedYear}`})
+          </p>
+
+          <button
+            type="button"
+            onClick={() => setShowCaStatutModal(true)}
+            className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/30 hover:bg-blue-500 hover:text-white transition-all shadow-2xs whitespace-nowrap cursor-pointer shrink-0"
+            title="Cliquer pour afficher la liste des incubés par statut juridique"
+          >
+            <Eye size={11} /> Voir par incubé
+          </button>
+        </div>
         <div className="flex-1 min-h-0">
           <Bar key={`statut-${theme}-${selectedPeriod}-${selectedYear}`} data={caStatutData} options={caStatutOptions} />
         </div>

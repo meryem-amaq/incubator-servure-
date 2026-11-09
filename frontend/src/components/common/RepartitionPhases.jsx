@@ -215,26 +215,43 @@ export default function RepartitionPhases({
     <div className={`card p-5 flex flex-col justify-between min-w-0 hover:border-blue-500/40 transition-all ${className}`}>
       
       {/* 1. EN-TÊTE : Titre cliquable à gauche + Badge Total à droite */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+      {/* Ligne 1 : Titre + Total */}
+      <div className="flex items-center justify-between gap-2 mb-1">
         <button
           type="button"
           onClick={() => {
             if (onOpenModal) onOpenModal();
             else setShowPhasesModal(true);
           }}
-          className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2 hover:text-blue-600 dark:hover:text-blue-400 transition-colors group text-left cursor-pointer"
+          className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2 hover:text-blue-600 dark:hover:text-blue-400 transition-colors group text-left cursor-pointer whitespace-nowrap"
           title="Cliquer pour afficher la liste des incubés par phase d'incubation"
         >
           <Layers size={16} className="text-primary-500 shrink-0 group-hover:scale-110 transition-transform" />
-          <span className="group-hover:underline underline-offset-2">RÉPARTITION PAR PHASE D'INCUBATION</span>
-          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-800 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-2xs">
-            <Eye size={11} /> Voir par incubé
-          </span>
+          <span className="group-hover:underline underline-offset-2">RÉPARTITION PAR PHASE</span>
         </button>
 
-        <div className="bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 text-xs font-black px-3 py-1 rounded-full border border-blue-200/80 dark:border-blue-800/40 shrink-0 shadow-xs">
+        <div className="bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 text-xs font-black px-2.5 py-0.5 rounded-full border border-blue-200/80 dark:border-blue-800/40 shrink-0 shadow-xs whitespace-nowrap">
           Total : {total} incubé(s)
         </div>
+      </div>
+
+      {/* Ligne 2 : Sous-titre descriptif + Bouton Voir par incubé */}
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <p className="text-xs text-slate-500 dark:text-dark-400 truncate">
+          Répartition des incubés selon leur phase d'avancement
+        </p>
+
+        <button
+          type="button"
+          onClick={() => {
+            if (onOpenModal) onOpenModal();
+            else setShowPhasesModal(true);
+          }}
+          className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-0.5 rounded-full border border-blue-200 dark:border-blue-800 hover:bg-blue-600 hover:text-white transition-all shadow-2xs whitespace-nowrap cursor-pointer shrink-0"
+          title="Cliquer pour afficher la liste des incubés par phase d'incubation"
+        >
+          <Eye size={11} /> Voir par incubé
+        </button>
       </div>
 
       {/* 2. AU MILIEU : GRAND Graphique circulaire qui occupe toute la largeur et la hauteur */}
