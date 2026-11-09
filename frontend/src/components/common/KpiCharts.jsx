@@ -1015,28 +1015,28 @@ export function KpiEconomique({ stats, section = 'all' }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* TOP 3 CHIFFRE D'AFFAIRES */}
         <div className="card p-5 flex flex-col min-h-[350px] min-w-0 hover:border-amber-500/40 transition-all shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1">
+          <div className="flex items-center justify-between gap-2 mb-1 min-w-0">
             <div 
               onClick={() => setShowAllIncubesModal(true)}
-              className="group flex items-center gap-2 cursor-pointer select-none"
+              className="group flex items-center gap-1.5 sm:gap-2 cursor-pointer select-none min-w-0"
               title="Cliquez pour afficher le classement du chiffre d'affaires pour tous les incubés"
             >
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2 group-hover:text-amber-500 transition-colors">
+              <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2 group-hover:text-amber-500 transition-colors whitespace-nowrap">
                 TOP 3 CHIFFRE D'AFFAIRES
               </h3>
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30 group-hover:bg-amber-500 group-hover:text-white transition-all shadow-2xs">
+              <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30 group-hover:bg-amber-500 group-hover:text-white transition-all shadow-2xs whitespace-nowrap shrink-0">
                 <Eye size={11} /> Voir tous ({allIncubesCAList.length})
               </span>
             </div>
 
             {/* Sélecteur de Période (T1, T2, T3, T4, Annuel) */}
-            <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-dark-900 p-0.5 rounded-lg border border-slate-200 dark:border-dark-700 self-start sm:self-auto">
+            <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-dark-900 p-0.5 rounded-lg border border-slate-200 dark:border-dark-700 shrink-0">
               {['annuel', 'T1', 'T2', 'T3', 'T4'].map((p) => (
                 <button
                   key={p}
                   type="button"
                   onClick={() => setSelectedPeriod(p)}
-                  className={`px-2 py-0.5 text-[10px] font-extrabold rounded-md transition-all cursor-pointer ${
+                  className={`px-1.5 sm:px-2 py-0.5 text-[10px] font-extrabold rounded-md transition-all cursor-pointer whitespace-nowrap ${
                     selectedPeriod === p
                       ? 'bg-amber-500 text-white shadow-sm'
                       : 'text-slate-500 hover:text-slate-800 dark:text-dark-400 dark:hover:text-white'
@@ -1100,17 +1100,20 @@ export function KpiEconomique({ stats, section = 'all' }) {
 
       {/* Chiffre d'Affaires par Statut */}
       <div className="card p-5 flex flex-col min-h-[350px] min-w-0 hover:border-blue-500/40 transition-all shadow-sm">
-        {/* Ligne 1 : Titre + Période */}
-        <div className="flex items-center justify-between gap-2 mb-1">
+        {/* Ligne 1 : Titre + Bouton Voir par incubé + Période — TOUT SUR LA MÊME LIGNE */}
+        <div className="flex items-center justify-between gap-2 mb-1 min-w-0">
           <button
             type="button"
             onClick={() => setShowCaStatutModal(true)}
-            className="group cursor-pointer select-none text-left"
+            className="group cursor-pointer select-none text-left flex items-center gap-1.5 sm:gap-2 min-w-0"
             title="Cliquer pour afficher la liste des incubés par statut juridique"
           >
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-1.5 group-hover:text-blue-500 transition-colors whitespace-nowrap">
+            <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white uppercase group-hover:text-blue-500 transition-colors whitespace-nowrap">
               CHIFFRE D'AFFAIRES PAR STATUT
             </h3>
+            <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/30 group-hover:bg-blue-500 group-hover:text-white transition-all shadow-2xs whitespace-nowrap shrink-0">
+              <Eye size={11} /> Voir par incubé
+            </span>
           </button>
 
           {/* Sélecteur de Période (T1, T2, T3, T4, Annuel) */}
@@ -1120,7 +1123,7 @@ export function KpiEconomique({ stats, section = 'all' }) {
                 key={p}
                 type="button"
                 onClick={() => setSelectedPeriod(p)}
-                className={`px-2 py-0.5 text-[10px] font-extrabold rounded-md transition-all cursor-pointer ${
+                className={`px-1.5 sm:px-2 py-0.5 text-[10px] font-extrabold rounded-md transition-all cursor-pointer whitespace-nowrap ${
                   selectedPeriod === p
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'text-slate-500 hover:text-slate-800 dark:text-dark-400 dark:hover:text-white'
@@ -1133,21 +1136,9 @@ export function KpiEconomique({ stats, section = 'all' }) {
           </div>
         </div>
 
-        {/* Ligne 2 : Sous-titre descriptif + Bouton Voir par incubé */}
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <p className="text-xs text-slate-500 dark:text-dark-400 truncate">
-            Répartition financière par statut juridique ({selectedPeriod === 'annuel' ? `Année ${selectedYear}` : `${selectedPeriod} ${selectedYear}`})
-          </p>
-
-          <button
-            type="button"
-            onClick={() => setShowCaStatutModal(true)}
-            className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/30 hover:bg-blue-500 hover:text-white transition-all shadow-2xs whitespace-nowrap cursor-pointer shrink-0"
-            title="Cliquer pour afficher la liste des incubés par statut juridique"
-          >
-            <Eye size={11} /> Voir par incubé
-          </button>
-        </div>
+        <p className="text-xs text-slate-500 dark:text-dark-400 mb-3 truncate">
+          Répartition financière par statut juridique ({selectedPeriod === 'annuel' ? `Année ${selectedYear}` : `${selectedPeriod} ${selectedYear}`})
+        </p>
         <div className="flex-1 min-h-0">
           <Bar key={`statut-${theme}-${selectedPeriod}-${selectedYear}`} data={caStatutData} options={caStatutOptions} />
         </div>
@@ -1163,25 +1154,25 @@ export function KpiEconomique({ stats, section = 'all' }) {
 
       {/* 5. Postes Créés */}
       <div className="card p-5 flex flex-col justify-between min-w-0 hover:border-emerald-500/40 transition-all">
-        <div className="flex justify-between items-start mb-4">
+        <div className="flex items-center justify-between gap-2 mb-1 min-w-0">
           <button
             type="button"
             onClick={() => setShowEmploisModal(true)}
-            className="group cursor-pointer select-none text-left"
+            className="group cursor-pointer select-none text-left flex items-center gap-1.5 sm:gap-2 min-w-0"
             title="Cliquer pour voir la décomposition des postes créés par incubé"
           >
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2 group-hover:text-emerald-500 transition-colors">
+            <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2 group-hover:text-emerald-500 transition-colors whitespace-nowrap">
               POSTES CRÉÉS
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 group-hover:bg-emerald-500 group-hover:text-white transition-all shadow-2xs">
-                <Eye size={11} /> Voir par incubé
-              </span>
             </h3>
-            <p className="text-xs text-slate-500 dark:text-dark-400 mt-1">Stages, Prestations & Contrats</p>
+            <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 group-hover:bg-emerald-500 group-hover:text-white transition-all shadow-2xs whitespace-nowrap shrink-0">
+              <Eye size={11} /> Voir par incubé
+            </span>
           </button>
-          <div className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-semibold px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800/40 shrink-0">
+          <div className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-semibold px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800/40 shrink-0 whitespace-nowrap">
             Total : {totalEmplois}
           </div>
         </div>
+        <p className="text-xs text-slate-500 dark:text-dark-400 mb-3 truncate">Stages, Prestations & Contrats</p>
         <div className="flex-1 min-h-[170px]">
           <Bar
             key={`emplois-${theme}`}

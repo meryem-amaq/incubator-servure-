@@ -144,32 +144,32 @@ export default function Top4EmploisTreemap({
   return (
     <div className={`card p-5 flex flex-col justify-between min-w-0 hover:border-emerald-500/40 transition-all ${className}`}>
       
-      {/* 1. EN-TÊTE : Titre cliquable + Bouton Voir par incubé + Total */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 mb-3">
+      {/* 1. EN-TÊTE : Titre cliquable + Bouton Voir par incubé + Total — TOUT SUR LA MÊME LIGNE */}
+      <div className="flex items-center justify-between gap-2 mb-1 min-w-0">
         <button
           type="button"
           onClick={() => {
             if (onOpenModal) onOpenModal();
           }}
-          className="group cursor-pointer select-none text-left"
+          className="group cursor-pointer select-none text-left flex items-center gap-1.5 sm:gap-2 min-w-0"
           title="Cliquer pour voir la décomposition des postes créés par tous les incubés"
         >
-          <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2 group-hover:text-emerald-500 transition-colors">
-            <Trophy size={16} className="text-emerald-500 shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="group-hover:underline underline-offset-2">TOP CRÉATEURS D'EMPLOIS</span>
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 group-hover:bg-emerald-500 group-hover:text-white transition-all shadow-2xs">
-              <Eye size={11} /> Voir par incubé
-            </span>
+          <Trophy size={16} className="text-emerald-500 shrink-0 group-hover:scale-110 transition-transform" />
+          <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white uppercase group-hover:text-emerald-500 transition-colors group-hover:underline underline-offset-2 whitespace-nowrap">
+            TOP CRÉATEURS D'EMPLOIS
           </h3>
-          <p className="text-xs text-slate-500 dark:text-dark-400 mt-1">
-            Classement des incubés par nombre de postes créés
-          </p>
+          <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 group-hover:bg-emerald-500 group-hover:text-white transition-all shadow-2xs whitespace-nowrap shrink-0">
+            <Eye size={11} /> Voir par incubé
+          </span>
         </button>
 
-        <div className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-semibold px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800/40 shrink-0">
+        <div className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-semibold px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800/40 shrink-0 whitespace-nowrap">
           Total Top 4 : {totalTopPostes} postes
         </div>
       </div>
+      <p className="text-xs text-slate-500 dark:text-dark-400 mb-3 truncate">
+        Classement des incubés par nombre de postes créés
+      </p>
 
       {/* 2. GRAPHIQUE EN BARRES (HISTOGRAMME HORIZONTAL) */}
       <div className="flex-1 min-h-[220px] py-2 flex items-center">
