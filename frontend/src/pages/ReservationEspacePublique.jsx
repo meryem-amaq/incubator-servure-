@@ -241,6 +241,30 @@ export default function ReservationEspacePublique() {
     setForm(f => ({ ...f, equipementsUtilises: parts.join(', ') }));
   };
 
+  // Matériel disponible sélectionnable (non bloqué en maintenance)
+  const availableEquipments = equipementsDisponibles.filter(eq =>
+    eq.etatAvant !== 'En maintenance / Bloqué' &&
+    (!eq.incidents || !eq.incidents.some(i => !i.resolu && i.gravite === 'bloquant'))
+  );
+
+  const isAllEquipementsSelected = availableEquipments.length > 0 &&
+    availableEquipments.every(eq => selectedEquipements.includes(eq.nom));
+
+  const handleToggleAllEquipements = () => {
+    if (isAllEquipementsSelected) {
+      setSelectedEquipements([]);
+      const parts = customEquipement.trim() ? [customEquipement.trim()] : [];
+      setForm(f => ({ ...f, equipementsUtilises: parts.join(', ') }));
+    } else {
+      const allNoms = availableEquipments.map(e => e.nom);
+      setSelectedEquipements(allNoms);
+      const parts = [...allNoms];
+      if (customEquipement.trim()) parts.push(customEquipement.trim());
+      setForm(f => ({ ...f, equipementsUtilises: parts.join(', ') }));
+      setIsMaterielListOpen(true);
+    }
+  };
+
   // Chargement des réservations pour détection des créneaux occupés
   const loadReservations = () => {
     fetch('/api/reservations')
@@ -258,15 +282,22 @@ export default function ReservationEspacePublique() {
     loadReservations();
   }, []);
 
-  // Réservations de la date et salle sélectionnées
+  // Nettoyage heure (ex: '09:00:00' -> '09:00')
+  const cleanTime = (t) => (t ? String(t).trim().slice(0, 5) : '');
+
+  // Réservations de la date et salle sélectionnées (comparaison insensible au format ISO / time)
   const reservationsDuJour = existingReservations.filter(r => {
     if (r.espace !== espaceKey) return false;
-    if (r.dateReservation !== form.dateReservation) return false;
-    if (r.statut !== 'valide' && r.statut !== 'en_attente') return false;
+    const rDate = r.dateReservation ? String(r.dateReservation).split('T')[0] : '';
+    const fDate = form.dateReservation ? String(form.dateReservation).split('T')[0] : '';
+    if (rDate !== fDate) return false;
+    // Exclure uniquement les réservations expressément annulées ou refusées
+    if (r.statut && ['refuse', 'annule', 'annulee'].includes(r.statut)) return false;
 
     if (selectedSousSalle) {
-      if (r.salleSpecifique) {
-        return r.salleSpecifique === selectedSousSalle;
+      const rSalle = r.salleSpecifique || r.salle;
+      if (rSalle) {
+        return rSalle === selectedSousSalle;
       }
       const defaultSalle = (SOUS_SALLES[espaceKey] || [])[0]?.id;
       return selectedSousSalle === defaultSalle;
@@ -274,10 +305,14 @@ export default function ReservationEspacePublique() {
     return true;
   });
 
-  // Détection de chevauchement : A < D et B > C
+  // Détection de chevauchement horaire strict : A < D et B > C
   const isTimeOverlap = (start1, end1, start2, end2) => {
-    if (!start1 || !end1 || !start2 || !end2) return false;
-    return start1 < end2 && end1 > start2;
+    const s1 = cleanTime(start1);
+    const e1 = cleanTime(end1);
+    const s2 = cleanTime(start2);
+    const e2 = cleanTime(end2);
+    if (!s1 || !e1 || !s2 || !e2) return false;
+    return s1 < e2 && e1 > s2;
   };
 
   // Vérifier si un créneau est déjà réservé
@@ -625,7 +660,7 @@ export default function ReservationEspacePublique() {
                       }
                     }}
                     className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 select-none ${isDisabled
-                      ? 'bg-slate-900/60 border-slate-800 text-slate-600 cursor-not-allowed opacity-60'
+                      ? 'bg-slate-900/80 border-slate-800/80 text-slate-500 cursor-not-allowed opacity-50 grayscale'
                       : isSelected
                         ? 'bg-amber-500 text-navy-950 border-amber-500 shadow-lg shadow-amber-500/20 font-bold scale-[1.02] cursor-pointer'
                         : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:border-slate-500 hover:bg-slate-800 cursor-pointer'
@@ -635,12 +670,12 @@ export default function ReservationEspacePublique() {
                       {slot.label}
                     </span>
                     <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full ${isDisabled
-                      ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                      ? 'bg-slate-800/90 text-slate-400 border border-slate-700/80'
                       : isSelected
                         ? 'bg-navy-950/20 text-navy-950 font-black'
                         : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                       }`}>
-                      {isDisabled ? 'Occupé' : isSelected ? 'Choisi' : 'Disponible'}
+                      {isDisabled ? 'Réservé' : isSelected ? 'Choisi' : 'Disponible'}
                     </span>
                   </button>
                 );
@@ -655,7 +690,7 @@ export default function ReservationEspacePublique() {
           {/* MATÉRIEL ET ÉQUIPEMENTS DISPONIBLES */}
           {equipementsDisponibles.length > 0 && (
             <div className="space-y-2 pt-2 border-t border-slate-800">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <div>
                   <label className="block text-xs font-bold text-slate-300">
                     Matériel ou équipement spécifique
@@ -664,17 +699,26 @@ export default function ReservationEspacePublique() {
                     Sélectionnez les machines ou outils nécessaires pour votre session
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsMaterielListOpen(!isMaterielListOpen)}
-                  className="text-xs text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1 cursor-pointer"
-                >
-                  <span>{isMaterielListOpen ? 'Masquer la liste' : 'Parcourir le matériel'}</span>
-                  <ChevronDown
-                    size={14}
-                    className={`transition-transform duration-200 ${isMaterielListOpen ? 'rotate-180' : ''}`}
-                  />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleToggleAllEquipements}
+                    className="text-xs text-amber-400 hover:text-amber-300 font-semibold cursor-pointer underline decoration-dotted whitespace-nowrap"
+                  >
+                    {isAllEquipementsSelected ? 'Tout décocher' : 'Tout cocher'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsMaterielListOpen(!isMaterielListOpen)}
+                    className="text-xs text-slate-300 hover:text-white font-semibold flex items-center gap-1 cursor-pointer bg-slate-800/80 px-2 py-1 rounded-lg border border-slate-700 whitespace-nowrap"
+                  >
+                    <span>{isMaterielListOpen ? 'Masquer' : 'Parcourir'}</span>
+                    <ChevronDown
+                      size={14}
+                      className={`transition-transform duration-200 ${isMaterielListOpen ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+                </div>
               </div>
 
               {/* LISTE DÉROULANTE DU MATÉRIEL */}
@@ -782,20 +826,6 @@ export default function ReservationEspacePublique() {
             <div className="space-y-3 pt-1 border-t border-slate-800">
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Thématique *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ex: Entrepreneuriat tech, IA appliquée, économie circulaire, insertion..."
-                  value={form.thematique}
-                  onChange={e => setForm({ ...form, thematique: e.target.value })}
-                  className="w-full bg-slate-800/80 border border-slate-700 text-white text-xs rounded-xl px-3.5 py-2.5 focus:border-amber-500 outline-none placeholder:text-slate-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
                   Sujet du podcast *
                 </label>
                 <textarea
@@ -807,16 +837,34 @@ export default function ReservationEspacePublique() {
                   className="w-full bg-slate-800/80 border border-slate-700 text-white text-xs rounded-xl p-2.5 focus:border-amber-500 outline-none placeholder:text-slate-500"
                 />
               </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">
+                  Thématique *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Entrepreneuriat tech, IA appliquée, économie circulaire, insertion..."
+                  value={form.thematique}
+                  onChange={e => setForm({ ...form, thematique: e.target.value })}
+                  className="w-full bg-slate-800/80 border border-slate-700 text-white text-xs rounded-xl px-3.5 py-2.5 focus:border-amber-500 outline-none placeholder:text-slate-500"
+                />
+              </div>
             </div>
           ) : (
             <div className="space-y-1 pt-1 border-t border-slate-800">
               <label className="block text-xs font-bold text-slate-300 mb-1">
-                Motif de la réservation / Projet à réaliser *
+                {espaceKey === 'salle_reunion'
+                  ? 'Objet de la réunion / Ordre du jour *'
+                  : 'Projet à réaliser / Objectif de la session *'}
               </label>
               <textarea
                 required
                 rows={2}
-                placeholder="Décrivez brièvement votre projet (ex: Prototypage de pièce 3D, réunion partenaires, test électronique...)"
+                placeholder={espaceKey === 'salle_reunion'
+                  ? "Précisez l'objet de votre réunion ou les points à l'ordre du jour..."
+                  : "Décrivez les travaux ou le prototypage à réaliser lors de votre session au FabLab..."}
                 value={form.motif}
                 onChange={e => setForm({ ...form, motif: e.target.value })}
                 className="w-full bg-slate-800/80 border border-slate-700 text-white text-xs rounded-xl p-2.5 focus:border-amber-500 outline-none placeholder:text-slate-500"
