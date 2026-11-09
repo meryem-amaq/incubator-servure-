@@ -1903,9 +1903,6 @@ export function KpiAssiduite({ impactStats, stats }) {
   const [selectedPlanAccompagnateurModal, setSelectedPlanAccompagnateurModal] = useState(null);
   const [planModalTab, setPlanModalTab] = useState('all'); // 'all' | 'atteint' | 'en_cours' | 'non_atteint'
   const [selectedPlanAccompagnateur, setSelectedPlanAccompagnateur] = useState('tous');
-  const [planPeriodeType, setPlanPeriodeType] = useState('trimestre'); // 'trimestre' | 'mois'
-  const [selectedPlanTrimestre, setSelectedPlanTrimestre] = useState('tous'); // 'tous' | 'T1' | 'T2' | 'T3' | 'T4'
-  const [selectedPlanMois, setSelectedPlanMois] = useState('tous'); // 'tous' | '01'..'12'
   const [selectedPlanYear, setSelectedPlanYear] = useState(() => String(new Date().getFullYear())); // 'YYYY' ou 'toutes'
   const [selectedEventAnnee, setSelectedEventAnnee] = useState(() => String(new Date().getFullYear())); // 'YYYY' ou 'toutes'
   const [selectedEventFormateur, setSelectedEventFormateur] = useState('tous');
@@ -2582,21 +2579,9 @@ export function KpiAssiduite({ impactStats, stats }) {
           return false;
         }
       }
-      // 3. Filtre par Trimestre ou par Mois
-      if (planPeriodeType === 'trimestre' && selectedPlanTrimestre !== 'tous') {
-        if (!p.echeance || p.echeance.length < 7) return false;
-        const m = Number(p.echeance.substring(5, 7));
-        const tIdx = Math.ceil(m / 3);
-        if (`T${tIdx}` !== selectedPlanTrimestre) return false;
-      } else if (planPeriodeType === 'mois' && selectedPlanMois !== 'tous') {
-        if (!p.echeance || p.echeance.length < 7) return false;
-        const m = Number(p.echeance.substring(5, 7));
-        const mStr = String(m).padStart(2, '0');
-        if (mStr !== selectedPlanMois) return false;
-      }
       return true;
     });
-  }, [rawPlanList, selectedPlanAccompagnateur, selectedPlanYear, planPeriodeType, selectedPlanTrimestre, selectedPlanMois]);
+  }, [rawPlanList, selectedPlanAccompagnateur, selectedPlanYear]);
 
   // Liste des accompagnateurs avec leur progression globale et détail pour la modale
   const accompagnateursStatsList = useMemo(() => {
@@ -3490,69 +3475,8 @@ export function KpiAssiduite({ impactStats, stats }) {
               </select>
             )}
 
-            {/* Bascule Trimestres / Mois */}
-            <div className="flex items-center gap-0.5 bg-white dark:bg-dark-900 p-0.5 rounded-lg border border-slate-200 dark:border-dark-700 shrink-0">
-              <button
-                type="button"
-                onClick={() => setPlanPeriodeType('trimestre')}
-                className={`px-1.5 py-0.5 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
-                  planPeriodeType === 'trimestre'
-                    ? 'bg-purple-600 text-white shadow-2xs'
-                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                Trim.
-              </button>
-              <button
-                type="button"
-                onClick={() => setPlanPeriodeType('mois')}
-                className={`px-1.5 py-0.5 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
-                  planPeriodeType === 'mois'
-                    ? 'bg-purple-600 text-white shadow-2xs'
-                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                Mois
-              </button>
-            </div>
-
-            {/* Sélecteur spécifique selon mode Trimestres vs Mois */}
-            {planPeriodeType === 'trimestre' ? (
-              <select
-                value={selectedPlanTrimestre}
-                onChange={e => setSelectedPlanTrimestre(e.target.value)}
-                className="text-[11px] font-bold bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 text-slate-800 dark:text-slate-100 rounded-lg px-1.5 py-0.5 outline-none cursor-pointer"
-              >
-                <option value="tous">Tous trimestres</option>
-                <option value="T1">T1 (Jan-Mar)</option>
-                <option value="T2">T2 (Avr-Juin)</option>
-                <option value="T3">T3 (Juil-Sep)</option>
-                <option value="T4">T4 (Oct-Déc)</option>
-              </select>
-            ) : (
-              <select
-                value={selectedPlanMois}
-                onChange={e => setSelectedPlanMois(e.target.value)}
-                className="text-[11px] font-bold bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 text-slate-800 dark:text-slate-100 rounded-lg px-1.5 py-0.5 outline-none cursor-pointer"
-              >
-                <option value="tous">Tous mois</option>
-                <option value="01">Janvier</option>
-                <option value="02">Février</option>
-                <option value="03">Mars</option>
-                <option value="04">Avril</option>
-                <option value="05">Mai</option>
-                <option value="06">Juin</option>
-                <option value="07">Juillet</option>
-                <option value="08">Août</option>
-                <option value="09">Septembre</option>
-                <option value="10">Octobre</option>
-                <option value="11">Novembre</option>
-                <option value="12">Décembre</option>
-              </select>
-            )}
-
             {/* Navigation & Sélecteur d'Année */}
-            <div className="flex items-center gap-0.5 shrink-0 pl-1 border-l border-slate-200 dark:border-dark-700">
+            <div className="flex items-center gap-0.5 shrink-0">
               <button
                 type="button"
                 onClick={() => handleNavYear(-1)}
@@ -3591,7 +3515,7 @@ export function KpiAssiduite({ impactStats, stats }) {
         {/* Graphique par Accompagnateur (Noms sur l'axe) */}
         <div className="flex-1 min-h-[160px] max-h-[190px]">
           <Bar
-            key={`planaction-acc-${theme}-${selectedPlanYear}-${selectedPlanAccompagnateur}-${planPeriodeType}-${selectedPlanTrimestre}-${selectedPlanMois}`}
+            key={`planaction-acc-${theme}-${selectedPlanYear}-${selectedPlanAccompagnateur}`}
             data={planActionChartData}
             options={planActionOpts}
           />
