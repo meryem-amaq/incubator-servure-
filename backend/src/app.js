@@ -32,11 +32,49 @@ const emailService = require('./services/emailService');
 
 const app = express();
 
+// Désactiver l'empreinte technologique Express (OWASP ASVS V14.4 / CIS)
+app.disable('x-powered-by');
+
 // Activer le proxy de confiance pour obtenir les vraies adresses IP clients derrière Nginx / reverse proxy
 app.set('trust proxy', 1);
 
-// Middlewares
-app.use(cors({ origin: process.env.FRONTEND_URL || '*', credentials: true }));
+// En-têtes de sécurité HTTP (compatibles HTTP interne http://10.0.5.126:3030 et HTTPS)
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
+  res.setHeader('X-XSS-Protection', '0');
+
+  // HSTS activé uniquement si la connexion est réellement en HTTPS (ne bloque jamais le serveur HTTP interne)
+  const isHttps = req.secure || String(req.headers['x-forwarded-proto'] || '').toLowerCase().includes('https');
+  if (isHttps) {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
+
+// Middlewares CORS & Body Parser
+const allowedOrigins = (process.env.FRONTEND_URL || '')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Autoriser les requêtes same-origin / serveur-à-serveur (sans en-tête Origin)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.length === 0 || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    // Autoriser les origines du réseau local / intranet IDS (localhost, 127.0.0.1, 10.x.x.x, 192.168.x.x)
+    if (/^https?:\/\/(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+)(:\d+)?$/i.test(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Origine non autorisée par la politique CORS'));
+  },
+  credentials: true
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -56,8 +94,14 @@ const uploadsDir = process.env.UPLOAD_PATH
   : path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
-app.use('/uploads', express.static(uploadsDir));
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+const staticUploadOptions = {
+  setHeaders: (res) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox");
+  }
+};
+app.use('/uploads', express.static(uploadsDir, staticUploadOptions));
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads'), staticUploadOptions));
 
 const auth = require('./middleware/auth');
 const requireStaff = require('./middleware/requireStaff');
@@ -106,6 +150,72 @@ app.post('/api/sync/trigger', auth, requireStaff, async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Erreur lors de la synchronisation', error: err.message });
+  }
+});
+
+// Middleware strict réservé aux Administrateurs pour la gestion des sauvegardes chiffrées
+const requireAdminOnly = (req, res, next) => {
+  const role = req.user?.role;
+  if (role === 'super_admin' || role === 'administrateur') {
+    return next();
+  }
+  return res.status(403).json({ message: 'Accès réservé aux administrateurs.' });
+};
+
+// Lister les sauvegardes chiffrées AES-256 disponibles (ADMIN)
+app.get('/api/backups/status', auth, requireAdminOnly, (req, res) => {
+  try {
+    const backupService = require('./services/backupService');
+    const backups = backupService.listEncryptedBackups();
+    res.json({
+      success: true,
+      encryption: 'AES-256-GCM + GZIP',
+      totalBackups: backups.length,
+      backups,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Erreur lecture des sauvegardes', error: err.message });
+  }
+});
+
+// Déclencher immédiatement une sauvegarde chiffrée AES-256 (ADMIN)
+app.post('/api/backups/trigger', auth, requireAdminOnly, async (req, res) => {
+  try {
+    const backupService = require('./services/backupService');
+    const info = await backupService.createEncryptedBackup({ prefix: 'backup_auto' });
+    res.json({
+      success: true,
+      message: 'Sauvegarde complète chiffrée (AES-256-GCM) créée avec succès',
+      backup: {
+        fileName: info.fileName,
+        timestamp: info.timestamp,
+        totalTables: info.totalTables,
+        totalRows: info.totalRows,
+        encryptedSizeBytes: info.encryptedSizeBytes,
+        compressionRatioPercent: info.compressionRatioPercent,
+        checksum: info.checksum,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Erreur lors de la création de la sauvegarde', error: err.message });
+  }
+});
+
+// Télécharger un fichier de sauvegarde chiffré .idsbak.enc (ADMIN)
+app.get('/api/backups/download/:filename', auth, requireAdminOnly, (req, res) => {
+  try {
+    const backupService = require('./services/backupService');
+    const safeName = path.basename(String(req.params.filename || ''));
+    if (!safeName.endsWith('.idsbak.enc')) {
+      return res.status(400).json({ message: 'Format de fichier de sauvegarde non autorisé.' });
+    }
+    const filePath = path.join(backupService.getPrimaryBackupDir(), safeName);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: 'Fichier de sauvegarde introuvable.' });
+    }
+    res.download(filePath, safeName);
+  } catch (err) {
+    res.status(500).json({ message: 'Erreur lors du téléchargement de la sauvegarde' });
   }
 });
 
@@ -366,6 +476,14 @@ sequelize.authenticate()
       }, 1000);
     } catch (collErr) {
       console.warn('⚠️ Erreur init collecteur tourniquets:', collErr.message);
+    }
+
+    // Planificateur de sauvegarde quotidienne chiffrée (AES-256-GCM + GZIP) en lecture seule
+    try {
+      const backupService = require('./services/backupService');
+      backupService.startAutoBackupCron();
+    } catch (bakErr) {
+      console.warn('⚠️ Erreur init planificateur de sauvegarde:', bakErr.message);
     }
   })
   .catch(err => {

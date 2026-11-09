@@ -4,6 +4,19 @@ export const loadXLSX = () => {
   return Promise.resolve(XLSX);
 };
 
+/**
+ * Neutralise les formules Excel / CSV Injection (DDE, =CMD, +..., -..., @...) lors de l'export
+ * tout en préservant les nombres négatifs ou numéros de téléphone internationaux (+212...).
+ */
+export const sanitizeExcelCellValue = (val) => {
+  if (val === undefined || val === null) return '';
+  const str = String(val);
+  if (/^[=+\-@]/.test(str) && !/^[+\-]?\d+([.,]\d+)?$/.test(str) && !/^\+\d[\d\s\-()]+$/.test(str)) {
+    return `'${str}`;
+  }
+  return str;
+};
+
 // Application du style visuel officiel IDS (Bleu Marine, bordures nettes, freeze pane, alternance de lignes)
 export const applyIdsTableStyle = (ws, totalRows = 0, isTemplate = false) => {
   if (!ws || !ws['!ref']) return;
@@ -183,7 +196,7 @@ export const buildOptionBSheet = (incubesList = [], isTemplate = false, xlsxLib 
 
       ws[addr] = {
         t: 's',
-        v: String(val),
+        v: sanitizeExcelCellValue(val),
         s: {
           fill: { fgColor: { rgb: isZebra ? "F8FAFC" : "FFFFFF" } },
           font: { name: "Calibri", sz: 10, color: { rgb: "1E293B" } },
@@ -291,7 +304,7 @@ export const buildOptionBSheet = (incubesList = [], isTemplate = false, xlsxLib 
 
       ws[addr] = {
         t: 's',
-        v: String(val),
+        v: sanitizeExcelCellValue(val),
         s: {
           fill: { fgColor: { rgb: isZebra ? "F0FDF4" : "FFFFFF" } },
           font: { name: "Calibri", sz: 10, color: { rgb: "064E3B" } },
@@ -645,7 +658,7 @@ export const buildSingleTableSheetWithBanner = ({
 
       ws[addr] = {
         t: 's',
-        v: String(val),
+        v: sanitizeExcelCellValue(val),
         s: {
           fill: { fgColor: { rgb: isZebra ? "F8FAFC" : "FFFFFF" } },
           font: { name: "Calibri", sz: 10, color: { rgb: "1E293B" } },

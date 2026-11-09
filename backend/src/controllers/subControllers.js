@@ -72,6 +72,11 @@ function createSubController(Model, modelName) {
 
         // Validation Badge RFID, Auto-attribution Matricule & Dates pour le personnel RH (Staff Startup)
         if (Model === RhDetail) {
+          // Seule l'équipe administrative (staff) peut attribuer un badge RFID physique
+          if (req.user.role === 'incube') {
+            delete req.body.badge_id;
+            delete req.body.matricule;
+          }
           if (!req.body.date_fin || String(req.body.date_fin).trim() === '') {
             req.body.date_fin = null;
           }
@@ -171,11 +176,18 @@ function createSubController(Model, modelName) {
         if (!(await checkIncubeAccess(req.params.incubeId, req.user, true))) {
           return res.status(403).json({ message: 'Accès non autorisé à ce dossier' });
         }
-        const item = await Model.findByPk(req.params.id);
+        // Protection Anti-IDOR / BOLA : vérifier que l'élément appartient bien à :incubeId
+        const item = await Model.findOne({
+          where: { id: req.params.id, incube_id: req.params.incubeId }
+        });
         if (!item) return res.status(404).json({ message: `${modelName} non trouvé` });
 
         // Validation Badge RFID, Matricule & Dates pour le personnel RH (Staff Startup)
         if (Model === RhDetail) {
+          if (req.user.role === 'incube') {
+            delete req.body.badge_id;
+            delete req.body.matricule;
+          }
           if (!req.body.date_fin || String(req.body.date_fin).trim() === '') {
             req.body.date_fin = null;
           }
@@ -214,6 +226,8 @@ function createSubController(Model, modelName) {
         }
 
         const updateData = { ...req.body };
+        delete updateData.id;
+        delete updateData.incube_id;
         // Pour SuiviEngagement : les heures de présence sont certifiées par les tourniquets et protégées
         if (Model === SuiviEngagement && req.body.moyenne_heures_presence !== undefined) {
           if (item.moyenne_heures_presence !== null && item.moyenne_heures_presence !== undefined && !req.body._forceTourniquetSync) {
@@ -250,7 +264,10 @@ function createSubController(Model, modelName) {
         if (!(await checkIncubeAccess(req.params.incubeId, req.user, true))) {
           return res.status(403).json({ message: 'Accès non autorisé à ce dossier' });
         }
-        const item = await Model.findByPk(req.params.id);
+        // Protection Anti-IDOR / BOLA : vérifier que l'élément appartient bien à :incubeId
+        const item = await Model.findOne({
+          where: { id: req.params.id, incube_id: req.params.incubeId }
+        });
         if (!item) return res.status(404).json({ message: `${modelName} non trouvé` });
         await item.destroy();
         res.json({ message: `${modelName} supprimé` });

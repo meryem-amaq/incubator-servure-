@@ -138,12 +138,9 @@ export default function Utilisateurs() {
         formData.append('photo', editPhotoFile);
       }
 
-      const token = localStorage.getItem('cgs_token');
       const res = await fetch(import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/users/${editModalUser.id}` : `/api/users/${editModalUser.id}`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
+        credentials: 'include',
         body: formData
       });
 
@@ -170,12 +167,9 @@ export default function Utilisateurs() {
       Object.keys(form).forEach(key => formData.append(key, form[key]));
       if (photoFile) formData.append('photo', photoFile);
 
-      const token = localStorage.getItem('cgs_token');
       const res = await fetch(import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/users` : '/api/users', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
+        credentials: 'include',
         body: formData
       });
 

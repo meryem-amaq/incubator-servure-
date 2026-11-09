@@ -4,6 +4,7 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const requireStaff = require('../middleware/requireStaff');
 const isSuperAdmin = require('../middleware/isSuperAdmin');
+const { publicWriteLimiter } = require('../middleware/rateLimiter');
 const { PresenceAtelier, Incube, Atelier, User, Attendance, TourniquetUser, RhDetail, sequelize } = require('../models');
 const tourniquetService = require('../services/tourniquetService');
 
@@ -103,9 +104,10 @@ function isAtelierAttendanceWindowOpen(atelier, body = {}) {
   }
 
   const now = new Date();
-  const dateStr = normalizeDateString(body.date || atelier.date);
-  const heureDebutStr = body.heureDebut || atelier.heureDebut || '09:30';
-  const heureFinStr = body.heureFin || atelier.heureFin || '12:30';
+  // Toujours prioriser les horaires officiels de l'atelier en base de données (empêche le contournement via req.body)
+  const dateStr = normalizeDateString(atelier.date || body.date);
+  const heureDebutStr = atelier.heureDebut || body.heureDebut || '09:30';
+  const heureFinStr = atelier.heureFin || body.heureFin || '12:30';
 
   const [hD, mD] = heureDebutStr.split(':').map(Number);
   const startDateTime = new Date(`${dateStr}T${String(hD || 0).padStart(2, '0')}:${String(mD || 0).padStart(2, '0')}:00`);
@@ -663,8 +665,8 @@ router.post('/superadmin/sync-clocks', auth, isSuperAdmin, async (req, res) => {
   }
 });
 
-// GET /api/presence/live : Retourne en temps réel toutes les personnes actuellement à l'intérieur du bâtiment
-router.get('/live', auth, async (req, res) => {
+// GET /api/presence/live : Retourne en temps réel toutes les personnes actuellement à l'intérieur du bâtiment (Staff uniquement)
+router.get('/live', auth, requireStaff, async (req, res) => {
   try {
     const liveData = await tourniquetService.getLivePresence();
     res.json(liveData);
@@ -704,7 +706,7 @@ router.get('/incubes', async (req, res) => {
 });
 
 // POST /api/presence/enregistrer : Enregistrer ou retirer une présence en BDD
-router.post('/enregistrer', async (req, res) => {
+router.post('/enregistrer', publicWriteLimiter, async (req, res) => {
   try {
     const { atelierId, incubeId, nom, prenom, pp_numero, email, time, present, action } = req.body;
     if (!atelierId || (!incubeId && !nom && !pp_numero)) {
@@ -715,10 +717,9 @@ router.post('/enregistrer', async (req, res) => {
 
     // Extraction et vérification du token JWT s'il est fourni
     let authenticatedUser = null;
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = require('../utils/authCookie').getTokenFromRequest(req);
+    if (token) {
       try {
-        const token = authHeader.split(' ')[1];
         const jwt = require('jsonwebtoken');
         authenticatedUser = jwt.verify(token, process.env.JWT_SECRET);
       } catch (err) {

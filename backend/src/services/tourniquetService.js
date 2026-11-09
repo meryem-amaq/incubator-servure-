@@ -252,7 +252,7 @@ function processScansToMonthlyHours(rawScans, targetYear = new Date().getFullYea
   }
 
   // Filtrer pour l'année ciblée et grouper par jour calendaire (YYYY-MM-DD)
-  const daysMap = new Map(); // 'YYYY-MM-DD' -> [timestamps]
+  const daysMap = new Map(); // 'YYYY-MM-DD' -> [{ timeMs, type }]
 
   for (const s of debounced) {
     const d = new Date(s.time);
@@ -261,33 +261,74 @@ function processScansToMonthlyHours(rawScans, targetYear = new Date().getFullYea
       if (!daysMap.has(dayKey)) {
         daysMap.set(dayKey, []);
       }
-      daysMap.get(dayKey).push(d.getTime());
+      daysMap.get(dayKey).push({
+        timeMs: d.getTime(),
+        type: s.type ? String(s.type).toUpperCase() : null
+      });
     }
   }
 
   let grandTotalSeconds = 0;
   let totalDaysPresent = daysMap.size;
 
-  // 2. Traitement journalier par appairage
-  for (const [dayKey, dayTimestamps] of daysMap.entries()) {
-    dayTimestamps.sort((a, b) => a - b);
+  // 2. Traitement journalier par appairage Entrée / Sortie
+  for (const [dayKey, dayScans] of daysMap.entries()) {
+    dayScans.sort((a, b) => a.timeMs - b.timeMs);
     let daySeconds = 0;
-    const n = dayTimestamps.length;
+    const n = dayScans.length;
+    const hasExplicitIn = dayScans.some(x => x.type === 'IN');
+    const hasExplicitOut = dayScans.some(x => x.type === 'OUT');
 
-    // Appairer deux par deux
-    for (let i = 0; i < n - 1; i += 2) {
-      const entryTime = dayTimestamps[i];
-      const exitTime = dayTimestamps[i + 1];
-      const diffSec = Math.max(0, (exitTime - entryTime) / 1000);
-      
-      // Plafond de sécurité : une séance continue ne peut dépasser 14 heures (50400s)
-      const cappedSec = Math.min(diffSec, 50400);
-      daySeconds += cappedSec;
-    }
+    if (hasExplicitIn && !hasExplicitOut) {
+      // L'incubé a badgé une ou plusieurs fois en Entrée (IN) mais n'a JAMAIS pointé sa Sortie (OUT) de la journée :
+      // Appliquer strictement le forfait de 2 heures (7200 secondes)
+      daySeconds = 7200;
+    } else if (hasExplicitIn && hasExplicitOut) {
+      // Appairage directionnel intelligent basé sur le sens certifié des tourniquets (IN -> OUT)
+      let openInTime = null;
+      let forfaitAppliedForDay = false;
 
-    // En cas de scan impair (entrée sans badgeage de sortie), appliquer un forfait de 2 heures (7200 secondes)
-    if (n % 2 !== 0) {
-      daySeconds += 7200; // 2 heures
+      for (const sc of dayScans) {
+        if (sc.type === 'IN') {
+          if (openInTime === null) {
+            openInTime = sc.timeMs;
+          } else {
+            // Deuxième entrée IN sans sortie OUT intermédiaire :
+            // Si l'écart est >= 2h (ex: sorti à midi sans badger OUT, puis revenu l'après-midi),
+            // appliquer le forfait de 2h sur la 1ère entrée non clôturée (1 seule fois max par jour)
+            if ((sc.timeMs - openInTime) >= 7200 * 1000 && !forfaitAppliedForDay) {
+              daySeconds += 7200;
+              forfaitAppliedForDay = true;
+              openInTime = sc.timeMs;
+            }
+          }
+        } else if (sc.type === 'OUT') {
+          if (openInTime !== null) {
+            const diffSec = Math.max(0, (sc.timeMs - openInTime) / 1000);
+            daySeconds += Math.min(diffSec, 50400); // Plafond 14h
+            openInTime = null;
+          }
+        }
+      }
+
+      // Fin de journée : si la dernière entrée (IN) n'a pas de badgeage de sortie (OUT), appliquer le forfait de 2h (7200s)
+      if (openInTime !== null && !forfaitAppliedForDay) {
+        daySeconds += 7200;
+      }
+    } else {
+      // Fallback par parité (scans sans type explicite ou archives historiques)
+      for (let i = 0; i < n - 1; i += 2) {
+        const entryTime = dayScans[i].timeMs;
+        const exitTime = dayScans[i + 1].timeMs;
+        const diffSec = Math.max(0, (exitTime - entryTime) / 1000);
+        const cappedSec = Math.min(diffSec, 50400);
+        daySeconds += cappedSec;
+      }
+
+      // En cas de scan impair (entrée sans badgeage de sortie), appliquer un forfait de 2 heures (7200 secondes)
+      if (n % 2 !== 0) {
+        daySeconds += 7200; // 2 heures
+      }
     }
 
     grandTotalSeconds += daySeconds;
@@ -719,11 +760,13 @@ async function getLivePresence() {
       }
     }
 
-    // Si nombre de scans est impair, la personne est actuellement entrée sans ressortir
-    const isInside = filtered.length % 2 !== 0;
+    // Vérifier si le dernier mouvement est une entrée (IN) sans sortie ultérieure
+    const lastScan = filtered[filtered.length - 1];
+    const isInside = lastScan && lastScan.type
+      ? String(lastScan.type).toUpperCase() === 'IN'
+      : (filtered.length % 2 !== 0);
 
-    if (isInside) {
-      const lastScan = filtered[filtered.length - 1];
+    if (isInside && lastScan) {
       
       // Trouver les infos de l'usager
       let nom = 'Usager Badge #' + badgeId;

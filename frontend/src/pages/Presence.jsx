@@ -262,13 +262,10 @@ export default function Presence() {
         'ngrok-skip-browser-warning': 'true',
         'Bypass-Tunnel-Reminder': 'true'
       };
-      const token = localStorage.getItem('token');
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
 
       const res = await fetch('/api/presence/enregistrer', {
         method: 'POST',
+        credentials: 'include',
         headers,
         body: JSON.stringify(payload)
       });

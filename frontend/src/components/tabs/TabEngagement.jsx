@@ -714,10 +714,16 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
         ? parseFloat(d.moyenne_heures_presence)
         : null;
 
-      // Appliquer le filtre « Porteur seul » vs « Équipe globale » si les données tourniquets détaillées sont chargées
+      // Appliquer le filtre par catégorie (Équipe, Incubé, Associés, Salariés RH) si les données tourniquets détaillées sont chargées
       if (tourniquetFilterMode === 'porteur' && tourniquetTeamData?.porteurMonthlyHours) {
         const porteurH = Number(tourniquetTeamData.porteurMonthlyHours[m] || 0);
         valHours = porteurH > 0 ? porteurH : null;
+      } else if (tourniquetFilterMode === 'associes' && tourniquetTeamData?.associesMonthlyHours) {
+        const assocH = Number(tourniquetTeamData.associesMonthlyHours[m] || 0);
+        valHours = assocH > 0 ? assocH : null;
+      } else if (tourniquetFilterMode === 'salaries' && tourniquetTeamData?.salariesMonthlyHours) {
+        const salH = Number(tourniquetTeamData.salariesMonthlyHours[m] || 0);
+        valHours = salH > 0 ? salH : null;
       } else if (tourniquetFilterMode === 'equipe' && tourniquetTeamData?.equipeMonthlyHours) {
         const equipeH = Number(tourniquetTeamData.equipeMonthlyHours[m] || 0);
         if (equipeH > 0) valHours = equipeH;
@@ -874,7 +880,13 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                       ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
                       : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800'
                   }`}>
-                    {tourniquetFilterMode === 'equipe' ? 'Équipe' : 'Incubé seul'}
+                    {tourniquetFilterMode === 'equipe'
+                      ? 'Équipe'
+                      : tourniquetFilterMode === 'associes'
+                      ? 'Associés'
+                      : tourniquetFilterMode === 'salaries'
+                      ? 'Salariés RH'
+                      : 'Incubé seul'}
                   </span>
                 </div>
                 <div className="flex items-baseline gap-1 mt-0.5">
@@ -1143,18 +1155,6 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
 
           {/* Actions contextuelles selon l'onglet actif — Alignées sur la même ligne */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-2">
-            {activeEngagementTab === 'tourniquets' && (
-              <button
-                type="button"
-                onClick={() => handleSyncTourniquet(false)}
-                disabled={syncingTourniquet}
-                className="btn btn-secondary btn-xs font-bold text-blue-600 inline-flex items-center gap-1.5 border-blue-200 dark:border-blue-900 whitespace-nowrap"
-                title="Actualiser les pointages réels des tourniquets physiques"
-              >
-                <RefreshCw size={13} className={syncingTourniquet ? "animate-spin" : ""} />
-                <span>Sync Tourniquets</span>
-              </button>
-            )}
             {activeEngagementTab === 'formations' && (
               <button
                 type="button"
@@ -1197,83 +1197,114 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
         {/* ========================================================= */}
         {activeEngagementTab === 'tourniquets' && (
           <div className="space-y-3">
-            {/* Bandeau Unique de Synthèse Équipe & Filtres (Mois & Mode) */}
-            <div className="rounded-xl border border-slate-200/80 dark:border-dark-700/60 bg-slate-50/70 dark:bg-dark-800/40 p-2.5 sm:px-3.5 shadow-2xs">
-              <div className="flex flex-wrap items-center justify-between gap-2.5">
+            {/* Barre de filtrage épurée sur 1 seule ligne : chaque bouton filtre réellement le tableau */}
+            <div className="rounded-xl border border-slate-200/80 dark:border-dark-700/60 bg-white dark:bg-dark-900 p-2 sm:px-3 shadow-2xs">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 
-                {/* Gauche : Synthèse dynamique de l'équipe ou de l'incubé selon les filtres */}
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  {tourniquetFilterMode === 'equipe' ? (
-                    <>
-                      <span className="font-bold text-slate-800 dark:text-dark-100 flex items-center gap-1">
-                        <Users size={14} className="text-blue-600 dark:text-blue-400 shrink-0" />
-                        <span>
-                          Équipe ({tourniquetTeamData?.incube?.teamMembersCount || tourniquetTeamData?.teamBreakdown?.length || 1} membre{(tourniquetTeamData?.incube?.teamMembersCount || tourniquetTeamData?.teamBreakdown?.length || 1) > 1 ? 's' : ''} • {tourniquetTeamData?.incube?.teamBadgeCount || 0} badgé{(tourniquetTeamData?.incube?.teamBadgeCount || 0) > 1 ? 's' : ''})
-                        </span>
-                        <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded-md border border-blue-200 dark:border-blue-800/40">
-                          {currentTourniquetSynthesis.label} :
-                        </span>
-                      </span>
+                {/* Gauche : Boutons de filtrage interactifs par catégorie (zéro badge décoratif inutile) */}
+                <div className="inline-flex flex-wrap items-center gap-1 bg-slate-100 dark:bg-dark-800 p-1 rounded-xl border border-slate-200/70 dark:border-dark-700">
+                  <button
+                    type="button"
+                    onClick={() => setTourniquetFilterMode('equipe')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      tourniquetFilterMode === 'equipe'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-dark-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-dark-700/60'
+                    }`}
+                  >
+                    <Users size={13} className="shrink-0" />
+                    <span>Équipe</span>
+                    <span className={`px-1.5 py-0.2 rounded text-[11px] font-extrabold ${
+                      tourniquetFilterMode === 'equipe'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-slate-200/80 dark:bg-dark-700 text-slate-700 dark:text-dark-200'
+                    }`}>
+                      {currentTourniquetSynthesis.heuresEquipe} h
+                    </span>
+                  </button>
 
-                      <div className="flex flex-wrap items-center gap-1.5 font-medium text-[11px]">
-                        <span className="px-2.5 py-0.5 rounded-lg bg-blue-600 text-white font-black shadow-2xs">
-                          Total : <strong>{currentTourniquetSynthesis.heuresEquipe} h</strong>
-                        </span>
-                        <span className="px-2.5 py-0.5 rounded-lg bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20">
-                          Incubé : <strong>{currentTourniquetSynthesis.heuresPorteur} h</strong>
-                        </span>
-                        <span className="px-2.5 py-0.5 rounded-lg bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
-                          Associés : <strong>{currentTourniquetSynthesis.heuresAssocies} h</strong>
-                        </span>
-                        <span className="px-2.5 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
-                          Salariés RH : <strong>{currentTourniquetSynthesis.heuresSalaries} h</strong>
-                        </span>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <span className="font-bold text-slate-800 dark:text-dark-100 flex items-center gap-1">
-                        <Clock size={14} className="text-blue-600 dark:text-blue-400 shrink-0" />
-                        <span>Incubé (Porteur seul)</span>
-                        <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded-md border border-blue-200 dark:border-blue-800/40">
-                          {currentTourniquetSynthesis.label} :
-                        </span>
-                      </span>
+                  <button
+                    type="button"
+                    onClick={() => setTourniquetFilterMode('porteur')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      tourniquetFilterMode === 'porteur'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-dark-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-dark-700/60'
+                    }`}
+                  >
+                    <span>Incubé</span>
+                    <span className={`px-1.5 py-0.2 rounded text-[11px] font-extrabold ${
+                      tourniquetFilterMode === 'porteur'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-slate-200/80 dark:bg-dark-700 text-slate-700 dark:text-dark-200'
+                    }`}>
+                      {currentTourniquetSynthesis.heuresPorteur} h
+                    </span>
+                  </button>
 
-                      <div className="flex flex-wrap items-center gap-1.5 font-medium text-[11px]">
-                        <span className="px-2.5 py-0.5 rounded-lg bg-blue-600 text-white font-black shadow-2xs">
-                          Heures Incubé : <strong>{currentTourniquetSynthesis.heuresPorteur} h</strong>
-                        </span>
-                        <span className="px-2 py-0.5 rounded-lg bg-slate-200/80 text-slate-700 dark:bg-dark-700 dark:text-dark-300 border border-slate-300/60 dark:border-dark-600 text-[10px] font-semibold">
-                          Filtre Incubé actif (collaborateurs exclus)
-                        </span>
-                        {(tourniquetTeamData?.incube?.teamMembersCount || 1) <= 1 && (
-                          <span className="text-[10px] text-slate-400 italic">
-                            (Startup à 1 seul membre • Équipe = Incubé)
-                          </span>
-                        )}
-                      </div>
-                    </>
+                  {(currentTourniquetSynthesis.heuresAssocies > 0 || (tourniquetTeamData?.teamBreakdown || []).some(m => m.type === 'associe')) && (
+                    <button
+                      type="button"
+                      onClick={() => setTourniquetFilterMode('associes')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                        tourniquetFilterMode === 'associes'
+                          ? 'bg-purple-600 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-dark-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-dark-700/60'
+                      }`}
+                    >
+                      <span>Associés</span>
+                      <span className={`px-1.5 py-0.2 rounded text-[11px] font-extrabold ${
+                        tourniquetFilterMode === 'associes'
+                          ? 'bg-white/20 text-white'
+                          : 'bg-slate-200/80 dark:bg-dark-700 text-slate-700 dark:text-dark-200'
+                      }`}>
+                        {currentTourniquetSynthesis.heuresAssocies} h
+                      </span>
+                    </button>
+                  )}
+
+                  {(currentTourniquetSynthesis.heuresSalaries > 0 || (tourniquetTeamData?.teamBreakdown || []).some(m => m.type === 'salarie')) && (
+                    <button
+                      type="button"
+                      onClick={() => setTourniquetFilterMode('salaries')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                        tourniquetFilterMode === 'salaries'
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-dark-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-dark-700/60'
+                      }`}
+                    >
+                      <span>Salariés RH</span>
+                      <span className={`px-1.5 py-0.2 rounded text-[11px] font-extrabold ${
+                        tourniquetFilterMode === 'salaries'
+                          ? 'bg-white/20 text-white'
+                          : 'bg-slate-200/80 dark:bg-dark-700 text-slate-700 dark:text-dark-200'
+                      }`}>
+                        {currentTourniquetSynthesis.heuresSalaries} h
+                      </span>
+                    </button>
                   )}
                 </div>
 
-                {/* Droite : Filtre de mois & Filtre Équipe/Incubé & Bouton déplier membres */}
+                {/* Droite : Sélecteur de mois compact & bouton détail des membres */}
                 <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                  {/* SÉLECTEUR DE FILTRAGE PAR MOIS */}
-                  <div className="flex items-center gap-1.5 bg-white dark:bg-dark-900 border border-slate-300/80 dark:border-dark-700 rounded-xl px-2.5 py-1 text-xs shadow-2xs">
+                  <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-dark-800 border border-slate-200 dark:border-dark-700 rounded-xl px-2.5 py-1.5 text-xs">
                     <Calendar size={13} className="text-blue-600 dark:text-blue-400 shrink-0" />
-                    <span className="text-slate-500 dark:text-dark-400 font-medium">Mois :</span>
                     <select
                       value={selectedTourniquetMonth}
                       onChange={(e) => setSelectedTourniquetMonth(e.target.value)}
                       className="bg-transparent font-bold text-slate-800 dark:text-dark-100 focus:outline-none cursor-pointer pr-1 text-xs"
-                      title="Filtrer les heures par mois spécifique ou voir le cumul annuel"
                     >
-                      <option value="all">Tous les 12 mois (Cumul annuel)</option>
+                      <option value="all">Tous les 12 mois</option>
                       {MOIS.map((m) => {
                         const porteurM = Number(tourniquetTeamData?.porteurMonthlyHours?.[m] ?? months[m]?.moyenne_heures_presence ?? 0);
+                        const assocM = Number(tourniquetTeamData?.associesMonthlyHours?.[m] ?? 0);
+                        const salM = Number(tourniquetTeamData?.salariesMonthlyHours?.[m] ?? 0);
                         const equipeM = Number(tourniquetTeamData?.equipeMonthlyHours?.[m] ?? porteurM);
-                        const hVal = tourniquetFilterMode === 'equipe' ? equipeM : porteurM;
+                        const hVal =
+                          tourniquetFilterMode === 'porteur' ? porteurM :
+                          tourniquetFilterMode === 'associes' ? assocM :
+                          tourniquetFilterMode === 'salaries' ? salM :
+                          equipeM;
                         return (
                           <option key={m} value={m}>
                             {m} {annee} {hVal > 0 ? `(${hVal.toFixed(1)} h)` : ''}
@@ -1283,43 +1314,18 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                     </select>
                   </div>
 
-                  {/* BOUTONS FILTRE ÉQUIPE / INCUBÉ */}
-                  <div className="inline-flex items-center bg-slate-200/70 dark:bg-dark-900 p-0.5 rounded-xl border border-slate-300/60 dark:border-dark-700 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => setTourniquetFilterMode('equipe')}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        tourniquetFilterMode === 'equipe'
-                          ? 'bg-blue-600 text-white shadow-xs'
-                          : 'text-slate-600 dark:text-dark-300 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                      title="Afficher les heures de toute l'équipe dans le tableau"
-                    >
-                      Équipe
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTourniquetFilterMode('porteur')}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        tourniquetFilterMode === 'porteur'
-                          ? 'bg-blue-600 text-white shadow-xs'
-                          : 'text-slate-600 dark:text-dark-300 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                      title="Afficher uniquement les heures de l'incubé (porteur seul) dans le tableau"
-                    >
-                      Incubé
-                    </button>
-                  </div>
-
-                  {tourniquetTeamData?.teamBreakdown && tourniquetTeamData.teamBreakdown.length > 0 && (
+                  {tourniquetTeamData?.teamBreakdown && tourniquetTeamData.teamBreakdown.length > 1 && (
                     <button
                       type="button"
                       onClick={() => setIsTeamDetailOpen(!isTeamDetailOpen)}
-                      className="px-2.5 py-1 text-xs font-bold rounded-lg border border-slate-200 dark:border-dark-600 bg-white dark:bg-dark-900 hover:bg-slate-100 dark:hover:bg-dark-700 text-slate-700 dark:text-dark-200 flex items-center gap-1.5 shadow-2xs transition-all shrink-0 cursor-pointer"
-                      title={isTeamDetailOpen ? "Masquer la liste des collaborateurs" : "Afficher la liste des collaborateurs et leurs heures"}
+                      className={`px-2.5 py-1.5 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition-all shrink-0 cursor-pointer ${
+                        isTeamDetailOpen
+                          ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300'
+                          : 'border-slate-200 dark:border-dark-700 bg-slate-50 dark:bg-dark-800 hover:bg-slate-100 dark:hover:bg-dark-700 text-slate-700 dark:text-dark-200'
+                      }`}
                     >
-                      <span>{isTeamDetailOpen ? 'Masquer membres' : `Voir les ${tourniquetTeamData.teamBreakdown.length} membres`}</span>
-                      <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 ${isTeamDetailOpen ? 'rotate-180' : ''}`} />
+                      <span>{isTeamDetailOpen ? 'Masquer membres' : `Détail (${tourniquetTeamData.teamBreakdown.length} membres)`}</span>
+                      <ChevronDown size={14} className={`transition-transform duration-200 ${isTeamDetailOpen ? 'rotate-180' : ''}`} />
                     </button>
                   )}
                 </div>
@@ -1329,16 +1335,6 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
               {/* Volet Déroulant des membres (Visible uniquement si déplié) */}
               {isTeamDetailOpen && tourniquetTeamData?.teamBreakdown && (
                 <div className="pt-2.5 mt-2.5 border-t border-slate-200/70 dark:border-dark-700/60 animate-in fade-in duration-150">
-                  <div className="flex flex-wrap items-center justify-between pb-2 text-[11px] text-slate-500 gap-1.5">
-                    <span>
-                      Détail par collaborateur pour {selectedTourniquetMonth === 'all' ? `l'année ${annee} entière (Cumul)` : `le mois de ${selectedTourniquetMonth} ${annee}`} :
-                    </span>
-                    {tourniquetFilterMode === 'porteur' && (
-                      <span className="font-semibold text-blue-600 dark:text-blue-400">
-                        👤 Filtre « Incubé » actif : Seules les heures du Porteur sont comptabilisées
-                      </span>
-                    )}
-                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
                     {tourniquetTeamData.teamBreakdown.map((member, mIdx) => {
                       const isPorteur = member.type === 'porteur';
@@ -1346,7 +1342,10 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                         ? (member.totalHours || 0)
                         : Number(member.monthlyHours?.[selectedTourniquetMonth] || 0);
 
-                      const isDimmed = tourniquetFilterMode === 'porteur' && !isPorteur;
+                      const isDimmed =
+                        (tourniquetFilterMode === 'porteur' && member.type !== 'porteur') ||
+                        (tourniquetFilterMode === 'associes' && member.type !== 'associe') ||
+                        (tourniquetFilterMode === 'salaries' && member.type !== 'salarie');
 
                       return (
                         <div
@@ -1402,29 +1401,6 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
 
             </div>
 
-            {/* Alerte / Rappel si un mois spécifique est filtré */}
-            {selectedTourniquetMonth !== 'all' && (
-              <div className="flex items-center justify-between px-3.5 py-2 bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 rounded-xl text-xs">
-                <div className="flex items-center gap-2">
-                  <Calendar size={14} className="text-blue-600 dark:text-blue-400 shrink-0" />
-                  <span className="font-semibold text-blue-950 dark:text-blue-100">
-                    Filtre actif : Affichage focalisé sur le mois de <strong>{selectedTourniquetMonth} {annee}</strong>
-                  </span>
-                  <span className="text-[11px] px-2 py-0.5 rounded-md font-bold bg-white dark:bg-dark-800 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-dark-700">
-                    {tourniquetFilterMode === 'equipe' ? '👥 Vue Équipe' : '👤 Vue Incubé seul'}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedTourniquetMonth('all')}
-                  className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 flex items-center gap-1 underline cursor-pointer"
-                >
-                  <span>Afficher les 12 mois</span>
-                  <ArrowRight size={13} />
-                </button>
-              </div>
-            )}
-
             <div className="card overflow-hidden border border-slate-200 dark:border-dark-700/60 shadow-sm p-0">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
@@ -1436,7 +1412,13 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                       <th className="py-3 px-4 font-bold text-slate-800 dark:text-dark-200 text-center min-w-[200px]">
                         <div className="flex items-center justify-center gap-1.5">
                           <span>
-                            {tourniquetFilterMode === 'equipe' ? '👥 Heures Totales Équipe / Mois' : '👤 Heures Incubé Seul / Mois'}
+                            {tourniquetFilterMode === 'equipe'
+                              ? '👥 Heures Totales Équipe / Mois'
+                              : tourniquetFilterMode === 'associes'
+                              ? '💼 Heures Associés / Mois'
+                              : tourniquetFilterMode === 'salaries'
+                              ? '🪪 Heures Salariés RH / Mois'
+                              : '👤 Heures Incubé Seul / Mois'}
                           </span>
                           <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                             ZKTeco Direct
@@ -1472,6 +1454,10 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
                           } else if (item.moyenne_heures_presence !== '' && !isNaN(item.moyenne_heures_presence)) {
                             valPresence = parseFloat(item.moyenne_heures_presence);
                           }
+                        } else if (tourniquetFilterMode === 'associes') {
+                          valPresence = Number(tourniquetTeamData?.associesMonthlyHours?.[m] || 0);
+                        } else if (tourniquetFilterMode === 'salaries') {
+                          valPresence = Number(tourniquetTeamData?.salariesMonthlyHours?.[m] || 0);
                         } else {
                           if (tourniquetTeamData?.equipeMonthlyHours && tourniquetTeamData.equipeMonthlyHours[m] !== undefined) {
                             valPresence = Number(tourniquetTeamData.equipeMonthlyHours[m] || 0);

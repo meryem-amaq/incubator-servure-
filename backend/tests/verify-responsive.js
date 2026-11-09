@@ -44,8 +44,8 @@ function postJSON(url, data) {
       let body = '';
       res.on('data', d => body += d);
       res.on('end', () => {
-        try { resolve({ status: res.statusCode, body: JSON.parse(body) }); }
-        catch (e) { resolve({ status: res.statusCode, body }); }
+        try { resolve({ status: res.statusCode, headers: res.headers, body: JSON.parse(body) }); }
+        catch (e) { resolve({ status: res.statusCode, headers: res.headers, body }); }
       });
     });
     req.on('error', reject);
@@ -118,10 +118,10 @@ async function run() {
     email: 'admin@cgs-incubateur.ma',
     mot_de_passe: 'Admin@2024'
   });
-  if (loginRes.status !== 200 || !loginRes.body.token) {
+  if (loginRes.status !== 200 || !authTokenFrom(loginRes)) {
     throw new Error(`Échec login: status=${loginRes.status}`);
   }
-  const token = loginRes.body.token;
+  const token = authTokenFrom(loginRes);
   const user = loginRes.body.user;
   console.log(`✅ Connecté en tant que: ${user.email} (rôle: ${user.role})`);
 
@@ -291,3 +291,10 @@ async function run() {
 
 run();
 
+
+// Le serveur dépose le JWT dans le cookie httpOnly "ids_auth" (il n'est plus renvoyé dans le corps JSON)
+function authTokenFrom(res) {
+  const cookies = (res && res.headers && res.headers['set-cookie']) || [];
+  const match = cookies.join(';').match(/(?:^|;\s*)ids_auth=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}

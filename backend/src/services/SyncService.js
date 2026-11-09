@@ -82,10 +82,11 @@ class SyncService {
       const data = await response.json();
       const reservations = data.reservations || [];
       const presences = data.presences || [];
+      const decisions = data.decisions || [];
 
-      if (reservations.length === 0 && presences.length === 0) {
+      if (reservations.length === 0 && presences.length === 0 && decisions.length === 0) {
         this.isSyncing = false;
-        return { success: true, pulledReservations: 0, pulledPresences: 0 };
+        return { success: true, pulledReservations: 0, pulledPresences: 0, syncedDecisions: 0 };
       }
 
       const syncedReservationIds = [];
@@ -96,14 +97,22 @@ class SyncService {
         try {
           const ppNum = res.numero_pp || res.pp_numero || res.ppNumero || '';
           const emailVal = (res.email_incube || res.emailIncube || res.email || '').trim().toLowerCase();
-          const nomVal = (res.nom_incube || res.nomIncube || res.nomComplet || res.nom || '').trim().toLowerCase();
           
-          const isAdmin = 
-            String(ppNum).toUpperCase() === 'ADMIN' ||
-            emailVal.includes('admin') ||
-            nomVal.includes('admin');
+          // Vérification stricte en base locale : l'auto-validation est réservée aux comptes Staff/Admin actifs vérifiés
+          let isVerifiedStaff = false;
+          if (emailVal) {
+            const staffUser = await User.findOne({
+              where: {
+                email: emailVal,
+                actif: true,
+                role: { [Op.in]: ['super_admin', 'admin', 'administrateur', 'accompagnateur', 'gestionnaire', 'consultant'] }
+              },
+              attributes: ['id', 'role']
+            });
+            if (staffUser) isVerifiedStaff = true;
+          }
 
-          const targetStatut = isAdmin ? 'valide' : 'en_attente';
+          const targetStatut = isVerifiedStaff ? 'valide' : 'en_attente';
 
           const createdReservation = await ReservationEspace.create({
             cloudId: res.id || null,
@@ -219,46 +228,67 @@ class SyncService {
             const dateVal = dec.dateReservation ? String(dec.dateReservation).split('T')[0] : null;
             if (!dateVal || !dec.heureDebut || !dec.heureFin) continue;
 
-            const localWhere = {
-              dateReservation: dateVal,
-              heureDebut: dec.heureDebut,
-              heureFin: dec.heureFin,
-              espace: dec.espace,
-              statut: 'en_attente'
-            };
-            if (dec.salle) localWhere.salleSpecifique = dec.salle;
+            let pendingRes = null;
+            if (dec.id) {
+              pendingRes = await ReservationEspace.findOne({ where: { cloudId: dec.id } });
+            }
+            if (!pendingRes) {
+              const localWhere = {
+                dateReservation: dateVal,
+                heureDebut: dec.heureDebut,
+                heureFin: dec.heureFin,
+                espace: dec.espace
+              };
+              if (dec.salle) localWhere.salleSpecifique = dec.salle;
+              pendingRes = await ReservationEspace.findOne({ where: localWhere });
+            }
 
-            const pendingRes = await ReservationEspace.findOne({ where: localWhere });
             if (pendingRes) {
-              pendingRes.statut = dec.decision; // 'valide' ou 'refuse'
-              await pendingRes.save();
-              console.log(`⚡ [SyncService] Réservation locale #${pendingRes.id} synchronisée vers "${dec.decision}" (décision Cloud par ${dec.decision_par || 'Accompagnateur'})`);
-
-              // Génération automatique de la checklist matériel si validée
-              if (dec.decision === 'valide' && EquipementEspace && ChecklistMateriel) {
-                try {
-                  const equipWhere = { espace: pendingRes.espace };
-                  if (pendingRes.salleSpecifique) equipWhere.salle = pendingRes.salleSpecifique;
-                  const equipements = await EquipementEspace.findAll({ where: equipWhere });
-                  if (equipements && equipements.length > 0) {
-                    await ChecklistMateriel.destroy({ where: { reservation_id: pendingRes.id } });
-                    const checklists = equipements.map(e => ({
-                      reservation_id: pendingRes.id,
-                      equipement_id: e.id,
-                      etat_avant: e.etatAvant || 'Opérationnel / Parfait état',
-                      etat_apres: e.etatApres || 'Conforme & Rendu propre'
-                    }));
-                    await ChecklistMateriel.bulkCreate(checklists);
-                  }
-                } catch (chkErr) {}
+              if (pendingRes.statut !== dec.decision) {
+                pendingRes.statut = dec.decision; // 'valide' ou 'refuse'
+                await pendingRes.save();
+                console.log(`⚡ [SyncService] Réservation locale #${pendingRes.id} synchronisée vers "${dec.decision}" (décision Cloud par ${dec.decision_par || 'Accompagnateur'})`);
               }
+            } else {
+              // Si la réservation a été faite et validée sur le Cloud pendant que le serveur local était éteint
+              pendingRes = await ReservationEspace.create({
+                cloudId: dec.id || null,
+                espace: dec.espace || 'salle_reunion',
+                salleSpecifique: dec.salle || null,
+                nomIncube: dec.nomComplet || '—',
+                emailIncube: dec.email || null,
+                dateReservation: dateVal,
+                heureDebut: dec.heureDebut,
+                heureFin: dec.heureFin,
+                statut: dec.decision || 'valide'
+              });
+              console.log(`⚡ [SyncService] Nouvelle réservation Cloud #${dec.id} (${dec.nomComplet}) créée directement avec statut "${dec.decision}"`);
+            }
 
-              // Notification officielle à l'incubé par email
-              if (pendingRes.emailIncube) {
-                emailService.sendReservationStatusEmail(pendingRes, dec.decision, dec.decision_motif).catch(e => {
-                  console.warn(`⚠️ [SyncService] Erreur notification email incubé pour rés #${pendingRes.id}:`, e.message);
-                });
-              }
+            // Génération automatique de la checklist matériel si validée
+            if (dec.decision === 'valide' && EquipementEspace && ChecklistMateriel) {
+              try {
+                const equipWhere = { espace: pendingRes.espace };
+                if (pendingRes.salleSpecifique) equipWhere.salle = pendingRes.salleSpecifique;
+                const equipements = await EquipementEspace.findAll({ where: equipWhere });
+                if (equipements && equipements.length > 0) {
+                  await ChecklistMateriel.destroy({ where: { reservation_id: pendingRes.id } });
+                  const checklists = equipements.map(e => ({
+                    reservation_id: pendingRes.id,
+                    equipement_id: e.id,
+                    etat_avant: e.etatAvant || 'Opérationnel / Parfait état',
+                    etat_apres: e.etatApres || 'Conforme & Rendu propre'
+                  }));
+                  await ChecklistMateriel.bulkCreate(checklists);
+                }
+              } catch (chkErr) {}
+            }
+
+            // Notification officielle à l'incubé par email (si pas encore notifié)
+            if (pendingRes.emailIncube && dec.decision_motif) {
+              emailService.sendReservationStatusEmail(pendingRes, dec.decision, dec.decision_motif).catch(e => {
+                console.warn(`⚠️ [SyncService] Erreur notification email incubé pour rés #${pendingRes.id}:`, e.message);
+              });
             }
           } catch (decErr) {
             console.warn(`⚠️ [SyncService] Erreur traitement décision cloud:`, decErr.message);

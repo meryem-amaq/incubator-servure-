@@ -1,6 +1,6 @@
 const http = require('http');
 
-const BASE_URL = 'http://localhost:5000';
+const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:5000';
 let token = '';
 
 function request(method, path, body = null, headers = {}) {
@@ -89,10 +89,10 @@ async function main() {
       email: 'admin@cgs-incubateur.ma',
       mot_de_passe: 'Admin@2024',
     });
-    if (res.status !== 200 || !res.body.token) {
+    if (res.status !== 200 || !authTokenFrom(res)) {
       throw new Error(`Échec connexion: ${res.status} - ${JSON.stringify(res.body)}`);
     }
-    token = res.body.token;
+    token = authTokenFrom(res);
     return `Token JWT reçu pour ${res.body.user?.email} (${res.body.user?.role})`;
   });
 
@@ -385,3 +385,10 @@ main().catch((err) => {
   console.error('Erreur fatale test:', err);
   process.exit(1);
 });
+
+// Le serveur dépose le JWT dans le cookie httpOnly "ids_auth" (il n'est plus renvoyé dans le corps JSON)
+function authTokenFrom(res) {
+  const cookies = (res && res.headers && res.headers['set-cookie']) || [];
+  const match = cookies.join(';').match(/(?:^|;\s*)ids_auth=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}

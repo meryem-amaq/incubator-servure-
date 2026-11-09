@@ -96,10 +96,10 @@ async function runAllTests() {
       email: 'admin@cgs-incubateur.ma',
       mot_de_passe: 'Admin@2024'
     });
-    if (res.status !== 200 || !res.body.token) {
+    if (res.status !== 200 || !authTokenFrom(res)) {
       throw new Error(`Échec login: HTTP ${res.status}`);
     }
-    token = res.body.token;
+    token = authTokenFrom(res);
     return `Token généré pour ${res.body.user.email} (${res.body.user.role})`;
   });
 
@@ -291,3 +291,10 @@ async function runAllTests() {
 }
 
 runAllTests().catch(console.error);
+
+// Le serveur dépose le JWT dans le cookie httpOnly "ids_auth" (il n'est plus renvoyé dans le corps JSON)
+function authTokenFrom(res) {
+  const cookies = (res && res.headers && res.headers['set-cookie']) || [];
+  const match = cookies.join(';').match(/(?:^|;\s*)ids_auth=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}

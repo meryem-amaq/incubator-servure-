@@ -158,16 +158,12 @@ export default function Evenements() {
   const [serverPresences, setServerPresences] = useState([]);
   const [serverPresencesAtelierId, setServerPresencesAtelierId] = useState(null);
 
-  // Headers avec token d'authentification
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem('cgs_token');
-    return {
-      'Content-Type': 'application/json',
-      'ngrok-skip-browser-warning': 'true',
-      'Bypass-Tunnel-Reminder': 'true',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-    };
-  };
+  // Headers communs (l'authentification passe par le cookie httpOnly envoyé automatiquement)
+  const getAuthHeaders = () => ({
+    'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
+    'Bypass-Tunnel-Reminder': 'true'
+  });
 
   // Polling automatique des présences depuis le backend toutes les 3 secondes quand un atelier est sélectionné
   useEffect(() => {

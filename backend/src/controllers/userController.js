@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const { User, Incube } = require('../models');
 const emailService = require('../services/emailService');
 const { syncWhitelistCloud } = require('./incubeController');
+const { invalidateUserAuthCache } = require('../middleware/auth');
 
 // GET /api/users — Liste de tous les utilisateurs avec nombre d'incubés
 exports.getAll = async (req, res) => {
@@ -128,9 +129,14 @@ exports.create = async (req, res) => {
       userRole = 'admin';
     }
 
-    const photo_url = req.file 
-      ? `data:${req.file.mimetype || 'image/jpeg'};base64,${req.file.buffer.toString('base64')}` 
-      : null;
+    let photo_url = null;
+    if (req.file) {
+      const allowedImageMimes = ['image/jpeg', 'image/png', 'image/webp'];
+      if (!allowedImageMimes.includes(req.file.mimetype)) {
+        return res.status(400).json({ message: 'Format de photo non autorisé (JPEG, PNG ou WebP requis)' });
+      }
+      photo_url = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+    }
 
     const newUser = await User.create({
       nom,
@@ -197,11 +203,15 @@ exports.update = async (req, res) => {
     }
 
     if (req.file) {
-      const mime = req.file.mimetype || 'image/jpeg';
-      user.photo_url = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
+      const allowedImageMimes = ['image/jpeg', 'image/png', 'image/webp'];
+      if (!allowedImageMimes.includes(req.file.mimetype)) {
+        return res.status(400).json({ message: 'Format de photo non autorisé (JPEG, PNG ou WebP requis)' });
+      }
+      user.photo_url = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
     }
 
     await user.save();
+    invalidateUserAuthCache(user.id);
 
     // Synchronisation instantanée de la liste blanche vers le Cloud
     if (typeof syncWhitelistCloud === 'function') {
@@ -235,6 +245,7 @@ exports.delete = async (req, res) => {
     }
 
     await user.destroy();
+    invalidateUserAuthCache(user.id);
 
     // Synchronisation instantanée de la liste blanche vers le Cloud
     if (typeof syncWhitelistCloud === 'function') {
@@ -262,6 +273,7 @@ exports.resetPasswordByAdmin = async (req, res) => {
 
     user.mot_de_passe = await bcrypt.hash(mot_de_passe, 12);
     await user.save();
+    invalidateUserAuthCache(user.id);
 
     let emailSent = false;
     if (envoyer_email && user.email) {

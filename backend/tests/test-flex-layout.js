@@ -17,7 +17,7 @@ function postJSON(url, data) {
     }, res => {
       let body = '';
       res.on('data', d => body += d);
-      res.on('end', () => resolve({ status: res.statusCode, body: JSON.parse(body) }));
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: JSON.parse(body) }));
     });
     req.on('error', reject);
     req.write(postData);
@@ -30,7 +30,7 @@ async function test() {
     email: 'admin@cgs-incubateur.ma',
     mot_de_passe: 'Admin@2024'
   });
-  const token = loginRes.body.token;
+  const token = authTokenFrom(loginRes);
   const user = loginRes.body.user;
 
   const edge = spawn('C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', [
@@ -132,3 +132,10 @@ async function test() {
 }
 test();
 
+
+// Le serveur dépose le JWT dans le cookie httpOnly "ids_auth" (il n'est plus renvoyé dans le corps JSON)
+function authTokenFrom(res) {
+  const cookies = (res && res.headers && res.headers['set-cookie']) || [];
+  const match = cookies.join(';').match(/(?:^|;\s*)ids_auth=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}

@@ -15,15 +15,13 @@ const sanitizeUserData = (userData) => {
   return cleaned;
 };
 
+// Le jeton JWT est désormais stocké dans un cookie httpOnly géré par le serveur :
+// il n'est jamais lisible par le JavaScript. Seul le profil (non sensible) est mis en cache
+// dans localStorage pour l'affichage immédiat de l'interface.
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
-    const token = localStorage.getItem('cgs_token');
-    // Si un ancien faux token démo est présent, on le purge
-    if (token === 'demo-token') {
-      localStorage.removeItem('cgs_token');
-      localStorage.removeItem('cgs_user');
-      return null;
-    }
+    // Purge définitive de l'ancien jeton stocké en clair avant la migration vers le cookie httpOnly
+    localStorage.removeItem('cgs_token');
     const stored = localStorage.getItem('cgs_user');
     if (!stored) return null;
     try {
@@ -39,29 +37,26 @@ export function AuthProvider({ children }) {
   });
   const [loading, setLoading] = useState(false);
 
-  // Synchronisation avec l'API pour récupérer les données fraîches sans "CGS"
+  // Vérification de la session auprès du serveur (le cookie httpOnly est envoyé automatiquement)
   useEffect(() => {
-    const token = localStorage.getItem('cgs_token');
-    if (token && token !== 'demo-token') {
-      api.get('/auth/me')
-        .then((res) => {
-          if (res.data) {
-            const cleaned = sanitizeUserData(res.data);
-            setUser(cleaned);
-            localStorage.setItem('cgs_user', JSON.stringify(cleaned));
-          }
-        })
-        .catch(() => {});
-    }
+    if (!localStorage.getItem('cgs_user')) return;
+    api.get('/auth/me')
+      .then((res) => {
+        if (res.data) {
+          const cleaned = sanitizeUserData(res.data);
+          setUser(cleaned);
+          localStorage.setItem('cgs_user', JSON.stringify(cleaned));
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const login = async (email, mot_de_passe) => {
     setLoading(true);
 
-    // Connexion réelle via API backend
+    // Connexion réelle via API backend (le serveur dépose le cookie httpOnly de session)
     try {
       const res = await api.post('/auth/login', { email, mot_de_passe });
-      localStorage.setItem('cgs_token', res.data.token);
       localStorage.setItem('cgs_user', JSON.stringify(res.data.user));
       setUser(res.data.user);
       return { success: true };
@@ -75,10 +70,15 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('cgs_token');
+  const logout = async () => {
     localStorage.removeItem('cgs_user');
     setUser(null);
+    // Le cookie httpOnly ne peut être supprimé que par le serveur
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // Ignorer : la session locale est déjà vidée
+    }
   };
 
   const updateUser = (updatedUser) => {

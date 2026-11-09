@@ -4,6 +4,7 @@ const { RendezVous, Incube } = require('../models');
 const { Op } = require('sequelize');
 const emailService = require('../services/emailService');
 const auth = require('../middleware/auth');
+const requireStaff = require('../middleware/requireStaff');
 
 // Tous les endpoints de rendez-vous nécessitent une authentification
 router.use(auth);
@@ -11,8 +12,14 @@ router.use(auth);
 // GET /api/rendezvous - Liste tous les rendez-vous avec filtrage optionnel
 router.get('/', async (req, res) => {
   try {
-    const { incubeId, accompagnateurId, statut } = req.query;
+    let { incubeId, accompagnateurId, statut } = req.query;
     const where = {};
+
+    // Cloisonnement strict : un incubé ne peut voir que ses propres rendez-vous
+    if (req.user.role === 'incube') {
+      if (!req.user.pp_id) return res.json([]);
+      incubeId = req.user.pp_id;
+    }
 
     if (statut) {
       where.statut = statut;
@@ -46,8 +53,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/rendezvous/creer - Créer un nouveau rendez-vous
-router.post('/creer', async (req, res) => {
+// POST /api/rendezvous/creer - Créer un nouveau rendez-vous (Staff uniquement)
+router.post('/creer', requireStaff, async (req, res) => {
   try {
     const {
       accompagnateurId,
@@ -127,8 +134,8 @@ router.post('/creer', async (req, res) => {
   }
 });
 
-// PUT /api/rendezvous/:id - Modifier un rendez-vous (statut, date, notes)
-router.put('/:id', async (req, res) => {
+// PUT /api/rendezvous/:id - Modifier un rendez-vous (statut, date, notes) (Staff uniquement)
+router.put('/:id', requireStaff, async (req, res) => {
   try {
     const rdv = await RendezVous.findByPk(req.params.id);
     if (!rdv) {
@@ -145,8 +152,8 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/rendezvous/:id - Supprimer un rendez-vous
-router.delete('/:id', async (req, res) => {
+// DELETE /api/rendezvous/:id - Supprimer un rendez-vous (Staff uniquement)
+router.delete('/:id', requireStaff, async (req, res) => {
   try {
     const rdv = await RendezVous.findByPk(req.params.id);
     if (!rdv) {

@@ -227,12 +227,9 @@ export default function TabInfos({ incube, onUpdate }) {
         formData.append('photo_path', form.photo_path);
       }
 
-      const token = localStorage.getItem('cgs_token');
       const res = await fetch(import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/incubes/${incube.id}` : `/api/incubes/${incube.id}`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
+        credentials: 'include',
         body: formData
       });
 

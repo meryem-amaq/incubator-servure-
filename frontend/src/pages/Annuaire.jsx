@@ -298,12 +298,9 @@ export default function Annuaire() {
         formData.append('photo', photoFile);
       }
 
-      const token = localStorage.getItem('cgs_token');
       const res = await fetch(import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/incubes` : '/api/incubes', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
+        credentials: 'include',
         body: formData
       });
 
@@ -1052,7 +1049,7 @@ export default function Annuaire() {
           ) : null}
         </div>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))] gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map((inc, idx) => {
             const followUp = getFollowUpStatus(inc);
             const planStatut = getPlanStatus(inc);

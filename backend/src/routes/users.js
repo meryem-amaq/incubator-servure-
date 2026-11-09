@@ -9,8 +9,8 @@ const tourniquetService = require('../services/tourniquetService');
 
 const requireStaff = require('../middleware/requireStaff');
 
-// GET /api/users/activite?type=Formation : Historique et total d'accès pour les catégories hors-incubés
-router.get('/activite', auth, async (req, res) => {
+// GET /api/users/activite?type=Formation : Historique et total d'accès pour les catégories hors-incubés (Staff uniquement)
+router.get('/activite', auth, requireStaff, async (req, res) => {
   try {
     const { type = 'Formation', startDate, endDate } = req.query;
     const result = await tourniquetService.getActivityByType(type, startDate, endDate);

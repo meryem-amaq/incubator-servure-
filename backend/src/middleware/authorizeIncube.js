@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { getTokenFromRequest } = require('../utils/authCookie');
 
 /**
  * Middleware Express : authorizeIncube
@@ -14,11 +15,10 @@ const jwt = require('jsonwebtoken');
 module.exports = (req, res, next) => {
   // 1. Vérification de l'authentification préalable
   if (!req.user) {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const token = getTokenFromRequest(req);
+    if (!token) {
       return res.status(401).json({ message: 'Authentification requise : token manquant' });
     }
-    const token = authHeader.split(' ')[1];
     try {
       const secret = process.env.JWT_SECRET;
       if (!secret) return res.status(500).json({ message: 'Configuration de sécurité du serveur incomplète' });

@@ -3,14 +3,26 @@ const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
 const { User, Incube } = require('../models');
 const emailService = require('../services/emailService');
+const { setAuthCookie, clearAuthCookie } = require('../utils/authCookie');
+const { invalidateUserAuthCache } = require('../middleware/auth');
+
+// POST /api/auth/logout : suppression du cookie httpOnly (impossible depuis le JavaScript du navigateur)
+exports.logout = (req, res) => {
+  clearAuthCookie(res, req);
+  res.json({ success: true });
+};
 
 // POST /api/auth/login
 exports.login = async (req, res) => {
   try {
-    const { email, mot_de_passe } = req.body;
-    const emailAliases = [email];
-    if (email === 'admin@ids-incubateur.ma') emailAliases.push('admin@cgs-incubateur.ma', 'admin@cgs.ma');
-    if (email === 'admin@cgs-incubateur.ma' || email === 'admin@cgs.ma') emailAliases.push('admin@ids-incubateur.ma', 'admin@ids.ma');
+    const { email, mot_de_passe } = req.body || {};
+    if (typeof email !== 'string' || typeof mot_de_passe !== 'string' || !email.trim() || !mot_de_passe) {
+      return res.status(401).json({ message: 'Email ou mot de passe incorrect' });
+    }
+    const cleanEmail = email.trim();
+    const emailAliases = [cleanEmail];
+    if (cleanEmail === 'admin@ids-incubateur.ma') emailAliases.push('admin@cgs-incubateur.ma', 'admin@cgs.ma');
+    if (cleanEmail === 'admin@cgs-incubateur.ma' || cleanEmail === 'admin@cgs.ma') emailAliases.push('admin@ids-incubateur.ma', 'admin@ids.ma');
 
     const user = await User.findOne({ where: { email: { [Op.in]: emailAliases }, actif: true } });
     if (!user) return res.status(401).json({ message: 'Email ou mot de passe incorrect' });
@@ -53,8 +65,10 @@ exports.login = async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
     );
 
+    // Jeton déposé dans un cookie httpOnly (Secure auto-détecté selon HTTP/HTTPS) : il n'est plus renvoyé dans le corps JSON
+    setAuthCookie(res, token, req);
+
     res.json({
-      token,
       user: {
         id: user.id,
         nom: user.nom,
@@ -92,15 +106,22 @@ exports.me = async (req, res) => {
   }
 };
 
-// POST /api/auth/register (admin only)
+// POST /api/auth/register (Super Admin uniquement)
 exports.register = async (req, res) => {
   try {
     const { nom, prenom, email, mot_de_passe, role } = req.body;
-    const exists = await User.findOne({ where: { email } });
+    if (!nom || !prenom || !email || !mot_de_passe || String(mot_de_passe).length < 6) {
+      return res.status(400).json({ message: 'Champs obligatoires manquants ou mot de passe trop court (min 6 caractères)' });
+    }
+    const cleanEmail = String(email).trim().toLowerCase();
+    const exists = await User.findOne({ where: { email: cleanEmail } });
     if (exists) return res.status(400).json({ message: 'Email déjà utilisé' });
 
+    const allowedRoles = ['super_admin', 'admin', 'incube'];
+    const safeRole = allowedRoles.includes(role) ? role : 'admin';
+
     const hash = await bcrypt.hash(mot_de_passe, 12);
-    const user = await User.create({ nom, prenom, email, mot_de_passe: hash, role });
+    const user = await User.create({ nom, prenom, email: cleanEmail, mot_de_passe: hash, role: safeRole });
 
     try {
       const { syncWhitelistCloud } = require('./incubeController');
@@ -135,11 +156,16 @@ exports.updateMe = async (req, res) => {
     }
 
     if (req.file) {
-      const mime = req.file.mimetype || 'image/jpeg';
+      const allowedImageMimes = ['image/jpeg', 'image/png', 'image/webp'];
+      const mime = allowedImageMimes.includes(req.file.mimetype) ? req.file.mimetype : null;
+      if (!mime) {
+        return res.status(400).json({ message: 'Format de photo non autorisé (JPEG, PNG ou WebP requis)' });
+      }
       user.photo_url = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
     }
 
     await user.save();
+    invalidateUserAuthCache(user.id);
 
     res.json({
       id: user.id,
@@ -159,9 +185,9 @@ exports.updateMe = async (req, res) => {
 // POST /api/auth/forgot-password
 exports.forgotPassword = async (req, res) => {
   try {
-    const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ message: "Veuillez fournir une adresse e-mail" });
+    const { email } = req.body || {};
+    if (!email || typeof email !== 'string' || /[\r\n]/.test(email)) {
+      return res.status(400).json({ message: "Veuillez fournir une adresse e-mail valide" });
     }
 
     const user = await User.findOne({ where: { email: email.trim().toLowerCase(), actif: true } });
@@ -200,9 +226,9 @@ exports.forgotPassword = async (req, res) => {
 // POST /api/auth/reset-password
 exports.resetPassword = async (req, res) => {
   try {
-    const { id, token, nouveau_mot_de_passe } = req.body;
+    const { id, token, nouveau_mot_de_passe } = req.body || {};
 
-    if (!id || !token || !nouveau_mot_de_passe) {
+    if (!id || typeof token !== 'string' || typeof nouveau_mot_de_passe !== 'string') {
       return res.status(400).json({ message: "Informations incomplètes pour la réinitialisation" });
     }
 
@@ -231,6 +257,7 @@ exports.resetPassword = async (req, res) => {
     // Hachage du nouveau mot de passe avec bcrypt salt 12
     user.mot_de_passe = await bcrypt.hash(nouveau_mot_de_passe, 12);
     await user.save();
+    invalidateUserAuthCache(user.id);
 
     res.json({
       success: true,

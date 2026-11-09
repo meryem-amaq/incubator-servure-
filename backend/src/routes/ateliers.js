@@ -50,6 +50,11 @@ router.get('/', auth, async (req, res) => {
 router.get('/incube-stats/:incubeId', auth, async (req, res) => {
   try {
     const incubeId = parseInt(req.params.incubeId, 10);
+    if (req.user.role === 'incube' && Number(req.user.pp_id) !== incubeId) {
+      return res.status(403).json({
+        message: 'Accès interdit : vous ne pouvez consulter que vos propres statistiques d\'ateliers'
+      });
+    }
     const annee = parseInt(req.query.annee || new Date().getFullYear(), 10);
 
     const incube = await Incube.findByPk(incubeId);

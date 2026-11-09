@@ -3,14 +3,9 @@ import axios from 'axios';
 const api = axios.create({
   baseURL: '/api',
   timeout: 15000,
+  // Le jeton JWT voyage dans un cookie httpOnly envoyé automatiquement par le navigateur
+  withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
-});
-
-// Attach JWT token to every request
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('cgs_token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
 });
 
 // Handle 401 globally
@@ -18,9 +13,11 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
-      localStorage.removeItem('cgs_token');
+      localStorage.removeItem('cgs_token'); // purge d'un éventuel ancien jeton stocké avant la migration
       localStorage.removeItem('cgs_user');
-      window.location.href = '/login';
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(err);
   }

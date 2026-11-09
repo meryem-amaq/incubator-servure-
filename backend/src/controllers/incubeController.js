@@ -4,6 +4,8 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const emailService = require('../services/emailService');
 const tourniquetService = require('../services/tourniquetService');
+const { sanitizePhotoUrl } = require('../middleware/upload');
+const { invalidateUserAuthCache } = require('../middleware/auth');
 
 // Fonction utilitaire pour synchroniser la liste blanche avec le Cloud
 const syncWhitelistCloud = async () => {
@@ -842,14 +844,18 @@ exports.create = async (req, res) => {
     const isSuper = req.user.role === 'super_admin' || req.user.role === 'administrateur';
     const data = { ...req.body };
 
-    // --- Gestion de la photo (upload multipart ou base64 inline) ---
+    // --- Gestion de la photo (upload multipart ou base64 inline sécurisé) ---
     if (req.file) {
-      const mime = req.file.mimetype || 'image/jpeg';
-      data.photo_path = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
+      const allowedImageMimes = ['image/jpeg', 'image/png', 'image/webp'];
+      if (!allowedImageMimes.includes(req.file.mimetype)) {
+        await t.rollback();
+        return res.status(400).json({ message: 'Format de photo non autorisé (JPEG, PNG ou WebP requis)' });
+      }
+      data.photo_path = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
     } else if (req.body.photo_path) {
-      data.photo_path = req.body.photo_path;
+      data.photo_path = sanitizePhotoUrl(req.body.photo_path);
     } else if (req.body.photo) {
-      data.photo_path = req.body.photo;
+      data.photo_path = sanitizePhotoUrl(req.body.photo);
     }
 
     // --- Résolution sécurisée de l'admin_id (vérification FK) ---
@@ -916,8 +922,14 @@ exports.create = async (req, res) => {
           telephone: data.telephone || null,
         }, { transaction: t });
       } else {
-        // Le compte existe déjà : on le laisse tel quel, on le lie simplement à l'incubé
-        console.log(`ℹ️ Compte User existant (${emailClean}) détecté — liaison sans modification.`);
+        // Interdire formellement le rattachement d'un compte d'administration (Super Admin / Staff) à un dossier incubé
+        if (userAccount.role !== 'incube') {
+          await t.rollback();
+          return res.status(400).json({
+            message: 'Cette adresse email appartient à un compte d\'administration et ne peut pas être rattachée à un dossier incubé.'
+          });
+        }
+        console.log(`ℹ️ Compte User incubé existant (${emailClean}) détecté — liaison sans modification.`);
       }
 
       // Lier user_id directement dans data (sera passé à Incube.create dans la même transaction)
@@ -1083,7 +1095,8 @@ exports.update = async (req, res) => {
     const incube = await Incube.findByPk(req.params.id);
     if (!incube) return res.status(404).json({ message: 'Incubé non trouvé' });
 
-    if (!isSuper) {
+    const isSelfIncube = req.user.role === 'incube' && String(req.user.pp_id) === String(incube.id);
+    if (!isSuper && !isSelfIncube) {
       const isOwner = incube.admin_id === req.user.id ||
         (req.user.nom && incube.accompagnateur && incube.accompagnateur.toLowerCase().includes(req.user.nom.toLowerCase()));
       if (!isOwner) {
@@ -1093,13 +1106,27 @@ exports.update = async (req, res) => {
 
     const data = { ...req.body };
 
+    // Un incubé modifiant son propre profil ne peut jamais altérer les champs d'administration ou de contrôle d'accès physique
+    if (isSelfIncube) {
+      delete data.admin_id;
+      delete data.accompagnateur;
+      delete data.user_id;
+      delete data.est_suspendu;
+      delete data.badge_id;
+      delete data.matricule;
+      delete data.pp_numero;
+    }
+
     if (req.file) {
-      const mime = req.file.mimetype || 'image/jpeg';
-      data.photo_path = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
+      const allowedImageMimes = ['image/jpeg', 'image/png', 'image/webp'];
+      if (!allowedImageMimes.includes(req.file.mimetype)) {
+        return res.status(400).json({ message: 'Format de photo non autorisé (JPEG, PNG ou WebP requis)' });
+      }
+      data.photo_path = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
     } else if (req.body.photo_path !== undefined) {
-      data.photo_path = req.body.photo_path || null;
+      data.photo_path = sanitizePhotoUrl(req.body.photo_path);
     } else if (req.body.photo !== undefined) {
-      data.photo_path = req.body.photo || null;
+      data.photo_path = sanitizePhotoUrl(req.body.photo);
     } else {
       delete data.photo_path;
     }
@@ -1316,6 +1343,16 @@ exports.envoyerAlerteAssiduite = async (req, res) => {
   try {
     const incube = await Incube.findByPk(req.params.id);
     if (!incube) return res.status(404).json({ message: 'Incubé non trouvé' });
+
+    const isSuper = ['super_admin', 'administrateur'].includes(req.user.role);
+    if (!isSuper) {
+      const isOwner = incube.admin_id === req.user.id ||
+        (req.user.nom && incube.accompagnateur && incube.accompagnateur.toLowerCase().includes(req.user.nom.toLowerCase()));
+      if (!isOwner) {
+        return res.status(403).json({ message: 'Action non autorisée sur ce dossier' });
+      }
+    }
+
     if (!incube.email) return res.status(400).json({ message: "L'incubé n'a pas d'adresse email enregistrée" });
 
     const { tauxPresence = 0, moyenneHeures = 0, annee = 2026 } = req.body;
@@ -1341,6 +1378,9 @@ exports.envoyerAlerteAssiduite = async (req, res) => {
 exports.syncTourniquet = async (req, res) => {
   try {
     const incubeId = req.params.id;
+    if (req.user.role === 'incube' && String(req.user.pp_id) !== String(incubeId)) {
+      return res.status(403).json({ message: 'Accès refusé : vous ne pouvez synchroniser que votre propre dossier' });
+    }
     const annee = parseInt(req.query.annee || req.body?.annee || new Date().getFullYear(), 10);
     const result = await tourniquetService.syncIncubeTourniquet(incubeId, annee);
     res.json({
@@ -1359,6 +1399,16 @@ exports.broadcastRfid = async (req, res) => {
   try {
     const incube = await Incube.findByPk(req.params.id);
     if (!incube) return res.status(404).json({ message: 'Incubé introuvable' });
+
+    const isSuper = ['super_admin', 'administrateur'].includes(req.user.role);
+    if (!isSuper) {
+      const isOwner = incube.admin_id === req.user.id ||
+        (req.user.nom && incube.accompagnateur && incube.accompagnateur.toLowerCase().includes(req.user.nom.toLowerCase()));
+      if (!isOwner) {
+        return res.status(403).json({ message: 'Action non autorisée sur ce dossier' });
+      }
+    }
+
     if (!incube.badge_id) {
       return res.status(400).json({ message: "Aucun badge RFID n'est attribué à cet incubé" });
     }
@@ -1384,6 +1434,15 @@ exports.updateAssocieBadge = async (req, res) => {
   try {
     const incube = await Incube.findByPk(req.params.id);
     if (!incube) return res.status(404).json({ message: 'Incubé introuvable' });
+
+    const isSuper = ['super_admin', 'administrateur'].includes(req.user.role);
+    if (!isSuper) {
+      const isOwner = incube.admin_id === req.user.id ||
+        (req.user.nom && incube.accompagnateur && incube.accompagnateur.toLowerCase().includes(req.user.nom.toLowerCase()));
+      if (!isOwner) {
+        return res.status(403).json({ message: 'Action non autorisée sur ce dossier' });
+      }
+    }
 
     const { associeIndex, associeNom, badge_id } = req.body;
     let associes = Array.isArray(incube.associes) ? [...incube.associes] : [];
@@ -1480,13 +1539,26 @@ exports.activerCompte = async (req, res) => {
     const emailClean = incube.email.trim().toLowerCase();
     let userAccount = null;
 
+    // Vérifier d'abord si l'email cible appartient à un compte staff/admin (protection anti Account-Takeover)
+    const emailOwner = await User.findOne({ where: { email: emailClean } });
+    if (emailOwner && emailOwner.role !== 'incube') {
+      return res.status(403).json({
+        message: 'Sécurité : cette adresse email appartient à un compte d\'administration et ne peut pas être utilisée pour un compte incubé.'
+      });
+    }
+
     // Priorité : user_id déjà lié à l'incubé
     if (incube.user_id) {
       userAccount = await User.findByPk(incube.user_id);
+      if (userAccount && userAccount.role !== 'incube') {
+        return res.status(403).json({
+          message: 'Sécurité : le compte rattaché est un compte d\'administration et ne peut pas être réinitialisé via un dossier incubé.'
+        });
+      }
     }
     // Fallback : recherche par email (cas où user_id n'est pas encore défini)
     if (!userAccount) {
-      userAccount = await User.findOne({ where: { email: emailClean } });
+      userAccount = emailOwner;
     }
 
     // --- 3. Génération du mot de passe temporaire sécurisé ---
@@ -1512,13 +1584,12 @@ exports.activerCompte = async (req, res) => {
       incube.user_id = userAccount.id;
       await incube.save();
     } else {
-      // Compte existant : régénération du mot de passe et activation
+      // Compte existant (vérifié role === 'incube') : régénération du mot de passe et activation
       userAccount.mot_de_passe = hashedPassword;
       userAccount.actif = true;
-      if (!['super_admin', 'admin', 'administrateur'].includes(userAccount.role)) {
-        userAccount.role = 'incube';
-      }
+      userAccount.role = 'incube';
       await userAccount.save();
+      invalidateUserAuthCache(userAccount.id);
 
       // S'assurer que le lien user_id est cohérent dans incubes
       if (incube.user_id !== userAccount.id) {
@@ -1584,9 +1655,10 @@ exports.desactiverCompte = async (req, res) => {
 
     if (incube.user_id) {
       const userAccount = await User.findByPk(incube.user_id);
-      if (userAccount) {
+      if (userAccount && userAccount.role === 'incube') {
         userAccount.actif = false;
         await userAccount.save();
+        invalidateUserAuthCache(userAccount.id);
       }
     }
 
@@ -1623,27 +1695,45 @@ exports.renvoyerAcces = async (req, res) => {
       return res.status(400).json({ message: 'Adresse email manquante pour cet incubé' });
     }
 
+    const emailClean = incube.email.trim().toLowerCase();
+    const emailOwner = await User.findOne({ where: { email: emailClean } });
+    if (emailOwner && emailOwner.role !== 'incube') {
+      return res.status(403).json({
+        message: 'Sécurité : cette adresse email appartient à un compte d\'administration et ne peut pas être réinitialisée via un dossier incubé.'
+      });
+    }
+
     let userAccount = null;
     if (incube.user_id) {
       userAccount = await User.findByPk(incube.user_id);
+      if (userAccount && userAccount.role !== 'incube') {
+        return res.status(403).json({
+          message: 'Sécurité : le compte rattaché est un compte d\'administration et ne peut pas être réinitialisé via un dossier incubé.'
+        });
+      }
     }
     if (!userAccount) {
-      userAccount = await User.findOne({ where: { email: incube.email.trim().toLowerCase() } });
+      userAccount = emailOwner;
     }
 
-    const rawPassword = req.body.password || (crypto.randomBytes(4).toString('hex').toUpperCase() + '@Ids' + Math.floor(10 + Math.random() * 90));
+    const customPwd = isSuper && req.body.password && String(req.body.password).trim().length >= 6
+      ? String(req.body.password).trim()
+      : null;
+    const rawPassword = customPwd || (crypto.randomBytes(4).toString('hex').toUpperCase() + '@Ids' + Math.floor(10 + Math.random() * 90));
     const hashedPassword = await bcrypt.hash(rawPassword, 10);
 
     if (userAccount) {
       userAccount.mot_de_passe = hashedPassword;
       userAccount.actif = true;
+      userAccount.role = 'incube';
       await userAccount.save();
+      invalidateUserAuthCache(userAccount.id);
     } else {
       const parts = (incube.nom_incube || 'Incubé').trim().split(' ');
       userAccount = await User.create({
         nom: parts.slice(1).join(' ') || 'Projet',
         prenom: parts[0] || 'Incubé',
-        email: incube.email.trim().toLowerCase(),
+        email: emailClean,
         mot_de_passe: hashedPassword,
         role: 'incube',
         actif: true

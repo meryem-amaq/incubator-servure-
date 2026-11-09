@@ -78,16 +78,15 @@ export default function RapportsActivite() {
     const toastId = toast.loading('Génération des graphiques HD et rédaction du rapport Word (.docx)...');
 
     try {
-      const token = localStorage.getItem('cgs_token');
       const response = await fetch(
         import.meta.env.VITE_API_URL 
           ? `${import.meta.env.VITE_API_URL}/rapports/generer-word` 
           : '/api/rapports/generer-word',
         {
           method: 'POST',
+          credentials: 'include',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({
             annee,

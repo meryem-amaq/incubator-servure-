@@ -3329,9 +3329,6 @@ export function KpiAssiduite({ impactStats, stats }) {
                 Total : {totalEventsYear} ({totalAteliersYear} ateliers • {totalFormationsYear} formations)
               </span>
             </div>
-            <p className="text-xs text-slate-500 dark:text-dark-400 mt-0.5">
-              Comparatif mensuel des ateliers collectifs et formations Pré/Post-Création réalisés
-            </p>
           </div>
 
           <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-dark-800 p-1 rounded-xl border border-slate-200 dark:border-dark-700 shadow-xs self-start sm:self-auto shrink-0 flex-wrap">
@@ -3473,9 +3470,6 @@ export function KpiAssiduite({ impactStats, stats }) {
               <span>SUIVI DU PLAN D'ACTION</span>
               <ExternalLink size={13} className="text-purple-500 opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
             </button>
-            <p className="text-[11px] text-slate-500 dark:text-dark-400 mt-0.5">
-              Objectifs atteints, en cours et non atteints par accompagnateur
-            </p>
           </div>
 
           {/* Barre de filtres compacte devant le titre (à droite) */}

@@ -50,11 +50,34 @@ test("Appairage IN/OUT : deux sessions dans la même journée", () => {
 // 3. Scan impair : forfait de 2 heures
 test("Scan impair : entrée sans badgeage de sortie applique forfait de 2h", () => {
   const scans = [
-    { time: new Date('2026-05-12T10:00:00Z'), raw_badge_id: '102' } // 1 scan = forfait 2h
+    { time: new Date('2026-05-12T10:00:00Z'), raw_badge_id: '102', type: 'IN' } // 1 scan IN sans OUT = forfait 2h
   ];
   const { totalHours, monthlyHours } = processScansToMonthlyHours(scans, 2026);
   assert.strictEqual(totalHours, 2.0, 'Scan unique doit valoir 2h forfaitaires');
   assert.strictEqual(monthlyHours['Mai'], 2.0, 'Mai doit avoir 2.0h');
+});
+
+// 3b. Deux scans IN consécutifs sans aucun scan OUT dans la journée -> forfait de 2h
+test("Deux entrées (IN -> IN) sans badgeage de sortie (OUT) applique le forfait de 2h", () => {
+  const scans = [
+    { time: new Date('2026-11-05T10:01:21Z'), raw_badge_id: '141', type: 'IN' },
+    { time: new Date('2026-11-05T10:44:04Z'), raw_badge_id: '141', type: 'IN' }
+  ];
+  const { totalHours, monthlyHours } = processScansToMonthlyHours(scans, 2026);
+  assert.strictEqual(totalHours, 2.0, 'Journée avec uniquement des IN sans OUT doit valoir 2h forfaitaires');
+  assert.strictEqual(monthlyHours['Novembre'], 2.0, 'Novembre doit avoir 2.0h');
+});
+
+// 3c. Séance matin (IN -> OUT) + séance après-midi sans sortie (IN seul) -> durée matin + 2h forfait
+test("Séance complète (IN -> OUT) suivie d'une entrée sans sortie (IN) ajoute 2h forfaitaires", () => {
+  const scans = [
+    { time: new Date('2026-10-23T09:00:00Z'), raw_badge_id: '141', type: 'IN' },
+    { time: new Date('2026-10-23T12:00:00Z'), raw_badge_id: '141', type: 'OUT' }, // 3h
+    { time: new Date('2026-10-23T14:00:00Z'), raw_badge_id: '141', type: 'IN' }   // +2h forfait -> 5h
+  ];
+  const { totalHours, monthlyHours } = processScansToMonthlyHours(scans, 2026);
+  assert.strictEqual(totalHours, 5.0, 'Total journée doit être 3h + 2h forfait = 5.0h');
+  assert.strictEqual(monthlyHours['Octobre'], 5.0, 'Octobre doit avoir 5.0h');
 });
 
 // 4. Calculs des métriques d'engagement contractuel

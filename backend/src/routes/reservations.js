@@ -7,30 +7,28 @@ const emailService = require('../services/emailService');
 const auth = require('../middleware/auth');
 const requireStaff = require('../middleware/requireStaff');
 const { getJourFerieInfo } = require('../utils/joursFeries');
+const { getTokenFromRequest } = require('../utils/authCookie');
+const { publicWriteLimiter } = require('../middleware/rateLimiter');
 
 /**
  * Helper : Vérifie si la requête possède un token d'authentification valide
  */
 function getAuthenticatedUser(req) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
-  const token = authHeader.split(' ')[1];
-  const secret1 = process.env.JWT_SECRET || 'cgs_incubateur_secret_key_super_secure_jwt_2024_ids';
-  const secret2 = 'cgs_incubateur_secret_key_ids_production_platform';
+  const token = getTokenFromRequest(req);
+  if (!token) return null;
+  const secret = process.env.JWT_SECRET;
+  if (!secret) return null;
   try {
-    return jwt.verify(token, secret1);
+    return jwt.verify(token, secret);
   } catch {
-    try {
-      return jwt.verify(token, secret2);
-    } catch {
-      return null;
-    }
+    return null;
   }
 }
 
 // GET /api/reservations (Toutes les réservations ou par espace/incubé)
-// Authentifié (Admin / Staff / Incubé) : Retourne toutes les informations complètes
-// Non-authentifié (Public) : Retourne les créneaux avec nom pour affichage du calendrier
+// Authentifié (Admin / Staff) : Retourne toutes les informations complètes
+// Authentifié (Incubé) : Retourne les informations complètes uniquement pour ses propres réservations
+// Non-authentifié (Public) : Retourne les créneaux sans données personnelles sensibles
 router.get('/', async (req, res) => {
   try {
     const user = getAuthenticatedUser(req);
@@ -54,25 +52,35 @@ router.get('/', async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
 
-    if (user) {
+    const staffRoles = ['super_admin', 'superadmin', 'admin', 'administrateur', 'gestionnaire', 'consultant', 'coach', 'accompagnateur'];
+    if (user && staffRoles.includes(user.role)) {
       return res.json(reservations);
     }
 
-    // Protection des données privées pour le public anonyme
-    const publicSlots = reservations.map(r => ({
-      id: r.id,
-      incubeId: r.incubeId,
-      espace: r.espace,
-      salleSpecifique: r.salleSpecifique,
-      nomIncube: r.nomIncube || 'Occupé',
-      dateReservation: r.dateReservation,
-      heureDebut: r.heureDebut,
-      heureFin: r.heureFin,
-      duree: r.duree,
-      statut: r.statut
-    }));
+    // Pour un incubé connecté ou un visiteur public : masquer email/téléphone/motif des autres incubés
+    const sanitizedSlots = reservations.map(r => {
+      const isOwnReservation = user && (
+        (user.pp_id && Number(r.incubeId) === Number(user.pp_id)) ||
+        (user.email && r.emailIncube && r.emailIncube.trim().toLowerCase() === user.email.trim().toLowerCase())
+      );
+      if (isOwnReservation) {
+        return r;
+      }
+      return {
+        id: r.id,
+        incubeId: r.incubeId,
+        espace: r.espace,
+        salleSpecifique: r.salleSpecifique,
+        nomIncube: r.nomIncube || 'Occupé',
+        dateReservation: r.dateReservation,
+        heureDebut: r.heureDebut,
+        heureFin: r.heureFin,
+        duree: r.duree,
+        statut: r.statut
+      };
+    });
 
-    res.json(publicSlots);
+    res.json(sanitizedSlots);
   } catch (err) {
     console.error('Erreur get reservations:', err.message);
     res.status(500).json({ message: 'Erreur serveur' });
@@ -80,7 +88,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/reservations/demande (PUBLIC - Demande de réservation via QR Code ou App)
-router.post('/demande', async (req, res) => {
+router.post('/demande', publicWriteLimiter, async (req, res) => {
   try {
     const nom = (req.body.nomIncube || req.body.nomComplet || '').trim();
     const email = (req.body.emailIncube || req.body.email || '').trim();

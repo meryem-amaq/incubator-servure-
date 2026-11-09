@@ -277,10 +277,9 @@ router.get('/', async (req, res) => {
   try {
     await ensureSeeded();
     let isAuthenticated = false;
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = require('../utils/authCookie').getTokenFromRequest(req);
+    if (token) {
       try {
-        const token = authHeader.split(' ')[1];
         const secret = process.env.JWT_SECRET;
         if (secret) {
           const jwt = require('jsonwebtoken');
