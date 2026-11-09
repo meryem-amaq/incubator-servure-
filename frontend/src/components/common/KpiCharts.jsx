@@ -852,12 +852,21 @@ export function KpiEconomique({ stats, section = 'all' }) {
     <div className="card p-5 flex flex-col min-w-0 hover:border-emerald-500/40 transition-all shadow-sm">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100 dark:border-dark-700/60">
           <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white uppercase tracking-tight">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white uppercase tracking-tight whitespace-nowrap">
                 ANALYSE FINANCIÈRE GLOBALE
               </h3>
+              {/* Légende intégrée à côté du titre */}
+              <div className="inline-flex items-center gap-2.5 text-xs font-semibold bg-slate-50 dark:bg-dark-900/70 px-2.5 py-1 rounded-xl border border-slate-200/80 dark:border-dark-700/60 shrink-0">
+                <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm"></span> Gains
+                </span>
+                <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400 font-bold">
+                  <span className="w-2 h-2 rounded-full bg-red-500 shadow-sm"></span> Pertes
+                </span>
+              </div>
             </div>
-            <p className="text-xs text-slate-500 dark:text-dark-400 mt-0.5">
+            <p className="text-xs text-slate-500 dark:text-dark-400 mt-1 truncate">
               Gains et Pertes cumulés pour {selectedPeriod === 'annuel' ? 'les 12 mois de' : `le trimestre ${selectedPeriod} de`} l'année {selectedYear}
               {selectedStatut !== 'tous' ? (
                 <span className="font-bold text-emerald-600 dark:text-emerald-400"> — Statut : {selectedStatut}</span>
@@ -867,17 +876,17 @@ export function KpiEconomique({ stats, section = 'all' }) {
             </p>
           </div>
 
-          {/* Contrôles : Filtre Année, Filtre Statut Juridique, et Légende */}
-          <div className="flex flex-wrap items-center gap-2.5">
+          {/* Contrôles : Filtre Année, Filtre Statut Juridique, Filtre Période — Tous alignés sur la même ligne */}
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
             {/* Sélecteur d'année sous forme de liste déroulante */}
-            <div className="flex items-center gap-2 bg-slate-50 dark:bg-dark-900/80 px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-dark-700/60 shadow-sm hover:border-emerald-500/50 transition-colors">
+            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-dark-900/80 px-2.5 py-1.5 rounded-xl border border-slate-200/80 dark:border-dark-700/60 shadow-xs hover:border-emerald-500/50 transition-colors">
               <span className="text-xs font-semibold text-slate-500 dark:text-dark-400">Année :</span>
               <div className="relative flex items-center">
                 <select
                   id="select-annee-financiere"
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(Number(e.target.value))}
-                  className="appearance-none bg-transparent text-slate-900 dark:text-white text-xs font-extrabold focus:outline-none cursor-pointer pr-5 pl-1 py-0.5"
+                  className="appearance-none bg-transparent text-slate-900 dark:text-white text-xs font-extrabold focus:outline-none cursor-pointer pr-4 pl-0.5 py-0.5"
                 >
                   {anneesDisponibles.map(yr => (
                     <option
@@ -898,17 +907,17 @@ export function KpiEconomique({ stats, section = 'all' }) {
             </div>
 
             {/* Nouveau : Filtre Statut Juridique */}
-            <div className="flex items-center gap-2 bg-slate-50 dark:bg-dark-900/80 px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-dark-700/60 shadow-sm hover:border-blue-500/50 transition-colors">
+            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-dark-900/80 px-2.5 py-1.5 rounded-xl border border-slate-200/80 dark:border-dark-700/60 shadow-xs hover:border-blue-500/50 transition-colors">
               <span className="text-xs font-semibold text-slate-500 dark:text-dark-400">Statut :</span>
               <div className="relative flex items-center">
                 <select
                   id="select-statut-financier"
                   value={selectedStatut}
                   onChange={(e) => setSelectedStatut(e.target.value)}
-                  className="appearance-none bg-transparent text-slate-900 dark:text-white text-xs font-extrabold focus:outline-none cursor-pointer pr-5 pl-1 py-0.5"
+                  className="appearance-none bg-transparent text-slate-900 dark:text-white text-xs font-extrabold focus:outline-none cursor-pointer pr-4 pl-0.5 py-0.5 max-w-[170px] truncate"
                 >
                   <option value="tous" className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white font-semibold py-1">
-                    Tous statuts ({formatDH(totalTousGainsForYear)})
+                    Tous ({formatDH(totalTousGainsForYear)})
                   </option>
                   {statutsDisponibles.map(st => {
                     const stGains = totalsByStatutForYear[st] || 0;
@@ -932,14 +941,14 @@ export function KpiEconomique({ stats, section = 'all' }) {
             </div>
 
             {/* Nouveau : Filtre Période */}
-            <div className="flex items-center gap-2 bg-slate-50 dark:bg-dark-900/80 px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-dark-700/60 shadow-sm hover:border-indigo-500/50 transition-colors">
+            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-dark-900/80 px-2.5 py-1.5 rounded-xl border border-slate-200/80 dark:border-dark-700/60 shadow-xs hover:border-indigo-500/50 transition-colors">
               <span className="text-xs font-semibold text-slate-500 dark:text-dark-400">Période :</span>
               <div className="relative flex items-center">
                 <select
                   id="select-periode-financiere"
                   value={selectedPeriod}
                   onChange={(e) => setSelectedPeriod(e.target.value)}
-                  className="appearance-none bg-transparent text-slate-900 dark:text-white text-xs font-extrabold focus:outline-none cursor-pointer pr-5 pl-1 py-0.5"
+                  className="appearance-none bg-transparent text-slate-900 dark:text-white text-xs font-extrabold focus:outline-none cursor-pointer pr-4 pl-0.5 py-0.5"
                 >
                   <option value="annuel" className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white font-semibold py-1">Annuel</option>
                   <option value="T1" className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white font-semibold py-1">T1</option>
@@ -953,16 +962,6 @@ export function KpiEconomique({ stats, section = 'all' }) {
                   </svg>
                 </div>
               </div>
-            </div>
-
-            {/* Légende */}
-            <div className="flex items-center gap-3 text-xs font-semibold bg-slate-50 dark:bg-dark-900/70 px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-dark-700/60">
-              <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm"></span> Gains
-              </span>
-              <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400 font-bold">
-                <span className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-sm"></span> Pertes
-              </span>
             </div>
           </div>
         </div>
