@@ -911,18 +911,8 @@ export default function Formations() {
           </p>
         </div>
 
-        {/* Boutons d'action principaux alignés côte-à-côte sur la même ligne */}
-        <div className="flex items-center gap-3 shrink-0 flex-nowrap">
-          <button
-            type="button"
-            onClick={() => handleOpenAddModule(selectedParcours)}
-            className="inline-flex items-center justify-center gap-2 border border-slate-200 dark:border-dark-700 bg-white dark:bg-dark-800 hover:border-amber-500/50 text-slate-800 dark:text-slate-100 font-bold py-2.5 px-4 rounded-xl cursor-pointer shadow-xs transition whitespace-nowrap text-xs"
-            title="Ajouter un module pédagogique officiel"
-          >
-            <BookOpen size={16} className="text-amber-500 shrink-0" />
-            <span>Nouveau Module</span>
-          </button>
-
+        {/* Bouton d'action principal */}
+        <div className="flex items-center gap-3 shrink-0">
           <button
             type="button"
             onClick={() => handleOpenAddFormation()}
@@ -987,29 +977,6 @@ export default function Formations() {
               {postCreationCount} session{postCreationCount > 1 ? 's' : ''}
             </span>
           </button>
-
-          <div className="w-px h-5 bg-slate-200 dark:bg-dark-700 self-center mx-1" />
-
-          {/* 3. Catalogue des Modules */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('modules')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
-              activeTab === 'modules'
-                ? 'bg-white dark:bg-dark-900 text-slate-900 dark:text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <BookOpen size={14} className="text-amber-500 shrink-0" />
-            <span>Catalogue des Modules</span>
-            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
-              activeTab === 'modules'
-                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
-                : 'bg-slate-200 dark:bg-dark-700 text-slate-700 dark:text-slate-300'
-            }`}>
-              {allModulesList.length}
-            </span>
-          </button>
         </div>
 
         {/* Recherche rapide */}
@@ -1059,7 +1026,7 @@ export default function Formations() {
                 <thead>
                   <tr className="border-b border-slate-100 dark:border-dark-800 text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[11px] font-bold bg-slate-50/50 dark:bg-dark-800/40">
                     <th className="py-3.5 px-4">Date & Horaires</th>
-                    <th className="py-3.5 px-4">Formation / Module</th>
+                    <th className="py-3.5 px-4">Formation</th>
                     <th className="py-3.5 px-4">Intervenants</th>
                     <th className="py-3.5 px-4 text-center">Présence</th>
                     <th className="py-3.5 px-4 text-right">Actions</th>
@@ -1104,25 +1071,11 @@ export default function Formations() {
                           )}
                         </td>
 
-                        {/* Formation & Module */}
+                        {/* Formation */}
                         <td className="py-4 px-4 align-top">
-                          <div className="flex items-center gap-2 mb-1 flex-wrap">
-                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${
-                              isPreCreation
-                                ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20'
-                                : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20'
-                            }`}>
-                              [{moduleInfo.code}]
-                            </span>
-                            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
-                              {moduleInfo.name}
-                            </span>
+                          <div className="font-extrabold text-xs text-slate-900 dark:text-white leading-snug">
+                            {formation.titre || moduleInfo.name}
                           </div>
-                          {formation.titre && formation.titre !== moduleInfo.name && (
-                            <div className="font-semibold text-xs text-slate-900 dark:text-white">
-                              {formation.titre}
-                            </div>
-                          )}
                         </td>
 
                         {/* Intervenants */}
@@ -2044,6 +1997,23 @@ export default function Formations() {
         const absentsCount = totalInscrits - presentsCount;
         const tauxPresence = totalInscrits > 0 ? Math.round((presentsCount / totalInscrits) * 100) : 0;
 
+        // Déterminer si la session est terminée ou en cours / future
+        const isSessionTerminee = (() => {
+          if (!formation?.date) return false;
+          try {
+            if (formation.statutOuverture === 'cloture') return true;
+            const dateVal = meta.dateFin || formation.dateFin || formation.date;
+            const timeVal = formation.heureFin || meta.heureFin || '18:00';
+            const cleanDate = String(dateVal).split('T')[0];
+            const [h, m] = String(timeVal).split(':').map(Number);
+            const sessionEnd = new Date(cleanDate);
+            sessionEnd.setHours(isNaN(h) ? 23 : h, isNaN(m) ? 59 : m, 0, 0);
+            return new Date() > sessionEnd;
+          } catch (e) {
+            return false;
+          }
+        })();
+
         let filteredList = baseList;
         if (presenceStatusFilter === 'presents') {
           filteredList = filteredList.filter(isIncubePresent);
@@ -2127,14 +2097,25 @@ export default function Formations() {
                   </p>
                 </div>
 
-                <div className="p-2 sm:p-2.5 rounded-2xl bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/50 shadow-xs">
-                  <div className="flex items-center justify-center gap-1 text-[10px] uppercase font-bold text-rose-700 dark:text-rose-400 tracking-wider">
-                    <XCircle size={11} /> Absents
+                {isSessionTerminee ? (
+                  <div className="p-2 sm:p-2.5 rounded-2xl bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/50 shadow-xs">
+                    <div className="flex items-center justify-center gap-1 text-[10px] uppercase font-bold text-rose-700 dark:text-rose-400 tracking-wider">
+                      <XCircle size={11} /> Absents
+                    </div>
+                    <p className="text-base sm:text-lg font-black text-rose-600 dark:text-rose-400 mt-0.5">
+                      {absentsCount}
+                    </p>
                   </div>
-                  <p className="text-base sm:text-lg font-black text-rose-600 dark:text-rose-400 mt-0.5">
-                    {absentsCount}
-                  </p>
-                </div>
+                ) : (
+                  <div className="p-2 sm:p-2.5 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 shadow-xs">
+                    <div className="flex items-center justify-center gap-1 text-[10px] uppercase font-bold text-amber-700 dark:text-amber-400 tracking-wider">
+                      <Clock size={11} /> En attente
+                    </div>
+                    <p className="text-base sm:text-lg font-black text-amber-600 dark:text-amber-400 mt-0.5">
+                      {absentsCount}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Filtres de statut + Recherche */}
@@ -2168,11 +2149,21 @@ export default function Formations() {
                     onClick={() => setPresenceStatusFilter('absents')}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
                       presenceStatusFilter === 'absents'
-                        ? 'bg-rose-600 text-white shadow-xs'
-                        : 'text-rose-700 dark:text-rose-400 hover:bg-rose-500/10'
+                        ? (isSessionTerminee ? 'bg-rose-600' : 'bg-amber-600') + ' text-white shadow-xs'
+                        : isSessionTerminee
+                          ? 'text-rose-700 dark:text-rose-400 hover:bg-rose-500/10'
+                          : 'text-amber-700 dark:text-amber-400 hover:bg-amber-500/10'
                     }`}
                   >
-                    <XCircle size={12} /> Absents ({absentsCount})
+                    {isSessionTerminee ? (
+                      <>
+                        <XCircle size={12} /> Absents ({absentsCount})
+                      </>
+                    ) : (
+                      <>
+                        <Clock size={12} /> En attente ({absentsCount})
+                      </>
+                    )}
                   </button>
                 </div>
 
@@ -2264,14 +2255,23 @@ export default function Formations() {
                                 <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400" />
                                 <span>PRÉSENT</span>
                               </div>
-                            ) : (
+                            ) : isSessionTerminee ? (
                               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 font-bold text-xs">
                                 <XCircle size={13} className="text-rose-600 dark:text-rose-400" />
                                 <span>ABSENT</span>
                               </div>
+                            ) : (
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-dark-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-dark-600 font-semibold text-xs">
+                                <Clock size={13} className="text-amber-600 dark:text-amber-400" />
+                                <span>EN ATTENTE</span>
+                              </div>
                             )}
                             <p className="text-[10px] text-slate-400 mt-0.5 text-right font-mono">
-                              {present ? `Émargé (${presInfo?.time || '09:30'})` : 'Non-émargé'}
+                              {present 
+                                ? `Émargé (${presInfo?.time || '09:30'})` 
+                                : isSessionTerminee 
+                                  ? 'Non-émargé' 
+                                  : "En attente d'émargement"}
                             </p>
                           </div>
 
@@ -2312,7 +2312,11 @@ export default function Formations() {
                   <span className="mx-2">•</span>
                   <span className="text-emerald-600 font-black">{presentsCount} présent(s)</span>
                   <span className="mx-2">•</span>
-                  <span className="text-rose-600 font-black">{absentsCount} absent(s)</span>
+                  {isSessionTerminee ? (
+                    <span className="text-rose-600 font-black">{absentsCount} absent(s)</span>
+                  ) : (
+                    <span className="text-amber-600 font-black">{absentsCount} en attente</span>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-end">

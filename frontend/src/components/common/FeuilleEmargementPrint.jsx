@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Printer, X, Download, CheckCircle2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -58,6 +59,23 @@ export default function FeuilleEmargementPrint({
   }
   const dateFinVal = meta.dateFin || atelier.dateFin;
 
+  // Déterminer si la session est terminée ou en cours / future
+  const isSessionTerminee = useMemo(() => {
+    if (!atelier || !atelier.date) return false;
+    try {
+      if (atelier.statutOuverture === 'cloture') return true;
+      const dateVal = dateFinVal || atelier.date;
+      const timeVal = atelier.heureFin || meta.heureFin || '18:00';
+      const cleanDate = String(dateVal).split('T')[0];
+      const [h, m] = String(timeVal).split(':').map(Number);
+      const sessionEnd = new Date(cleanDate);
+      sessionEnd.setHours(isNaN(h) ? 23 : h, isNaN(m) ? 59 : m, 0, 0);
+      return new Date() > sessionEnd;
+    } catch (e) {
+      return false;
+    }
+  }, [atelier, dateFinVal, meta]);
+
   const dateStr = atelier.date ? (
     dateFinVal && dateFinVal !== atelier.date ? (
       `Du ${new Date(atelier.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} au ${new Date(dateFinVal).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`
@@ -101,22 +119,32 @@ export default function FeuilleEmargementPrint({
     const pageHeight = doc.internal.pageSize.height; // 297mm
     const marginX = 14;
 
-    const tableBody = cleanPresences.map((p, idx) => [
-      String(idx + 1),
-      p.pp_numero || p.ppNumero || 'PP',
-      `${p.nom || ''} ${p.prenom && p.prenom !== '—' ? p.prenom : ''}`.trim(),
-      p.present ? '✔ PRÉSENT' : 'ABSENT',
-      p.time || '—',
-      p.present ? 'Signé Numériquement' : 'Non émargé'
-    ]);
+    const tableBody = cleanPresences.map((p, idx) => {
+      let statutText = 'En attente';
+      let sigText = '................................';
+      if (p.present) {
+        statutText = '✔ PRÉSENT';
+        sigText = 'Signé Numériquement';
+      } else if (isSessionTerminee) {
+        statutText = 'ABSENT';
+        sigText = 'Non émargé';
+      }
+
+      return [
+        String(idx + 1),
+        `${p.nom || ''} ${p.prenom && p.prenom !== '—' ? p.prenom : ''}`.trim(),
+        statutText,
+        sigText
+      ];
+    });
 
     autoTable(doc, {
       startY: 68,
-      head: [['#', 'N° Dossier / PP', "Nom & Prénom de l'Incubé", 'Statut', 'Heure', 'Signature / Visa']],
+      head: [['#', "Nom & Prénom de l'Incubé", 'Statut', 'Signature / Émargement']],
       body: tableBody,
       styles: {
-        fontSize: 8.5,
-        cellPadding: 3.2,
+        fontSize: 9,
+        cellPadding: 3.5,
         textColor: [30, 41, 59],
         lineColor: [203, 213, 225],
         lineWidth: 0.2
@@ -125,32 +153,42 @@ export default function FeuilleEmargementPrint({
         fillColor: [241, 245, 249],
         textColor: [71, 85, 105],
         fontStyle: 'bold',
-        fontSize: 8.5,
+        fontSize: 9,
         lineColor: [203, 213, 225],
         lineWidth: 0.3
       },
       columnStyles: {
-        0: { cellWidth: 10, halign: 'center' },
-        1: { cellWidth: 32 },
-        2: { cellWidth: 'auto' },
-        3: { cellWidth: 26, halign: 'center' },
-        4: { cellWidth: 22, halign: 'center' },
-        5: { cellWidth: 42, halign: 'center' }
+        0: { cellWidth: 12, halign: 'center' },
+        1: { cellWidth: 'auto' },
+        2: { cellWidth: 35, halign: 'center' },
+        3: { cellWidth: 55, halign: 'center' }
       },
       margin: { top: 68, left: marginX, right: marginX, bottom: 42 },
       didParseCell: function(data) {
-        if (data.section === 'body' && data.column.index === 3) {
+        if (data.section === 'body' && data.column.index === 2) {
           if (data.cell.raw === '✔ PRÉSENT') {
             data.cell.styles.textColor = [4, 120, 87];
             data.cell.styles.fontStyle = 'bold';
-          } else {
+          } else if (data.cell.raw === 'ABSENT') {
             data.cell.styles.textColor = [220, 38, 38];
             data.cell.styles.fontStyle = 'bold';
+          } else {
+            data.cell.styles.textColor = [100, 116, 139];
+            data.cell.styles.fontStyle = 'normal';
           }
         }
-        if (data.section === 'body' && data.column.index === 5 && data.cell.raw === 'Signé Numériquement') {
-          data.cell.styles.textColor = [5, 150, 105];
-          data.cell.styles.fontSize = 7.5;
+        if (data.section === 'body' && data.column.index === 3) {
+          if (data.cell.raw === 'Signé Numériquement') {
+            data.cell.styles.textColor = [5, 150, 105];
+            data.cell.styles.fontSize = 8;
+            data.cell.styles.fontStyle = 'bold';
+          } else if (data.cell.raw === 'Non émargé') {
+            data.cell.styles.textColor = [148, 163, 184];
+            data.cell.styles.fontStyle = 'italic';
+            data.cell.styles.fontSize = 8;
+          } else {
+            data.cell.styles.textColor = [203, 213, 225];
+          }
         }
       },
       didDrawPage: function(data) {
@@ -308,8 +346,8 @@ export default function FeuilleEmargementPrint({
     doc.save(safeFilename);
   };
 
-  return (
-    <div className="fixed inset-0 z-[9999] bg-slate-950/85 backdrop-blur-sm overflow-y-auto feuille-print-overlay">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] bg-slate-950/85 backdrop-blur-sm overflow-y-auto feuille-print-portal">
       <div className="min-h-screen w-full flex flex-col items-center justify-start py-6 sm:py-10 px-2 sm:px-4">
         {/* Barre d'outils (Non imprimée) */}
         <div className="w-full max-w-4xl bg-slate-900 text-white rounded-2xl p-4 mb-4 flex items-center justify-between shadow-2xl border border-slate-800 print:hidden shrink-0">
@@ -368,13 +406,21 @@ export default function FeuilleEmargementPrint({
                 color: #000000 !important;
                 overflow: visible !important;
                 height: auto !important;
+                min-height: auto !important;
                 margin: 0 !important;
                 padding: 0 !important;
               }
-              #mobile-navigation-drawer, nav, header, aside, .sidebar, .print\\:hidden, [class*="print:hidden"] {
+              /* Masquage absolu de tout le reste de l'application */
+              #root, #root * {
+                display: none !important;
+                visibility: hidden !important;
+                height: 0 !important;
+                overflow: hidden !important;
+              }
+              body > *:not(.feuille-print-portal) {
                 display: none !important;
               }
-              .feuille-print-overlay {
+              .feuille-print-portal {
                 position: static !important;
                 inset: auto !important;
                 width: 100% !important;
@@ -384,6 +430,12 @@ export default function FeuilleEmargementPrint({
                 padding: 0 !important;
                 margin: 0 !important;
                 overflow: visible !important;
+                display: block !important;
+              }
+              .feuille-print-portal > div {
+                min-height: auto !important;
+                padding: 0 !important;
+                margin: 0 !important;
                 display: block !important;
               }
               .feuille-print-card {
@@ -481,54 +533,54 @@ export default function FeuilleEmargementPrint({
               </div>
             </div>
 
-            {/* Tableau d'émargement */}
+            {/* Tableau d'émargement officiel simplifié : 4 colonnes strictes */}
             <div className="table-print-container overflow-x-auto border border-slate-300 rounded-xl">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-100 border-b border-slate-300 text-[10px] font-black uppercase tracking-wider text-slate-600">
-                    <th className="py-2.5 px-3 w-8 text-center border-r border-slate-300">#</th>
-                    <th className="py-2.5 px-3 w-28 border-r border-slate-300">N° Dossier / PP</th>
-                    <th className="py-2.5 px-3 border-r border-slate-300">Nom & Prénom de l'Incubé</th>
-                    <th className="py-2.5 px-3 w-24 border-r border-slate-300 text-center">Statut</th>
-                    <th className="py-2.5 px-3 w-24 border-r border-slate-300 text-center">Heure de Scan</th>
-                    <th className="py-2.5 px-3 text-center w-36">Signature / Visa</th>
+                    <th className="py-2.5 px-3 w-10 text-center border-r border-slate-300">#</th>
+                    <th className="py-2.5 px-4 border-r border-slate-300">Nom & Prénom de l'Incubé</th>
+                    <th className="py-2.5 px-3 w-28 border-r border-slate-300 text-center">Statut</th>
+                    <th className="py-2.5 px-3 text-center w-52">Signature / Émargement</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {cleanPresences.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-8 text-center text-slate-400 italic">
-                        Aucun participant n'a encore émargé à cet atelier.
+                      <td colSpan={4} className="py-8 text-center text-slate-400 italic">
+                        Aucun participant inscrit à cette session.
                       </td>
                     </tr>
                   ) : (
                     cleanPresences.map((p, idx) => (
                       <tr key={p.incubeId || idx} className="hover:bg-slate-50/60">
                         <td className="py-2.5 px-3 font-mono font-bold text-slate-400 text-center border-r border-slate-200">{idx + 1}</td>
-                        <td className="py-2.5 px-3 font-mono font-bold text-slate-700 border-r border-slate-200">
-                          {p.pp_numero || p.ppNumero || 'PP'}
-                        </td>
-                        <td className="py-2.5 px-3 font-black text-slate-900 border-r border-slate-200">
+                        <td className="py-2.5 px-4 font-black text-slate-900 border-r border-slate-200">
                           {p.nom} {p.prenom && p.prenom !== '—' ? p.prenom : ''}
                         </td>
                         <td className="py-2.5 px-3 text-center border-r border-slate-200">
                           {p.present ? (
                             <span className="font-bold text-emerald-700 text-[11px]">✔ PRÉSENT</span>
-                          ) : (
+                          ) : isSessionTerminee ? (
                             <span className="font-bold text-red-600 text-[11px]">ABSENT</span>
+                          ) : (
+                            <span className="font-semibold text-slate-500 text-[10px] bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                              En attente
+                            </span>
                           )}
-                        </td>
-                        <td className="py-2.5 px-3 font-mono font-semibold text-center text-slate-600 border-r border-slate-200">
-                          {p.time || '—'}
                         </td>
                         <td className="py-2.5 px-3 text-center">
                           {p.present ? (
                             <span className="font-mono text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                               Signé Numériquement
                             </span>
-                          ) : (
+                          ) : isSessionTerminee ? (
                             <span className="text-slate-400 italic text-[10px]">
                               Non émargé
+                            </span>
+                          ) : (
+                            <span className="text-slate-300 font-mono tracking-widest text-xs select-none">
+                              ................................
                             </span>
                           )}
                         </td>
@@ -551,6 +603,7 @@ export default function FeuilleEmargementPrint({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
