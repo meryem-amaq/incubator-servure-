@@ -1697,17 +1697,19 @@ export default function Formations() {
                   })}
                 </div>
 
-                {/* Info Option A : Processus sécurisé de convocation */}
-                <div className="mt-2.5 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-950 dark:text-amber-200 flex items-start gap-2.5">
-                  <Mail size={16} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <p className="font-extrabold text-amber-900 dark:text-amber-300">
-                      Vérification des invitations avant envoi :
-                    </p>
-                    <p className="text-[11px] leading-relaxed text-amber-800 dark:text-amber-300">
-                      L’enregistrement de la formation <strong>n’envoie pas d'email immédiatement</strong>. Dès validation, la liste des invités s’ouvrira automatiquement pour vous permettre de contrôler chaque participant et <strong>retirer d’un clic (🗑️) toute personne sélectionnée par erreur</strong> avant de déclencher l'envoi officiel des convocations.
-                    </p>
-                  </div>
+                <div className="mt-2.5 p-3 rounded-xl bg-slate-50 dark:bg-dark-800 border border-slate-200 dark:border-dark-700 text-[11px] text-slate-600 dark:text-dark-300 space-y-1">
+                  <p className="font-bold text-slate-800 dark:text-dark-100 flex items-center gap-1.5 text-xs text-primary-600 dark:text-primary-400">
+                    <Mail size={13} /> Modèle d'email officiel envoyé aux incubés :
+                  </p>
+                  <p className="italic text-slate-700 dark:text-dark-200 bg-white dark:bg-dark-900 p-2.5 rounded-lg border border-slate-100 dark:border-dark-800 leading-relaxed font-sans">
+                    « Bonjour à toutes et à tous,<br />
+                    Nous avons le plaisir de vous convier à la session de formation <strong>{selectedParcours === 'pre-creation' ? 'pré-création' : 'post-création'}</strong>, qui se déroulera <strong>{formationForm.dateFin && formationForm.dateFin !== formationForm.date ? `du ${formationForm.date} au ${formationForm.dateFin}` : `le ${formationForm.date}`}</strong> sous le thème <strong>{currentModules.find(m => m.code === formationForm.moduleCode)?.name || formationForm.moduleCode || 'Formation IDS'}</strong>.<br />
+                    Cette session, animée par des experts partenaires, constitue une étape clé de votre parcours d’incubation. Votre participation est donc indispensable pour valider votre accompagnement au sein de l’IDS-Salé.<br />
+                    Nous comptons sur votre motivation et votre implication.<br />
+                    Bien cordialement,<br />
+                    ----<br />
+                    Equipe IDS – Salé »
+                  </p>
                 </div>
               </div>
 
