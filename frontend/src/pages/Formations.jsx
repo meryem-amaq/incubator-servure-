@@ -258,14 +258,15 @@ export default function Formations() {
   };
 
   useEffect(() => {
-    if (participantsModalItem?.formation?.id) {
-      loadSessionPresences(participantsModalItem.formation.id);
+    const targetId = participantsModalItem?.formation?.id || printModalFormation?.id;
+    if (targetId) {
+      loadSessionPresences(targetId);
     } else {
       setSessionPresences([]);
       setPresenceStatusFilter('all');
       setParticipantFilter('');
     }
-  }, [participantsModalItem]);
+  }, [participantsModalItem, printModalFormation]);
 
   // Basculer la présence d'un incubé (Présent <-> Absent) par le staff
   const handleToggleIncubePresence = async (inc) => {
@@ -394,14 +395,23 @@ export default function Formations() {
       invitesIds = participantsModalItem.meta.invitesIds;
     } else if (formation.description) {
       try {
-        const meta = JSON.parse(formation.description);
+        const meta = typeof formation.description === 'object' ? formation.description : JSON.parse(formation.description || '{}');
         invitesIds = meta.invitesIds || [];
       } catch (e) {}
     }
 
-    const targetList = invitesIds.length > 0
-      ? allIncubes.filter(i => invitesIds.includes(i.id))
+    const rawList = invitesIds.length > 0
+      ? allIncubes.filter(i => invitesIds.map(Number).includes(Number(i.id)))
       : allIncubes;
+
+    // Dédoublonnage strict par ID unique pour garantir qu'aucun incubé n'apparaît deux fois
+    const uniqueMap = new Map();
+    rawList.forEach(inc => {
+      if (inc && inc.id && !uniqueMap.has(Number(inc.id))) {
+        uniqueMap.set(Number(inc.id), inc);
+      }
+    });
+    const targetList = Array.from(uniqueMap.values());
 
     return targetList.map(inc => {
       const p = sessionPresences.find(sp => 
