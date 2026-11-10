@@ -203,12 +203,12 @@ export default function FeuilleEmargementPrint({
       if (logoIds) {
         try {
           doc.addImage(logoIds, 'PNG', marginX, 9, 15, 15);
-        } catch (e) {}
+        } catch (e) { }
       }
       if (logoCtpes) {
         try {
           doc.addImage(logoCtpes, 'PNG', pageWidth - marginX - 44, 11, 44, 10);
-        } catch (e) {}
+        } catch (e) { }
       }
 
       // 2. Titre central officiel
@@ -352,7 +352,7 @@ export default function FeuilleEmargementPrint({
           5: { cellWidth: 38, halign: 'center' }
         },
         margin: { left: marginX, right: marginX },
-        didParseCell: function(data) {
+        didParseCell: function (data) {
           if (data.section === 'body') {
             if (data.column.index === 3) {
               if (data.cell.raw === '✔ PRÉSENT') {
@@ -383,20 +383,21 @@ export default function FeuilleEmargementPrint({
       });
 
       // 5. Zone de signature du Formateur (sur la DERNIÈRE page uniquement)
+      // Cadre horizontal agrandi occupant toute la largeur disponible avec marges régulières
       if (isLastPage) {
-        const boxWidth = 85;
-        const boxHeight = 27;
-        const boxX = pageWidth - marginX - boxWidth;
-        const boxY = pageHeight - 16 - boxHeight; // 254mm
+        const boxWidth = contentWidth; // 182mm (largeur complète de la page A4 avec marges régulières)
+        const boxHeight = 28;
+        const boxX = marginX; // 14mm (aligné avec les marges gauche/droite du tableau)
+        const boxY = pageHeight - 16 - boxHeight; // 253mm
         const formateurNom = atelier.formateur || atelier.intervenant || 'Intervenant IDS';
 
-        // 1. Fond blanc global et bordure extérieure bleu foncé (#1e40af)
+        // 1. Fond blanc global et bordure extérieure fine bleu marine (#1e40af)
         doc.setDrawColor(30, 64, 175);
         doc.setFillColor(255, 255, 255);
         doc.setLineWidth(0.4);
         doc.roundedRect(boxX, boxY, boxWidth, boxHeight, 2.5, 2.5, 'FD');
 
-        // 2. Bandeau supérieur bleu clair (#e8f1fd)
+        // 2. Bandeau supérieur bleu clair (#e8f1fd) sur toute la largeur
         doc.setFillColor(232, 241, 253);
         doc.setDrawColor(30, 64, 175);
         doc.roundedRect(boxX, boxY, boxWidth, 7, 2.5, 2.5, 'FD');
@@ -409,22 +410,22 @@ export default function FeuilleEmargementPrint({
         doc.line(boxX, boxY + 7, boxX + boxWidth, boxY + 7);
 
         // 3. Titre dans le bandeau : « Signature du formateur : »
-        doc.setFontSize(8);
+        doc.setFontSize(8.5);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(30, 58, 138); // #1e3a8a
-        doc.text('Signature du formateur :', boxX + 4, boxY + 4.8);
+        doc.text('Signature du formateur :', boxX + 6, boxY + 4.8);
 
-        // 4. Ligne horizontale de signature en bas
-        const lineY = boxY + boxHeight - 6.2;
-        doc.setDrawColor(148, 163, 184);
-        doc.setLineWidth(0.25);
-        doc.line(boxX + 4, lineY, boxX + boxWidth - 4, lineY);
+        // 4. Longue ligne horizontale bleue presque sur toute la largeur intérieure du cadre
+        const lineY = boxY + boxHeight - 6.5;
+        doc.setDrawColor(30, 64, 175); // bleue
+        doc.setLineWidth(0.3);
+        doc.line(boxX + 8, lineY, boxX + boxWidth - 8, lineY);
 
         // 5. Texte centré : « Nom : [Nom du formateur] »
-        doc.setFontSize(7.5);
+        doc.setFontSize(8);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(30, 41, 59);
-        const textX = boxX + (boxWidth / 2);
+        const textX = pageWidth / 2;
         doc.text(`Nom : ${formateurNom}`, textX, boxY + boxHeight - 2, { align: 'center' });
 
         // Redessiner la bordure extérieure pour une netteté parfaite
@@ -453,7 +454,7 @@ export default function FeuilleEmargementPrint({
   };
 
   return createPortal(
-    <div 
+    <div
       className="feuille-print-portal"
       style={{
         position: 'fixed',
@@ -475,7 +476,7 @@ export default function FeuilleEmargementPrint({
         }
       }}
     >
-      <div 
+      <div
         className="min-h-screen w-full flex flex-col items-center justify-start py-6 sm:py-10 px-2 sm:px-4"
         onClick={(e) => {
           if (e.target === e.currentTarget) {
@@ -484,7 +485,7 @@ export default function FeuilleEmargementPrint({
         }}
       >
         {/* Barre d'outils supérieure (Non imprimée) */}
-        <div 
+        <div
           onClick={e => e.stopPropagation()}
           className="w-full max-w-[210mm] bg-slate-900 text-white rounded-2xl p-4 mb-6 flex items-center justify-between shadow-2xl border border-slate-800 print:hidden shrink-0"
         >
@@ -534,12 +535,13 @@ export default function FeuilleEmargementPrint({
         </div>
 
         {/* CONTENEUR DE PAGES A4 */}
-        <div 
-          onClick={e => e.stopPropagation()} 
+        <div
+          onClick={e => e.stopPropagation()}
           className="w-full max-w-[210mm] flex flex-col items-center print:w-[210mm] print:max-w-none print:m-0 print:p-0"
         >
           {/* RÈGLES D'IMPRESSION STRICTES A4 */}
-          <style dangerouslySetInnerHTML={{ __html: `
+          <style dangerouslySetInnerHTML={{
+            __html: `
             @media print {
               @page {
                 size: 210mm 297mm;
@@ -634,7 +636,7 @@ export default function FeuilleEmargementPrint({
             const isLastPage = pageNum === totalPages;
 
             return (
-              <div 
+              <div
                 key={pageIdx}
                 className="feuille-page-a4 w-full max-w-[210mm] bg-white text-slate-900 rounded-2xl p-6 sm:p-8 shadow-2xl border border-slate-200 mb-8 print:mb-0 print:p-0 print:border-none print:shadow-none print:rounded-none flex flex-col justify-between"
                 style={{
@@ -801,20 +803,21 @@ export default function FeuilleEmargementPrint({
                 {/* PARTIE INFÉRIEURE DE LA PAGE : Signature (Dernière page) et Pied de page */}
                 <div className="pt-4">
                   {/* 4. Zone de signature du Formateur (sur la DERNIÈRE page uniquement) */}
+                  {/* Cadre horizontal agrandi occupant toute la largeur avec marges régulières */}
                   {isLastPage ? (
-                    <div className="signatures-print-block pb-3 flex justify-end text-xs">
-                      <div className="w-84 border-[1.5px] border-[#1e40af] rounded-xl overflow-hidden bg-white shadow-sm flex flex-col justify-between">
-                        {/* Bandeau d'en-tête bleu clair */}
-                        <div className="bg-[#e8f1fd] px-3.5 py-1.5 border-b border-[#bfdbfe]/60">
+                    <div className="signatures-print-block pb-3 w-full text-xs">
+                      <div className="w-full border-[1.5px] border-[#1e40af] rounded-xl overflow-hidden bg-white shadow-sm flex flex-col justify-between">
+                        {/* Bandeau d'en-tête bleu clair avec titre bien visible et en gras */}
+                        <div className="bg-[#e8f1fd] px-5 py-2 border-b border-[#bfdbfe]/60">
                           <p className="font-bold text-[#1e3a8a] text-xs">Signature du formateur :</p>
                         </div>
 
-                        {/* Zone blanche centrale pour signature manuscrite */}
-                        <div className="h-16 w-full"></div>
+                        {/* Grande zone blanche pour une signature manuscrite confortable */}
+                        <div className="h-20 w-full bg-white"></div>
 
-                        {/* Ligne de signature et Nom centré */}
-                        <div className="px-4 pb-2 pt-0">
-                          <div className="border-b border-slate-400/80 w-full mb-1"></div>
+                        {/* Longue ligne horizontale bleue presque sur toute la largeur et Nom centré */}
+                        <div className="px-6 pb-2.5 pt-0">
+                          <div className="border-b-[1.5px] border-[#1e40af] w-full mb-1.5"></div>
                           <p className="text-center text-[11px] text-slate-800">
                             <span className="font-bold text-[#1e3a8a]">Nom :</span>{' '}
                             <span>{atelier.formateur || atelier.intervenant || 'Intervenant IDS'}</span>
