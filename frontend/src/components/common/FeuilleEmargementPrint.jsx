@@ -369,29 +369,23 @@ export default function FeuilleEmargementPrint({
       // 5. Zone de signature du Formateur (sur la DERNIÈRE page uniquement)
       if (isLastPage) {
         const boxWidth = 82;
-        const boxHeight = 23;
+        const boxHeight = 24;
         const boxX = pageWidth - marginX - boxWidth;
-        const boxY = pageHeight - 16 - boxHeight; // 258mm
+        const boxY = pageHeight - 16 - boxHeight; // 257mm
 
         doc.setDrawColor(203, 213, 225);
         doc.setFillColor(255, 255, 255);
         doc.roundedRect(boxX, boxY, boxWidth, boxHeight, 2, 2, 'D');
 
-        doc.setFontSize(8);
+        doc.setFontSize(8.5);
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(71, 85, 105);
-        doc.text('Signature du formateur / intervenant :', boxX + 4, boxY + 5.5);
+        doc.setTextColor(30, 41, 59);
+        doc.text('Signature du formateur :', boxX + 4, boxY + 6);
 
-        // Ligne de signature en tirets
-        doc.setDrawColor(203, 213, 225);
-        doc.setLineDashPattern([1, 1], 0);
-        doc.line(boxX + 4, boxY + boxHeight - 7, boxX + boxWidth - 4, boxY + boxHeight - 7);
-        doc.setLineDashPattern([], 0);
-
-        doc.setFontSize(7.5);
-        doc.setFont('helvetica', 'italic');
-        doc.setTextColor(100, 116, 139);
-        doc.text(atelier.formateur || atelier.intervenant || 'Formateur responsable', boxX + 4, boxY + boxHeight - 2.5);
+        // Ligne de signature au bas
+        doc.setDrawColor(226, 232, 240);
+        doc.setLineWidth(0.3);
+        doc.line(boxX + 4, boxY + boxHeight - 3, boxX + boxWidth - 4, boxY + boxHeight - 3);
       }
 
       // 6. Pied de page officiel sur TOUTES les pages
@@ -764,14 +758,9 @@ export default function FeuilleEmargementPrint({
                   {/* 4. Zone de signature du Formateur (sur la DERNIÈRE page uniquement) */}
                   {isLastPage ? (
                     <div className="signatures-print-block pb-3 flex justify-end text-xs">
-                      <div className="border border-slate-300 rounded-xl p-3 h-24 w-72 flex flex-col justify-between bg-white shadow-sm">
-                        <p className="font-bold text-slate-700 text-xs">Signature du formateur / intervenant :</p>
-                        <div>
-                          <div className="border-b border-dashed border-slate-300 mb-1"></div>
-                          <p className="text-slate-500 italic text-[11px] truncate">
-                            {atelier.formateur || atelier.intervenant || 'Formateur responsable'}
-                          </p>
-                        </div>
+                      <div className="border border-slate-300 rounded-xl p-3.5 h-28 w-80 flex flex-col justify-between bg-white shadow-sm">
+                        <p className="font-bold text-slate-800 text-[13px]">Signature du formateur :</p>
+                        <div className="border-b border-slate-200 w-full mb-1"></div>
                       </div>
                     </div>
                   ) : (
