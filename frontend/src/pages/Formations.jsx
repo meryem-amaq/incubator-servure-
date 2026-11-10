@@ -221,6 +221,7 @@ export default function Formations() {
     notifyByEmail: false
   });
   const [submittingEditFormation, setSubmittingEditFormation] = useState(false);
+  const [sendingConvocationsId, setSendingConvocationsId] = useState(null);
 
   // Charger les présences réelles d'une session de formation
   const loadSessionPresences = async (formationId) => {
@@ -554,6 +555,13 @@ export default function Formations() {
     if (selectedParcours === 'pre-creation') {
       const ideationIncubes = allIncubes.filter(i => (i.phase_projet || '').toLowerCase().includes('idéation') || (i.phase_projet || '').toLowerCase().includes('ideation'));
       if (ideationIncubes.length > 0) targetIncubes = ideationIncubes;
+    } else if (selectedParcours === 'post-creation') {
+      const postIncubes = allIncubes.filter(i => {
+        const ph = (i.phase_projet || '').toLowerCase();
+        const st = (i.statut_juridique || '').toLowerCase();
+        return ph.includes('lancement') || ph.includes('croissance') || (st && st !== 'en cours' && st !== 'non défini' && st !== 'aucun');
+      });
+      if (postIncubes.length > 0) targetIncubes = postIncubes;
     }
 
     setFormationForm({
@@ -2328,7 +2336,10 @@ export default function Formations() {
 
                   <button
                     type="button"
+                    disabled={sendingConvocationsId === formation.id}
                     onClick={async () => {
+                      if (sendingConvocationsId === formation.id) return;
+                      setSendingConvocationsId(formation.id);
                       try {
                         const res = await api.post(`/evenements/${formation.id}/notifier`, {
                           evenement: formation,
@@ -2342,11 +2353,24 @@ export default function Formations() {
                       } catch (e) {
                         console.error('Erreur renvoi convocations:', e);
                         toast.error(e.response?.data?.message || e.response?.data?.error || "Erreur d'envoi d'email");
+                      } finally {
+                        setSendingConvocationsId(null);
                       }
                     }}
-                    className="btn btn-secondary btn-sm text-xs flex items-center gap-1.5 px-3 py-2 rounded-xl cursor-pointer"
+                    className={`btn btn-secondary btn-sm text-xs flex items-center gap-1.5 px-3 py-2 rounded-xl ${
+                      sendingConvocationsId === formation.id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                    }`}
                   >
-                    <Send size={13} /> Renvoyer convocations
+                    {sendingConvocationsId === formation.id ? (
+                      <>
+                        <span className="w-3 h-3 border-2 border-slate-600 border-t-transparent rounded-full animate-spin"></span>
+                        Envoi en cours...
+                      </>
+                    ) : (
+                      <>
+                        <Send size={13} /> Renvoyer convocations
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

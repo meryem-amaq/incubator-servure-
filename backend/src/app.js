@@ -289,12 +289,28 @@ app.post(['/api/evenements/:id/rappel', '/api/presence/atelier/:id/rappel'], aut
   }
 });
 
+// Cache anti-spam / anti-double clic pour l'envoi des convocations (10 secondes de cooldown par atelier)
+const recentAtelierNotifications = new Map();
+
 // Envoyer convocations & rappels d'atelier par email à toute la promotion ou une sélection (ADMIN)
 app.post(['/api/evenements/:id/notifier', '/api/presence/atelier/:id/notifier'], auth, requireStaff, async (req, res) => {
   try {
     const { Incube, Atelier } = require('./models');
-    const atelierId = req.params.id;
+    const atelierId = String(req.params.id);
     const { evenement = {}, incubeIds } = req.body;
+
+    // Protection anti-double-clic / anti-flood (10 secondes de sécurité)
+    const now = Date.now();
+    const lastNotified = recentAtelierNotifications.get(atelierId);
+    if (lastNotified && (now - lastNotified) < 10000) {
+      return res.json({
+        success: true,
+        message: "Les convocations pour cette session sont déjà en cours d'envoi ou ont été déclenchées récemment (protection anti-doublon).",
+        alreadySent: true,
+        sentCount: 0
+      });
+    }
+    recentAtelierNotifications.set(atelierId, now);
 
     let dbAtelier = null;
     if (atelierId && Atelier) {
@@ -308,7 +324,7 @@ app.post(['/api/evenements/:id/notifier', '/api/presence/atelier/:id/notifier'],
     let targetIncubes = [];
     let cleanIncubeIds = [];
     if (Array.isArray(incubeIds) && incubeIds.length > 0) {
-      cleanIncubeIds = incubeIds.map(id => Number(id)).filter(id => !isNaN(id) && id > 0);
+      cleanIncubeIds = [...new Set(incubeIds.map(id => Number(id)).filter(id => !isNaN(id) && id > 0))];
     }
 
     if (cleanIncubeIds.length > 0) {
@@ -339,21 +355,25 @@ app.post(['/api/evenements/:id/notifier', '/api/presence/atelier/:id/notifier'],
 
     let sentCount = 0;
     const errors = [];
+    const alreadySentEmails = new Set();
 
     for (const inc of targetIncubes) {
-      if (inc.email) {
-        try {
-          await emailService.sendFormationInvitationEmail(eventData, inc);
-          sentCount++;
-        } catch (e) {
-          errors.push({ email: inc.email, error: e.message });
-        }
+      const email = (inc.email || '').trim().toLowerCase();
+      // Dédoublonnage strict par adresse email : ne jamais envoyer deux fois au même destinataire
+      if (!email || alreadySentEmails.has(email)) continue;
+      alreadySentEmails.add(email);
+
+      try {
+        await emailService.sendFormationInvitationEmail(eventData, inc);
+        sentCount++;
+      } catch (e) {
+        errors.push({ email, error: e.message });
       }
     }
 
     res.json({
       success: true,
-      message: `Convocations envoyées par email à ${sentCount} incubé(s) !`,
+      message: `Convocations envoyées par email à ${sentCount} incubé(s) unique(s) !`,
       sentCount,
       totalIncubes: targetIncubes.length,
       errors: errors.length > 0 ? errors : undefined
