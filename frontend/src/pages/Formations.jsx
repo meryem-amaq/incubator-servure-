@@ -221,7 +221,6 @@ export default function Formations() {
     notifyByEmail: false
   });
   const [submittingEditFormation, setSubmittingEditFormation] = useState(false);
-  const [sendingConvocationsId, setSendingConvocationsId] = useState(null);
 
   // Charger les présences réelles d'une session de formation
   const loadSessionPresences = async (formationId) => {
@@ -303,88 +302,7 @@ export default function Formations() {
     }
   };
 
-  // Retirer un participant de la liste des invités (correction d'erreur avant ou après envoi)
-  const handleRemoveInvitedIncube = async (formation, inc) => {
-    if (!formation?.id || !inc?.id) return;
-    if (!window.confirm(`Retirer ${inc.nom_incube} de la liste des invités pour cette session de formation ?`)) return;
 
-    let meta = {};
-    try {
-      meta = typeof formation.description === 'string'
-        ? JSON.parse(formation.description || '{}')
-        : (formation.description || {});
-    } catch (e) {
-      meta = {};
-    }
-
-    const currentInvites = Array.isArray(meta.invitesIds) && meta.invitesIds.length > 0
-      ? meta.invitesIds
-      : allIncubes.map(i => i.id);
-
-    const updatedInvites = currentInvites.filter(id => Number(id) !== Number(inc.id));
-    const updatedMeta = { ...meta, invitesIds: updatedInvites };
-    const updatedDescription = JSON.stringify(updatedMeta);
-
-    try {
-      await api.put(`/ateliers/${formation.id}`, { description: updatedDescription });
-
-      setRawAteliers(prev => prev.map(f => f.id === formation.id ? { ...f, description: updatedDescription } : f));
-      setParticipantsModalItem(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          formation: { ...prev.formation, description: updatedDescription },
-          meta: updatedMeta
-        };
-      });
-
-      toast.success(`${inc.nom_incube} a été retiré de la liste des invités`);
-    } catch (err) {
-      console.error('Erreur retrait invité:', err);
-      toast.error('Erreur lors du retrait du participant');
-    }
-  };
-
-  // Ajouter un incubé supplémentaire à la liste des invités
-  const handleAddInvitedIncube = async (formation, incubeId) => {
-    if (!formation?.id || !incubeId) return;
-
-    let meta = {};
-    try {
-      meta = typeof formation.description === 'string'
-        ? JSON.parse(formation.description || '{}')
-        : (formation.description || {});
-    } catch (e) {
-      meta = {};
-    }
-
-    const currentInvites = Array.isArray(meta.invitesIds) ? meta.invitesIds : allIncubes.map(i => i.id);
-    if (currentInvites.map(Number).includes(Number(incubeId))) return;
-
-    const updatedInvites = [...currentInvites, Number(incubeId)];
-    const updatedMeta = { ...meta, invitesIds: updatedInvites };
-    const updatedDescription = JSON.stringify(updatedMeta);
-
-    try {
-      await api.put(`/ateliers/${formation.id}`, { description: updatedDescription });
-
-      setRawAteliers(prev => prev.map(f => f.id === formation.id ? { ...f, description: updatedDescription } : f));
-      setParticipantsModalItem(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          formation: { ...prev.formation, description: updatedDescription },
-          meta: updatedMeta
-        };
-      });
-
-      const added = allIncubes.find(i => Number(i.id) === Number(incubeId));
-      toast.success(`${added?.nom_incube || 'Participant'} ajouté à la liste des invités`);
-    } catch (err) {
-      console.error('Erreur ajout invité:', err);
-      toast.error('Erreur lors de l’ajout du participant');
-    }
-  };
 
   // Liste complète des présences et absences pour l'impression officielle A4
   const fullPresencesForPrint = useMemo(() => {
@@ -755,17 +673,7 @@ export default function Formations() {
 
       setShowAddFormationModal(false);
       await loadData();
-
-      // Option A : Ouvrir automatiquement la liste des invités pour vérification et suppression des erreurs
-      setParticipantsModalItem({
-        formation: created,
-        meta: metaToSave
-      });
-
-      toast.success(
-        'Formation enregistrée ! Vérifiez ci-dessous la liste des invités, retirez les erreurs si besoin puis cliquez sur "Envoyer les convocations".',
-        { duration: 6000 }
-      );
+      toast.success('Session de formation enregistrée avec succès !');
     } catch (err) {
       console.error('Erreur création formation:', err);
       toast.error(err.response?.data?.message || 'Erreur lors de la création de la formation');
@@ -1153,7 +1061,7 @@ export default function Formations() {
                     <th className="py-3.5 px-4">Date & Horaires</th>
                     <th className="py-3.5 px-4">Formation / Module</th>
                     <th className="py-3.5 px-4">Intervenants</th>
-                    <th className="py-3.5 px-4 text-center">Inscrits / Émargements</th>
+                    <th className="py-3.5 px-4 text-center">Présence</th>
                     <th className="py-3.5 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -1165,7 +1073,6 @@ export default function Formations() {
                     const moduleInfo = inferModuleInfo(formation, meta);
                     const collaborateur = meta.collaborateur || formation.intervenant || 'Ayoub Elbouchikhi (Coach IDS)';
                     const formateur = formation.formateur || meta.formateur || 'M. Khalid (Expert Formateur)';
-                    const invitesCount = Array.isArray(meta.invitesIds) ? meta.invitesIds.length : allIncubes.length;
                     const isPreCreation = activeTab === 'pre-creation';
 
                     return (
@@ -1232,16 +1139,16 @@ export default function Formations() {
                           </div>
                         </td>
 
-                        {/* Inscrits / Émargements */}
+                        {/* Présence & Émargement */}
                         <td className="py-4 px-4 align-top text-center">
                           <button
                             type="button"
                             onClick={() => setParticipantsModalItem({ formation, meta })}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-dark-700 hover:border-amber-500/50 bg-slate-50 dark:bg-dark-800 text-slate-800 dark:text-slate-100 font-bold hover:bg-white dark:hover:bg-dark-700 transition cursor-pointer shadow-xs text-xs"
-                            title="Voir la liste des participants et émargements"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-emerald-500/30 hover:border-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-extrabold transition cursor-pointer shadow-xs text-xs"
+                            title="Consulter et pointer la feuille de présence des incubés"
                           >
-                            <Users size={13} className="text-amber-500" />
-                            <span>{invitesCount} inscrits</span>
+                            <UserCheck size={14} className="text-emerald-600 dark:text-emerald-400" />
+                            <span>Présence</span>
                           </button>
                         </td>
 
@@ -2292,31 +2199,7 @@ export default function Formations() {
                 </div>
               </div>
 
-              {/* Barre d'action rapide : Inviter un participant supplémentaire si besoin */}
-              {nonInvitedIncubes.length > 0 && (
-                <div className="px-3 sm:px-5 py-2 bg-amber-50/70 dark:bg-amber-950/20 border-b border-amber-200/60 dark:border-amber-900/40 flex items-center justify-between gap-3 text-xs shrink-0 flex-wrap">
-                  <div className="flex items-center gap-1.5 text-amber-900 dark:text-amber-300 font-bold">
-                    <Plus size={14} className="text-amber-600 dark:text-amber-400" />
-                    <span>Ajouter un invité à la liste :</span>
-                  </div>
-                  <select
-                    value=""
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        handleAddInvitedIncube(formation, e.target.value);
-                      }
-                    }}
-                    className="text-xs bg-white dark:bg-dark-800 border border-amber-300 dark:border-amber-700/80 rounded-xl px-3 py-1 font-bold text-slate-800 dark:text-slate-100 cursor-pointer shadow-2xs hover:border-amber-500"
-                  >
-                    <option value="" disabled>Sélectionner un incubé ({nonInvitedIncubes.length} disponibles)...</option>
-                    {nonInvitedIncubes.map(i => (
-                      <option key={i.id} value={i.id}>
-                        {i.nom_incube} ({i.promotion || 'Sans promo'})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+
 
               {/* Tableau / Liste détaillée de Présence et Absence */}
               <div className="p-3 sm:p-5 overflow-y-auto space-y-2 flex-1 divide-y divide-slate-100 dark:divide-dark-800/80">
@@ -2415,16 +2298,6 @@ export default function Formations() {
                               </>
                             )}
                           </button>
-
-                          {/* Bouton Supprimer / Retirer de la liste des invités */}
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveInvitedIncube(formation, inc)}
-                            className="p-2 rounded-xl text-rose-500 hover:text-white hover:bg-rose-600 border border-rose-200 dark:border-rose-900/50 transition-colors cursor-pointer"
-                            title={`Retirer ${inc.nom_incube} de la liste des invités`}
-                          >
-                            <Trash2 size={13} />
-                          </button>
                         </div>
                       </div>
                     );
@@ -2432,99 +2305,25 @@ export default function Formations() {
                 )}
               </div>
 
-              {/* Footer Modal avec Bouton d'Impression Officielle A4 et Convocations */}
+              {/* Footer Modal avec Bouton d'Impression Officielle A4 */}
               <div className="p-3.5 sm:p-4 border-t border-slate-100 dark:border-dark-800 bg-slate-50/80 dark:bg-dark-800/40 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
-                <div className="text-xs text-slate-600 dark:text-dark-300 font-bold text-center sm:text-left space-y-1">
-                  <div>
-                    <span>Total : {totalInscrits} participant(s) invité(s)</span>
-                    <span className="mx-2">•</span>
-                    <span className="text-emerald-600 font-black">{presentsCount} présent(s)</span>
-                    <span className="mx-2">•</span>
-                    <span className="text-rose-600 font-black">{absentsCount} absent(s)</span>
-                  </div>
-                  <div>
-                    {meta.emailSentAt ? (
-                      <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
-                        <CheckCircle2 size={11} /> Convocations déjà envoyées le {new Date(meta.emailSentAt).toLocaleDateString('fr-FR')} à {new Date(meta.emailSentAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-400 font-semibold bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800">
-                        <Mail size={11} /> Convocations non encore envoyées (Vérifiez la liste puis cliquez ci-contre)
-                      </span>
-                    )}
-                  </div>
+                <div className="text-xs text-slate-600 dark:text-dark-300 font-bold text-center sm:text-left">
+                  <span>Total : {totalInscrits} participant(s)</span>
+                  <span className="mx-2">•</span>
+                  <span className="text-emerald-600 font-black">{presentsCount} présent(s)</span>
+                  <span className="mx-2">•</span>
+                  <span className="text-rose-600 font-black">{absentsCount} absent(s)</span>
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-end">
                   <button
                     type="button"
                     onClick={() => setPrintModalFormation(formation)}
-                    className="btn btn-sm bg-emerald-600 hover:bg-emerald-700 text-white font-black flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs shadow-md shadow-emerald-700/20 cursor-pointer"
+                    className="btn btn-sm bg-emerald-600 hover:bg-emerald-700 text-white font-black flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs shadow-md shadow-emerald-700/20 cursor-pointer"
                     title="Imprimer la feuille d'émargement officielle (A4)"
                   >
-                    <Printer size={14} /> Imprimer feuille (A4)
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={sendingConvocationsId === formation.id || totalInscrits === 0}
-                    onClick={async () => {
-                      if (sendingConvocationsId === formation.id || totalInscrits === 0) return;
-                      setSendingConvocationsId(formation.id);
-                      try {
-                        const targetIds = invitesIds;
-                        const res = await api.post(`/evenements/${formation.id}/notifier`, {
-                          evenement: formation,
-                          incubeIds: targetIds
-                        });
-
-                        const sentTime = new Date().toISOString();
-                        const updatedMeta = { ...meta, invitesIds: targetIds, emailSentAt: sentTime };
-                        const updatedDesc = JSON.stringify(updatedMeta);
-                        await api.put(`/ateliers/${formation.id}`, { description: updatedDesc }).catch(() => {});
-
-                        setRawAteliers(prev => prev.map(f => f.id === formation.id ? { ...f, description: updatedDesc } : f));
-                        setParticipantsModalItem(prev => prev ? {
-                          ...prev,
-                          formation: { ...prev.formation, description: updatedDesc },
-                          meta: updatedMeta
-                        } : null);
-
-                        if (res.data?.success) {
-                          toast.success(`Convocations par email envoyées avec succès à ${res.data.sentCount || totalInscrits} participant(s) !`);
-                        } else {
-                          toast.success('Convocations par email envoyées avec succès !');
-                        }
-                      } catch (e) {
-                        console.error('Erreur envoi convocations:', e);
-                        toast.error(e.response?.data?.message || e.response?.data?.error || "Erreur lors de l'envoi d'email");
-                      } finally {
-                        setSendingConvocationsId(null);
-                      }
-                    }}
-                    className={`btn btn-sm text-xs font-black flex items-center gap-2 px-4 py-2.5 rounded-xl shadow-md transition-all ${
-                      meta.emailSentAt
-                        ? 'btn-secondary text-slate-700 dark:text-slate-200 cursor-pointer'
-                        : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-amber-500/20 cursor-pointer'
-                    } ${sendingConvocationsId === formation.id || totalInscrits === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    title={meta.emailSentAt ? "Renvoyer les convocations par email à tous les participants validés" : "Envoyer les convocations par email à la liste validée"}
-                  >
-                    {sendingConvocationsId === formation.id ? (
-                      <>
-                        <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
-                        <span>Envoi en cours...</span>
-                      </>
-                    ) : meta.emailSentAt ? (
-                      <>
-                        <RefreshCw size={13} />
-                        <span>Renvoyer convocations ({totalInscrits})</span>
-                      </>
-                    ) : (
-                      <>
-                        <Send size={13} className="stroke-[2.5]" />
-                        <span>Envoyer les convocations ({totalInscrits})</span>
-                      </>
-                    )}
+                    <Printer size={15} />
+                    <span>Imprimer feuille d'émargement (A4)</span>
                   </button>
                 </div>
               </div>
