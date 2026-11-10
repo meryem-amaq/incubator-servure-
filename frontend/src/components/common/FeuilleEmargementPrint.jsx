@@ -385,33 +385,52 @@ export default function FeuilleEmargementPrint({
       // 5. Zone de signature du Formateur (sur la DERNIÈRE page uniquement)
       if (isLastPage) {
         const boxWidth = 85;
-        const boxHeight = 26;
+        const boxHeight = 27;
         const boxX = pageWidth - marginX - boxWidth;
-        const boxY = pageHeight - 16 - boxHeight; // 255mm
-        const formateurNom = atelier.formateur || atelier.intervenant || 'Formateur responsable';
+        const boxY = pageHeight - 16 - boxHeight; // 254mm
+        const formateurNom = atelier.formateur || atelier.intervenant || 'Intervenant IDS';
 
-        // Bordure fine bleu clair élégante (#bfdbfe) & fond blanc
-        doc.setDrawColor(191, 219, 254);
+        // 1. Fond blanc global et bordure extérieure bleu foncé (#1e40af)
+        doc.setDrawColor(30, 64, 175);
         doc.setFillColor(255, 255, 255);
-        doc.setLineWidth(0.35);
+        doc.setLineWidth(0.4);
         doc.roundedRect(boxX, boxY, boxWidth, boxHeight, 2.5, 2.5, 'FD');
 
-        // Titre : « Signature du formateur : »
+        // 2. Bandeau supérieur bleu clair (#e8f1fd)
+        doc.setFillColor(232, 241, 253);
+        doc.setDrawColor(30, 64, 175);
+        doc.roundedRect(boxX, boxY, boxWidth, 7, 2.5, 2.5, 'FD');
+        doc.setFillColor(232, 241, 253);
+        doc.rect(boxX + 0.2, boxY + 3.5, boxWidth - 0.4, 3.5, 'F');
+
+        // Ligne de délimitation sous le bandeau
+        doc.setDrawColor(191, 219, 254);
+        doc.setLineWidth(0.2);
+        doc.line(boxX, boxY + 7, boxX + boxWidth, boxY + 7);
+
+        // 3. Titre dans le bandeau : « Signature du formateur : »
         doc.setFontSize(8);
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(30, 41, 59);
-        doc.text('Signature du formateur :', boxX + 4, boxY + 5.5);
+        doc.setTextColor(30, 58, 138); // #1e3a8a
+        doc.text('Signature du formateur :', boxX + 4, boxY + 4.8);
 
-        // Ligne horizontale discrète pour signer
-        doc.setDrawColor(203, 213, 225);
+        // 4. Ligne horizontale de signature en bas
+        const lineY = boxY + boxHeight - 6.2;
+        doc.setDrawColor(148, 163, 184);
         doc.setLineWidth(0.25);
-        doc.line(boxX + 4, boxY + boxHeight - 6.5, boxX + boxWidth - 4, boxY + boxHeight - 6.5);
+        doc.line(boxX + 4, lineY, boxX + boxWidth - 4, lineY);
 
-        // Nom du formateur ou de l'intervenant sous la zone de signature
+        // 5. Texte centré : « Nom : [Nom du formateur] »
         doc.setFontSize(7.5);
-        doc.setFont('helvetica', 'italic');
-        doc.setTextColor(100, 116, 139);
-        doc.text(formateurNom, boxX + 4, boxY + boxHeight - 2.5);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(30, 41, 59);
+        const textX = boxX + (boxWidth / 2);
+        doc.text(`Nom : ${formateurNom}`, textX, boxY + boxHeight - 2, { align: 'center' });
+
+        // Redessiner la bordure extérieure pour une netteté parfaite
+        doc.setDrawColor(30, 64, 175);
+        doc.setLineWidth(0.4);
+        doc.roundedRect(boxX, boxY, boxWidth, boxHeight, 2.5, 2.5, 'D');
       }
 
       // 6. Pied de page officiel sur TOUTES les pages
@@ -784,12 +803,21 @@ export default function FeuilleEmargementPrint({
                   {/* 4. Zone de signature du Formateur (sur la DERNIÈRE page uniquement) */}
                   {isLastPage ? (
                     <div className="signatures-print-block pb-3 flex justify-end text-xs">
-                      <div className="border border-blue-200/90 rounded-xl p-4 h-28 w-80 flex flex-col justify-between bg-white shadow-sm">
-                        <p className="font-bold text-slate-800 text-xs">Signature du formateur :</p>
-                        <div>
-                          <div className="border-b border-slate-300/80 mb-1.5 w-full"></div>
-                          <p className="text-slate-500 italic text-[11px] truncate">
-                            {atelier.formateur || atelier.intervenant || 'Formateur responsable'}
+                      <div className="w-84 border-[1.5px] border-[#1e40af] rounded-xl overflow-hidden bg-white shadow-sm flex flex-col justify-between">
+                        {/* Bandeau d'en-tête bleu clair */}
+                        <div className="bg-[#e8f1fd] px-3.5 py-1.5 border-b border-[#bfdbfe]/60">
+                          <p className="font-bold text-[#1e3a8a] text-xs">Signature du formateur :</p>
+                        </div>
+
+                        {/* Zone blanche centrale pour signature manuscrite */}
+                        <div className="h-16 w-full"></div>
+
+                        {/* Ligne de signature et Nom centré */}
+                        <div className="px-4 pb-2 pt-0">
+                          <div className="border-b border-slate-400/80 w-full mb-1"></div>
+                          <p className="text-center text-[11px] text-slate-800">
+                            <span className="font-bold text-[#1e3a8a]">Nom :</span>{' '}
+                            <span>{atelier.formateur || atelier.intervenant || 'Intervenant IDS'}</span>
                           </p>
                         </div>
                       </div>
