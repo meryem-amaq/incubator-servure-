@@ -204,6 +204,17 @@
     display: none !important;
   }
 
+  /* Masquer complètement l'application lors de l'impression d'une feuille d'émargement officielle */
+  body.feuille-emargement-open #root,
+  body.feuille-emargement-open main,
+  body.feuille-emargement-open > *:not(.feuille-print-portal) {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    width: 0 !important;
+    overflow: hidden !important;
+  }
+
   body, html {
     background: #ffffff !important;
     color: #000000 !important;
