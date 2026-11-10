@@ -561,9 +561,9 @@ export default function Evenements() {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success(`📧 Convocations transmises avec succès par email (${data.sentCount || allIncubes.length} incubé(s)) !`, { duration: 4000 });
+        toast.success(data.message || `📧 Invitations transmises avec succès par email (${data.sentCount || allIncubes.length} incubé(s)) !`, { duration: 4000 });
       } else {
-        toast.success("Convocations transmises par email !");
+        toast.success("Invitations transmises par email !");
       }
     } catch (err) {
       console.error(err);
@@ -1170,10 +1170,10 @@ export default function Evenements() {
                   onClick={handleSendConvocations}
                   disabled={sendingEmails}
                   className="btn btn-secondary btn-sm flex items-center gap-1.5 text-xs font-bold border border-slate-300 dark:border-dark-700 bg-white dark:bg-dark-800 hover:bg-slate-50 dark:hover:bg-dark-700 text-slate-800 dark:text-slate-100 shadow-sm shrink-0 ml-auto sm:ml-0 transition-all cursor-pointer"
-                  title="Envoyer la convocation officielle et le rappel par email à tous les incubés"
+                  title="Envoyer les invitations et consignes par email aux incubés"
                 >
                   <Mail size={14} className="text-amber-500" />
-                  <span>{sendingEmails ? 'Envoi...' : '📧 Convocations'}</span>
+                  <span>{sendingEmails ? 'Envoi...' : '📧 Invitations'}</span>
                 </button>
 
                 <button

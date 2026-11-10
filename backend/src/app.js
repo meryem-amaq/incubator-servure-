@@ -259,27 +259,36 @@ app.post(['/api/evenements/:id/rappel', '/api/presence/atelier/:id/rappel'], aut
       formateur: evenement.formateur || (dbAtelier ? (dbAtelier.intervenant || dbAtelier.formateur) : null) || req.body.formateur || 'Intervenant IDS',
       intervenant: evenement.intervenant || (dbAtelier ? dbAtelier.intervenant : null) || req.body.intervenant || null,
       date: evenement.date || (dbAtelier ? dbAtelier.date : null) || req.body.date || new Date().toISOString().split('T')[0],
+      dateFin: evenement.dateFin || (dbAtelier ? dbAtelier.dateFin : null) || req.body.dateFin || null,
       heureDebut: evenement.heureDebut || (dbAtelier ? dbAtelier.heureDebut : null) || req.body.heureDebut || '09:30',
       heureFin: evenement.heureFin || (dbAtelier ? dbAtelier.heureFin : null) || req.body.heureFin || '12:30',
       duree: evenement.duree || (dbAtelier ? dbAtelier.duree : null) || req.body.duree || '3h00',
-      description: evenement.description || (dbAtelier ? dbAtelier.description : null) || req.body.description || ''
+      description: evenement.description || (dbAtelier ? dbAtelier.description : null) || req.body.description || '',
+      type: evenement.type || (dbAtelier ? dbAtelier.type : null) || req.body.type || null,
+      typeParcours: evenement.typeParcours || (dbAtelier ? dbAtelier.typeParcours : null) || req.body.typeParcours || null
     };
 
+    const isFormation = emailService.detectIsFormation(eventData);
     let sentCount = 0;
     for (const inc of targetIncubes) {
       if (inc.email) {
         try {
-          await emailService.sendWorkshopReminderEmail(eventData, inc);
+          if (isFormation) {
+            await emailService.sendWorkshopReminderEmail(eventData, inc);
+          } else {
+            await emailService.sendAtelierReminderEmail(eventData, inc);
+          }
           sentCount++;
         } catch (e) {
-          console.error(`Erreur rappel atelier pour ${inc.email}:`, e.message);
+          console.error(`Erreur rappel ${isFormation ? 'formation' : 'atelier'} pour ${inc.email}:`, e.message);
         }
       }
     }
 
+    const typeLibelle = isFormation ? 'de formation' : "d'atelier";
     res.json({
       success: true,
-      message: `Rappels d'atelier envoyés par email à ${sentCount} incubé(s) !`,
+      message: `Rappels ${typeLibelle} envoyés par email à ${sentCount} incubé(s) !`,
       sentCount,
       totalIncubes: targetIncubes.length
     });
@@ -305,7 +314,7 @@ app.post(['/api/evenements/:id/notifier', '/api/presence/atelier/:id/notifier'],
     if (lastNotified && (now - lastNotified) < 10000) {
       return res.json({
         success: true,
-        message: "Les convocations pour cette session sont déjà en cours d'envoi ou ont été déclenchées récemment (protection anti-doublon).",
+        message: "Les notifications pour cette session sont déjà en cours d'envoi ou ont été déclenchées récemment (protection anti-doublon).",
         alreadySent: true,
         sentCount: 0
       });
@@ -347,12 +356,16 @@ app.post(['/api/evenements/:id/notifier', '/api/presence/atelier/:id/notifier'],
       formateur: evenement.formateur || (dbAtelier ? (dbAtelier.intervenant || dbAtelier.formateur) : null) || req.body.formateur || 'Intervenant IDS',
       intervenant: evenement.intervenant || (dbAtelier ? dbAtelier.intervenant : null) || req.body.intervenant || null,
       date: evenement.date || (dbAtelier ? dbAtelier.date : null) || req.body.date || new Date().toISOString().split('T')[0],
+      dateFin: evenement.dateFin || (dbAtelier ? dbAtelier.dateFin : null) || req.body.dateFin || null,
       heureDebut: evenement.heureDebut || (dbAtelier ? dbAtelier.heureDebut : null) || req.body.heureDebut || '09:30',
       heureFin: evenement.heureFin || (dbAtelier ? dbAtelier.heureFin : null) || req.body.heureFin || '12:30',
       duree: evenement.duree || (dbAtelier ? dbAtelier.duree : null) || req.body.duree || '3h00',
-      description: evenement.description || (dbAtelier ? dbAtelier.description : null) || req.body.description || ''
+      description: evenement.description || (dbAtelier ? dbAtelier.description : null) || req.body.description || '',
+      type: evenement.type || (dbAtelier ? dbAtelier.type : null) || req.body.type || null,
+      typeParcours: evenement.typeParcours || (dbAtelier ? dbAtelier.typeParcours : null) || req.body.typeParcours || null
     };
 
+    const isFormation = emailService.detectIsFormation(eventData);
     let sentCount = 0;
     const errors = [];
     const alreadySentEmails = new Set();
@@ -364,16 +377,21 @@ app.post(['/api/evenements/:id/notifier', '/api/presence/atelier/:id/notifier'],
       alreadySentEmails.add(email);
 
       try {
-        await emailService.sendFormationInvitationEmail(eventData, inc);
+        if (isFormation) {
+          await emailService.sendFormationInvitationEmail(eventData, inc);
+        } else {
+          await emailService.sendAtelierInvitationEmail(eventData, inc);
+        }
         sentCount++;
       } catch (e) {
         errors.push({ email, error: e.message });
       }
     }
 
+    const typeLibelle = isFormation ? 'Convocations de formation' : "Invitations d'atelier";
     res.json({
       success: true,
-      message: `Convocations envoyées par email à ${sentCount} incubé(s) unique(s) !`,
+      message: `${typeLibelle} envoyées par email à ${sentCount} incubé(s) unique(s) !`,
       sentCount,
       totalIncubes: targetIncubes.length,
       errors: errors.length > 0 ? errors : undefined

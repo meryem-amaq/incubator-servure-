@@ -216,6 +216,42 @@ const detectFormationTheme = (evenement = {}) => {
 };
 
 /**
+ * Détection automatique pour différencier une Formation académique d'un Atelier pratique / Événement
+ */
+const detectIsFormation = (evenement = {}) => {
+  if (evenement.isFormation === true || evenement.type === 'formation') return true;
+  if (evenement.isFormation === false || evenement.type === 'atelier' || evenement.type === 'evenement') return false;
+
+  if (evenement.description) {
+    if (typeof evenement.description === 'object' && evenement.description !== null) {
+      if (evenement.description.moduleCode || evenement.description.typeParcours) return true;
+    } else if (typeof evenement.description === 'string') {
+      try {
+        const parsed = JSON.parse(evenement.description);
+        if (parsed.moduleCode || parsed.typeParcours) return true;
+      } catch (e) {}
+    }
+  }
+
+  if (evenement.typeParcours === 'pre-creation' || evenement.typeParcours === 'post-creation') return true;
+  if (evenement.parcours === 'pre-creation' || evenement.parcours === 'post-creation') return true;
+
+  const rawTitre = (evenement.titre || '').trim().toLowerCase();
+  if (
+    rawTitre.includes('[pré-création]') ||
+    rawTitre.includes('[pre-creation]') ||
+    rawTitre.includes('[post-création]') ||
+    rawTitre.includes('[post-creation]') ||
+    rawTitre.startsWith('[pre-') ||
+    rawTitre.startsWith('[post-')
+  ) {
+    return true;
+  }
+
+  return false;
+};
+
+/**
  * Gabarit HTML moderne, épuré et responsive harmonisé avec le style clair de l'application IDS
  */
 const renderEmailTemplate = ({ title, preheader, badgeText, badgeColor = '#0c87eb', contentHtml, ctaText, ctaUrl }) => {
@@ -547,6 +583,132 @@ Equipe IDS – Salé`;
 };
 
 /**
+ * 3.bis Invitation & Convocation à un Atelier Pratique / Événement Collaboratif (FabLab, Pitch, etc.)
+ */
+const sendAtelierInvitationEmail = async (evenement, incube = {}) => {
+  const recipient = incube.email || 'incubé@ids.ma';
+  const nomIncube = incube.nom_incube || incube.nom || 'Porteur de Projet';
+  const titreAtelier = (evenement.titre || 'Atelier Pratique IDS').trim();
+
+  let dateFin = evenement.dateFin || evenement.date_fin || null;
+  if (!dateFin && evenement.description) {
+    try {
+      const parsed = typeof evenement.description === 'object' ? evenement.description : JSON.parse(evenement.description);
+      dateFin = parsed.dateFin || parsed.date_fin || null;
+    } catch (e) {}
+  }
+
+  const { textPhrase: datePhrase, display: dateDisplay } = formatDateIntervalFrench(evenement.date, dateFin);
+  const animateur = evenement.intervenant || evenement.formateur || 'Équipe d’Animation IDS & Experts Invités';
+  const heureDebutStr = evenement.heureDebut || '09:30';
+  const heureFinStr = evenement.heureFin || '12:30';
+  const duree = evenement.duree || '3h00';
+  const lieu = evenement.lieu || 'Incubateur IDS — FabLab & Espace Collaboratif';
+
+  let descriptionText = '';
+  if (typeof evenement.description === 'string') {
+    try {
+      const parsed = JSON.parse(evenement.description);
+      descriptionText = parsed.description || parsed.notes || parsed.details || '';
+    } catch (e) {
+      descriptionText = evenement.description;
+    }
+  } else if (typeof evenement.description === 'object' && evenement.description !== null) {
+    descriptionText = evenement.description.description || evenement.description.notes || '';
+  }
+
+  const subject = `🛠️ Invitation : Atelier pratique — ${titreAtelier}`;
+
+  const safeNom = escapeHtml(nomIncube);
+  const safeTitre = escapeHtml(titreAtelier);
+  const safeDateDisplay = escapeHtml(dateDisplay);
+  const safeAnimateur = escapeHtml(animateur);
+  const safeHeureDebut = escapeHtml(heureDebutStr);
+  const safeHeureFin = escapeHtml(heureFinStr);
+  const safeDuree = escapeHtml(duree);
+  const safeLieu = escapeHtml(lieu);
+  const safeDescription = escapeHtml(descriptionText);
+
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0; font-size: 15px; color: #1e293b;">Bonjour <strong>${safeNom}</strong>,</p>
+
+    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      Nous avons le plaisir de vous inviter à prendre part au prochain atelier pratique : <strong>${safeTitre}</strong>, qui se déroulera ${escapeHtml(datePhrase)}.
+    </p>
+
+    <div class="card" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 20px; margin: 20px 0;">
+      <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600; width: 35%;">Atelier :</td><td style="padding: 6px 0; font-weight: 800; color: #00254d;">${safeTitre}</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Format :</td><td style="padding: 6px 0; font-weight: 700; color: #0ea5e9;">Atelier Pratique & Collaboratif</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Date :</td><td style="padding: 6px 0; font-weight: 800; color: #0c87eb;">${safeDateDisplay}</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Horaires :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeHeureDebut} - ${safeHeureFin} (${safeDuree})</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Animateur :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeAnimateur}</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Lieu :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeLieu}</td></tr>
+      </table>
+    </div>
+
+    ${safeDescription ? `
+      <div class="card" style="border-left: 4px solid #0ea5e9; background: #f0f9ff; border-top: 1px solid #e0f2fe; border-right: 1px solid #e0f2fe; border-bottom: 1px solid #e0f2fe; margin: 16px 0;">
+        <strong style="color: #0369a1; font-size: 12px; display: block; margin-bottom: 4px;">À propos de cette session :</strong>
+        <p style="margin: 0; color: #334155; font-size: 13px; line-height: 1.5;">${safeDescription}</p>
+      </div>
+    ` : ''}
+
+    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      💡 Cet atelier est conçu pour favoriser l'expérimentation, les échanges directs entre pairs et la progression concrète de vos réalisations.
+    </p>
+
+    <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 14px; margin: 18px 0; font-size: 13px; color: #92400e;">
+      <strong>🎒 Matériel recommandé :</strong>
+      <p style="margin: 4px 0 0 0;">Pensez à vous munir de votre ordinateur portable, de vos éléments de travail en cours et de vos éventuels prototypes pour des retours en direct.</p>
+    </div>
+
+    <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      Au plaisir de vous y retrouver pour cette séance collaborative !
+    </p>
+
+    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #334155;">
+      <p style="margin: 0 0 4px 0;">Bien cordialement,</p>
+      <p style="margin: 0 0 4px 0; color: #94a3b8;">----</p>
+      <p style="margin: 0; font-weight: 800; color: #00254d;">Équipe d’Animation & FabLab — IDS Salé</p>
+    </div>
+  `;
+
+  const html = renderEmailTemplate({
+    title: `Atelier Pratique : ${safeTitre}`,
+    preheader: `${safeTitre} • ${dateDisplay} de ${heureDebutStr} à ${heureFinStr}`,
+    badgeText: 'Atelier Pratique & Événement',
+    badgeColor: '#0ea5e9',
+    contentHtml
+  });
+
+  const text = `Bonjour ${nomIncube},
+
+Nous avons le plaisir de vous convier au prochain atelier pratique : "${titreAtelier}", qui se déroulera ${datePhrase}.
+
+Détails de l'atelier :
+- Atelier : ${titreAtelier}
+- Format : Atelier Pratique & Collaboratif
+- Date : ${dateDisplay}
+- Horaires : ${heureDebutStr} - ${heureFinStr} (${duree})
+- Animateur : ${animateur}
+- Lieu : ${lieu}
+${descriptionText ? `\nÀ propos : ${descriptionText}\n` : ''}
+🎒 Matériel recommandé : Pensez à vous munir de votre ordinateur portable et de vos éléments de travail en cours.
+
+Bien cordialement,
+----
+Équipe d’Animation & FabLab — IDS Salé`;
+
+  return await sendEmail({
+    to: recipient,
+    subject,
+    html,
+    text
+  });
+};
+
+/**
  * 4. Alerte d'Assiduité / Heures de Présence Insuffisantes
  */
 const sendAlerteAssiduiteEmail = async (incube, { tauxPresence = 0, moyenneHeures = 0, annee = 2026 } = {}) => {
@@ -736,6 +898,108 @@ Nous comptons sur votre motivation et votre implication.
 Bien cordialement,
 ----
 Equipe IDS – Salé`;
+
+  return await sendEmail({
+    to: recipient,
+    subject,
+    html,
+    text
+  });
+};
+
+/**
+ * 6.bis Rappel Automatique pour un Atelier Pratique / Événement Collaboratif (24h avant la session)
+ */
+const sendAtelierReminderEmail = async (evenement, incube = {}) => {
+  const recipient = incube.email || 'incubé@ids.ma';
+  const nomIncube = incube.nom_incube || incube.nom || 'Porteur de Projet';
+  const titreAtelier = (evenement.titre || 'Atelier Pratique IDS').trim();
+
+  let dateFin = evenement.dateFin || evenement.date_fin || null;
+  if (!dateFin && evenement.description) {
+    try {
+      const parsed = typeof evenement.description === 'object' ? evenement.description : JSON.parse(evenement.description);
+      dateFin = parsed.dateFin || parsed.date_fin || null;
+    } catch (e) {}
+  }
+
+  const { textPhrase: datePhrase, display: dateDisplay } = formatDateIntervalFrench(evenement.date, dateFin);
+  const animateur = evenement.intervenant || evenement.formateur || 'Équipe d’Animation IDS & Experts Invités';
+  const heureDebutStr = evenement.heureDebut || '09:30';
+  const heureFinStr = evenement.heureFin || '12:30';
+  const duree = evenement.duree || '3h00';
+  const lieu = evenement.lieu || 'Incubateur IDS — FabLab & Espace Collaboratif';
+
+  const subject = `🔔 RAPPEL : Votre atelier pratique « ${titreAtelier} » a lieu prochainement !`;
+
+  const safeNom = escapeHtml(nomIncube);
+  const safeTitre = escapeHtml(titreAtelier);
+  const safeDateDisplay = escapeHtml(dateDisplay);
+  const safeAnimateur = escapeHtml(animateur);
+  const safeHeureDebut = escapeHtml(heureDebutStr);
+  const safeHeureFin = escapeHtml(heureFinStr);
+  const safeDuree = escapeHtml(duree);
+  const safeLieu = escapeHtml(lieu);
+
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0; font-size: 15px; color: #1e293b;">Bonjour <strong>${safeNom}</strong>,</p>
+
+    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      Ceci est un petit rappel concernant votre atelier pratique <strong>${safeTitre}</strong>, qui se déroulera <strong>${escapeHtml(datePhrase)}</strong>.
+    </p>
+
+    <div class="card" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 20px; margin: 20px 0;">
+      <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600; width: 35%;">Atelier :</td><td style="padding: 6px 0; font-weight: 800; color: #00254d;">${safeTitre}</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Format :</td><td style="padding: 6px 0; font-weight: 700; color: #0ea5e9;">Atelier Pratique & Collaboratif</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Date :</td><td style="padding: 6px 0; font-weight: 800; color: #0c87eb;">${safeDateDisplay}</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Horaires :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeHeureDebut} - ${safeHeureFin} (${safeDuree})</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Animateur :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeAnimateur}</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Lieu :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeLieu}</td></tr>
+      </table>
+    </div>
+
+    <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 14px; margin: 18px 0; font-size: 13px; color: #92400e;">
+      <strong>⏰ Conseil pratique :</strong>
+      <p style="margin: 4px 0 0 0;">Merci d'arriver 10 minutes à l'avance afin de vous installer, de brancher vos équipements et d'émarger votre présence dès le début de la séance.</p>
+    </div>
+
+    <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      À très vite pour cet atelier interactif !
+    </p>
+
+    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #334155;">
+      <p style="margin: 0 0 4px 0;">Bien cordialement,</p>
+      <p style="margin: 0 0 4px 0; color: #94a3b8;">----</p>
+      <p style="margin: 0; font-weight: 800; color: #00254d;">Équipe d’Animation & FabLab — IDS Salé</p>
+    </div>
+  `;
+
+  const html = renderEmailTemplate({
+    title: `Rappel : Atelier ${safeTitre}`,
+    preheader: `Rappel atelier ${safeTitre} • ${dateDisplay} à ${safeHeureDebut}`,
+    badgeText: 'Rappel • Atelier Pratique',
+    badgeColor: '#f59e0b',
+    contentHtml
+  });
+
+  const text = `Bonjour ${nomIncube},
+
+Ceci est un rappel concernant votre atelier pratique : "${titreAtelier}", prévu ${datePhrase}.
+
+Détails de l'atelier :
+- Atelier : ${titreAtelier}
+- Format : Atelier Pratique & Collaboratif
+- Date : ${dateDisplay}
+- Horaires : ${heureDebutStr} - ${heureFinStr} (${duree})
+- Animateur : ${animateur}
+- Lieu : ${lieu}
+
+Merci d'arriver 10 minutes à l'avance avec votre matériel.
+
+Bien cordialement,
+----
+Équipe d’Animation & FabLab — IDS Salé`;
 
   return await sendEmail({
     to: recipient,
@@ -971,14 +1235,17 @@ module.exports = {
   sendDemandeReservationAccompagnateurEmail,
   sendRdvConfirmationEmail,
   sendFormationInvitationEmail,
+  sendAtelierInvitationEmail,
   sendAlerteAssiduiteEmail,
   sendWelcomeEmail,
   sendWorkshopReminderEmail,
+  sendAtelierReminderEmail,
   sendReservationReminderEmail,
   sendForgotPasswordEmail,
   sendPasswordResetByAdminEmail,
   formatDateFrench,
   formatDateIntervalFrench,
   detectFormationType,
-  detectFormationTheme
+  detectFormationTheme,
+  detectIsFormation
 };
