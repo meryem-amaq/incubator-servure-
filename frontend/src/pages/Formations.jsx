@@ -302,6 +302,89 @@ export default function Formations() {
     }
   };
 
+  // Retirer un participant de la liste des invités (correction d'erreur avant ou après envoi)
+  const handleRemoveInvitedIncube = async (formation, inc) => {
+    if (!formation?.id || !inc?.id) return;
+    if (!window.confirm(`Retirer ${inc.nom_incube} de la liste des invités pour cette session de formation ?`)) return;
+
+    let meta = {};
+    try {
+      meta = typeof formation.description === 'string'
+        ? JSON.parse(formation.description || '{}')
+        : (formation.description || {});
+    } catch (e) {
+      meta = {};
+    }
+
+    const currentInvites = Array.isArray(meta.invitesIds) && meta.invitesIds.length > 0
+      ? meta.invitesIds
+      : allIncubes.map(i => i.id);
+
+    const updatedInvites = currentInvites.filter(id => Number(id) !== Number(inc.id));
+    const updatedMeta = { ...meta, invitesIds: updatedInvites };
+    const updatedDescription = JSON.stringify(updatedMeta);
+
+    try {
+      await api.put(`/ateliers/${formation.id}`, { description: updatedDescription });
+
+      setRawAteliers(prev => prev.map(f => f.id === formation.id ? { ...f, description: updatedDescription } : f));
+      setParticipantsModalItem(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          formation: { ...prev.formation, description: updatedDescription },
+          meta: updatedMeta
+        };
+      });
+
+      toast.success(`${inc.nom_incube} a été retiré de la liste des invités`);
+    } catch (err) {
+      console.error('Erreur retrait invité:', err);
+      toast.error('Erreur lors du retrait du participant');
+    }
+  };
+
+  // Ajouter un incubé supplémentaire à la liste des invités
+  const handleAddInvitedIncube = async (formation, incubeId) => {
+    if (!formation?.id || !incubeId) return;
+
+    let meta = {};
+    try {
+      meta = typeof formation.description === 'string'
+        ? JSON.parse(formation.description || '{}')
+        : (formation.description || {});
+    } catch (e) {
+      meta = {};
+    }
+
+    const currentInvites = Array.isArray(meta.invitesIds) ? meta.invitesIds : allIncubes.map(i => i.id);
+    if (currentInvites.map(Number).includes(Number(incubeId))) return;
+
+    const updatedInvites = [...currentInvites, Number(incubeId)];
+    const updatedMeta = { ...meta, invitesIds: updatedInvites };
+    const updatedDescription = JSON.stringify(updatedMeta);
+
+    try {
+      await api.put(`/ateliers/${formation.id}`, { description: updatedDescription });
+
+      setRawAteliers(prev => prev.map(f => f.id === formation.id ? { ...f, description: updatedDescription } : f));
+      setParticipantsModalItem(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          formation: { ...prev.formation, description: updatedDescription },
+          meta: updatedMeta
+        };
+      });
+
+      const added = allIncubes.find(i => Number(i.id) === Number(incubeId));
+      toast.success(`${added?.nom_incube || 'Participant'} ajouté à la liste des invités`);
+    } catch (err) {
+      console.error('Erreur ajout invité:', err);
+      toast.error('Erreur lors de l’ajout du participant');
+    }
+  };
+
   // Liste complète des présences et absences pour l'impression officielle A4
   const fullPresencesForPrint = useMemo(() => {
     const formation = printModalFormation || participantsModalItem?.formation;
@@ -541,7 +624,7 @@ export default function Formations() {
     salle: 'Salle de formation IDS',
     promoFilter: 'all',
     selectedIncubes: [],
-    notifyByEmail: true
+    notifyByEmail: false
   });
   const [submittingFormation, setSubmittingFormation] = useState(false);
 
@@ -577,7 +660,7 @@ export default function Formations() {
       salle: 'Salle de formation IDS',
       promoFilter: 'all',
       selectedIncubes: targetIncubes.map(i => i.id),
-      notifyByEmail: true
+      notifyByEmail: false
     });
     setShowAddFormationModal(true);
   };
@@ -620,7 +703,7 @@ export default function Formations() {
     });
   };
 
-  // Enregistrer la session de formation
+  // Enregistrer la session de formation (Option A : Enregistrement sécurisé sans envoi précipité)
   const handleSaveFormation = async (e) => {
     e.preventDefault();
     const mod = currentModules.find(m => m.code === formationForm.moduleCode);
@@ -633,6 +716,17 @@ export default function Formations() {
 
     setSubmittingFormation(true);
     try {
+      const metaToSave = {
+        typeParcours: selectedParcours,
+        moduleCode: formationForm.moduleCode,
+        moduleName: modName,
+        collaborateur: formationForm.collaborateur,
+        salle: formationForm.salle,
+        invitesIds: formationForm.selectedIncubes,
+        dateDebut: formationForm.date,
+        dateFin: formationForm.dateFin || null
+      };
+
       const payload = {
         titre: `[${parcoursLabel}] ${formationForm.moduleCode} – ${modName}`,
         formateur: resolvedFormateur,
@@ -642,38 +736,26 @@ export default function Formations() {
         heureDebut: formationForm.heureDebut,
         heureFin: formationForm.heureFin,
         duree: formationForm.duree || '3h00',
-        description: JSON.stringify({
-          typeParcours: selectedParcours,
-          moduleCode: formationForm.moduleCode,
-          moduleName: modName,
-          collaborateur: formationForm.collaborateur,
-          salle: formationForm.salle,
-          invitesIds: formationForm.selectedIncubes,
-          dateDebut: formationForm.date,
-          dateFin: formationForm.dateFin || null
-        }),
+        description: JSON.stringify(metaToSave),
         statutOuverture: 'auto'
       };
 
       const res = await api.post('/ateliers', payload);
       const created = res.data;
-      toast.success('Session de formation créée avec succès !');
-
-      // Envoyer les convocations par email si demandé
-      if (formationForm.notifyByEmail && formationForm.selectedIncubes.length > 0) {
-        try {
-          await api.post(`/evenements/${created.id}/notifier`, {
-            evenement: created,
-            incubeIds: formationForm.selectedIncubes
-          });
-          toast.success(`Convocations par email envoyées à ${formationForm.selectedIncubes.length} incubé(s) !`);
-        } catch (mailErr) {
-          console.warn('Erreur envoi notification email:', mailErr);
-        }
-      }
 
       setShowAddFormationModal(false);
-      loadData();
+      await loadData();
+
+      // Option A : Ouvrir automatiquement la liste des invités pour vérification et suppression des erreurs
+      setParticipantsModalItem({
+        formation: created,
+        meta: metaToSave
+      });
+
+      toast.success(
+        'Formation enregistrée ! Vérifiez ci-dessous la liste des invités, retirez les erreurs si besoin puis cliquez sur "Envoyer les convocations".',
+        { duration: 6000 }
+      );
     } catch (err) {
       console.error('Erreur création formation:', err);
       toast.error(err.response?.data?.message || 'Erreur lors de la création de la formation');
@@ -1615,33 +1697,18 @@ export default function Formations() {
                   })}
                 </div>
 
-                <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer pt-1">
-                  <input
-                    type="checkbox"
-                    checked={formationForm.notifyByEmail}
-                    onChange={e => setFormationForm(p => ({ ...p, notifyByEmail: e.target.checked }))}
-                    className="rounded border-slate-300 text-amber-500 focus:ring-amber-500"
-                  />
-                  <Mail size={13} className="text-amber-500" />
-                  <span>Envoyer automatiquement une convocation par email aux participants</span>
-                </label>
-
-                {formationForm.notifyByEmail && (
-                  <div className="mt-2 p-3 rounded-xl bg-slate-50 dark:bg-dark-800 border border-slate-200 dark:border-dark-700 text-[11px] text-slate-600 dark:text-dark-300 space-y-1">
-                    <p className="font-bold text-slate-800 dark:text-dark-100 flex items-center gap-1.5 text-xs text-primary-600 dark:text-primary-400">
-                      <Mail size={13} /> Modèle d'email officiel envoyé aux incubés :
+                {/* Info Option A : Processus sécurisé de convocation */}
+                <div className="mt-2.5 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-950 dark:text-amber-200 flex items-start gap-2.5">
+                  <Mail size={16} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-extrabold text-amber-900 dark:text-amber-300">
+                      Vérification des invitations avant envoi :
                     </p>
-                    <p className="italic text-slate-700 dark:text-dark-200 bg-white dark:bg-dark-900 p-2.5 rounded-lg border border-slate-100 dark:border-dark-800 leading-relaxed font-sans">
-                      « Bonjour à toutes et à tous,<br />
-                      Nous avons le plaisir de vous convier à la session de formation <strong>{selectedParcours === 'pre-creation' ? 'pré-création' : 'post-création'}</strong>, qui se déroulera <strong>{formationForm.dateFin && formationForm.dateFin !== formationForm.date ? `du ${formationForm.date} au ${formationForm.dateFin}` : `le ${formationForm.date}`}</strong> sous le thème <strong>{currentModules.find(m => m.code === formationForm.moduleCode)?.name || formationForm.moduleCode || 'Formation IDS'}</strong>.<br />
-                      Cette session, animée par des experts partenaires, constitue une étape clé de votre parcours d’incubation. Votre participation est donc indispensable pour valider votre accompagnement au sein de l’IDS-Salé.<br />
-                      Nous comptons sur votre motivation et votre implication.<br />
-                      Bien cordialement,<br />
-                      ----<br />
-                      Equipe IDS – Salé »
+                    <p className="text-[11px] leading-relaxed text-amber-800 dark:text-amber-300">
+                      L’enregistrement de la formation <strong>n’envoie pas d'email immédiatement</strong>. Dès validation, la liste des invités s’ouvrira automatiquement pour vous permettre de contrôler chaque participant et <strong>retirer d’un clic (🗑️) toute personne sélectionnée par erreur</strong> avant de déclencher l'envoi officiel des convocations.
                     </p>
                   </div>
-                )}
+                </div>
               </div>
 
               {/* Boutons modal */}
@@ -2036,10 +2103,12 @@ export default function Formations() {
       {participantsModalItem && (() => {
         const formation = participantsModalItem.formation;
         const meta = participantsModalItem.meta || {};
-        const invitesIds = meta.invitesIds || [];
-        const baseList = invitesIds.length > 0
-          ? allIncubes.filter(i => invitesIds.includes(i.id))
-          : allIncubes;
+        const rawInvites = Array.isArray(meta.invitesIds) && meta.invitesIds.length > 0
+          ? meta.invitesIds
+          : allIncubes.map(i => i.id);
+        const invitesIds = rawInvites.map(Number);
+        const baseList = allIncubes.filter(i => invitesIds.includes(Number(i.id)));
+        const nonInvitedIncubes = allIncubes.filter(i => !invitesIds.includes(Number(i.id)));
 
         const isIncubePresent = (inc) => sessionPresences.some(p => 
           String(p.incubeId) === String(inc.id) ||
@@ -2211,6 +2280,32 @@ export default function Formations() {
                 </div>
               </div>
 
+              {/* Barre d'action rapide : Inviter un participant supplémentaire si besoin */}
+              {nonInvitedIncubes.length > 0 && (
+                <div className="px-3 sm:px-5 py-2 bg-amber-50/70 dark:bg-amber-950/20 border-b border-amber-200/60 dark:border-amber-900/40 flex items-center justify-between gap-3 text-xs shrink-0 flex-wrap">
+                  <div className="flex items-center gap-1.5 text-amber-900 dark:text-amber-300 font-bold">
+                    <Plus size={14} className="text-amber-600 dark:text-amber-400" />
+                    <span>Ajouter un invité à la liste :</span>
+                  </div>
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleAddInvitedIncube(formation, e.target.value);
+                      }
+                    }}
+                    className="text-xs bg-white dark:bg-dark-800 border border-amber-300 dark:border-amber-700/80 rounded-xl px-3 py-1 font-bold text-slate-800 dark:text-slate-100 cursor-pointer shadow-2xs hover:border-amber-500"
+                  >
+                    <option value="" disabled>Sélectionner un incubé ({nonInvitedIncubes.length} disponibles)...</option>
+                    {nonInvitedIncubes.map(i => (
+                      <option key={i.id} value={i.id}>
+                        {i.nom_incube} ({i.promotion || 'Sans promo'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Tableau / Liste détaillée de Présence et Absence */}
               <div className="p-3 sm:p-5 overflow-y-auto space-y-2 flex-1 divide-y divide-slate-100 dark:divide-dark-800/80">
                 {filteredList.length === 0 ? (
@@ -2308,6 +2403,16 @@ export default function Formations() {
                               </>
                             )}
                           </button>
+
+                          {/* Bouton Supprimer / Retirer de la liste des invités */}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveInvitedIncube(formation, inc)}
+                            className="p-2 rounded-xl text-rose-500 hover:text-white hover:bg-rose-600 border border-rose-200 dark:border-rose-900/50 transition-colors cursor-pointer"
+                            title={`Retirer ${inc.nom_incube} de la liste des invités`}
+                          >
+                            <Trash2 size={13} />
+                          </button>
                         </div>
                       </div>
                     );
@@ -2317,12 +2422,25 @@ export default function Formations() {
 
               {/* Footer Modal avec Bouton d'Impression Officielle A4 et Convocations */}
               <div className="p-3.5 sm:p-4 border-t border-slate-100 dark:border-dark-800 bg-slate-50/80 dark:bg-dark-800/40 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
-                <div className="text-xs text-slate-600 dark:text-dark-300 font-bold text-center sm:text-left">
-                  <span>Total : {totalInscrits} participant(s)</span>
-                  <span className="mx-2">•</span>
-                  <span className="text-emerald-600 font-black">{presentsCount} présent(s)</span>
-                  <span className="mx-2">•</span>
-                  <span className="text-rose-600 font-black">{absentsCount} absent(s)</span>
+                <div className="text-xs text-slate-600 dark:text-dark-300 font-bold text-center sm:text-left space-y-1">
+                  <div>
+                    <span>Total : {totalInscrits} participant(s) invité(s)</span>
+                    <span className="mx-2">•</span>
+                    <span className="text-emerald-600 font-black">{presentsCount} présent(s)</span>
+                    <span className="mx-2">•</span>
+                    <span className="text-rose-600 font-black">{absentsCount} absent(s)</span>
+                  </div>
+                  <div>
+                    {meta.emailSentAt ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
+                        <CheckCircle2 size={11} /> Convocations déjà envoyées le {new Date(meta.emailSentAt).toLocaleDateString('fr-FR')} à {new Date(meta.emailSentAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-400 font-semibold bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800">
+                        <Mail size={11} /> Convocations non encore envoyées (Vérifiez la liste puis cliquez ci-contre)
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-end">
@@ -2330,45 +2448,69 @@ export default function Formations() {
                     type="button"
                     onClick={() => setPrintModalFormation(formation)}
                     className="btn btn-sm bg-emerald-600 hover:bg-emerald-700 text-white font-black flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs shadow-md shadow-emerald-700/20 cursor-pointer"
+                    title="Imprimer la feuille d'émargement officielle (A4)"
                   >
-                    <Printer size={14} /> Imprimer feuille d'émargement (A4)
+                    <Printer size={14} /> Imprimer feuille (A4)
                   </button>
 
                   <button
                     type="button"
-                    disabled={sendingConvocationsId === formation.id}
+                    disabled={sendingConvocationsId === formation.id || totalInscrits === 0}
                     onClick={async () => {
-                      if (sendingConvocationsId === formation.id) return;
+                      if (sendingConvocationsId === formation.id || totalInscrits === 0) return;
                       setSendingConvocationsId(formation.id);
                       try {
+                        const targetIds = invitesIds;
                         const res = await api.post(`/evenements/${formation.id}/notifier`, {
                           evenement: formation,
-                          incubeIds: meta.invitesIds
+                          incubeIds: targetIds
                         });
+
+                        const sentTime = new Date().toISOString();
+                        const updatedMeta = { ...meta, invitesIds: targetIds, emailSentAt: sentTime };
+                        const updatedDesc = JSON.stringify(updatedMeta);
+                        await api.put(`/ateliers/${formation.id}`, { description: updatedDesc }).catch(() => {});
+
+                        setRawAteliers(prev => prev.map(f => f.id === formation.id ? { ...f, description: updatedDesc } : f));
+                        setParticipantsModalItem(prev => prev ? {
+                          ...prev,
+                          formation: { ...prev.formation, description: updatedDesc },
+                          meta: updatedMeta
+                        } : null);
+
                         if (res.data?.success) {
-                          toast.success(`Convocations par email renvoyées (${res.data.sentCount || 0} envoyé(s)) !`);
+                          toast.success(`Convocations par email envoyées avec succès à ${res.data.sentCount || totalInscrits} participant(s) !`);
                         } else {
-                          toast.success('Convocations par email renvoyées avec succès !');
+                          toast.success('Convocations par email envoyées avec succès !');
                         }
                       } catch (e) {
-                        console.error('Erreur renvoi convocations:', e);
-                        toast.error(e.response?.data?.message || e.response?.data?.error || "Erreur d'envoi d'email");
+                        console.error('Erreur envoi convocations:', e);
+                        toast.error(e.response?.data?.message || e.response?.data?.error || "Erreur lors de l'envoi d'email");
                       } finally {
                         setSendingConvocationsId(null);
                       }
                     }}
-                    className={`btn btn-secondary btn-sm text-xs flex items-center gap-1.5 px-3 py-2 rounded-xl ${
-                      sendingConvocationsId === formation.id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
-                    }`}
+                    className={`btn btn-sm text-xs font-black flex items-center gap-2 px-4 py-2.5 rounded-xl shadow-md transition-all ${
+                      meta.emailSentAt
+                        ? 'btn-secondary text-slate-700 dark:text-slate-200 cursor-pointer'
+                        : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-amber-500/20 cursor-pointer'
+                    } ${sendingConvocationsId === formation.id || totalInscrits === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    title={meta.emailSentAt ? "Renvoyer les convocations par email à tous les participants validés" : "Envoyer les convocations par email à la liste validée"}
                   >
                     {sendingConvocationsId === formation.id ? (
                       <>
-                        <span className="w-3 h-3 border-2 border-slate-600 border-t-transparent rounded-full animate-spin"></span>
-                        Envoi en cours...
+                        <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
+                        <span>Envoi en cours...</span>
+                      </>
+                    ) : meta.emailSentAt ? (
+                      <>
+                        <RefreshCw size={13} />
+                        <span>Renvoyer convocations ({totalInscrits})</span>
                       </>
                     ) : (
                       <>
-                        <Send size={13} /> Renvoyer convocations
+                        <Send size={13} className="stroke-[2.5]" />
+                        <span>Envoyer les convocations ({totalInscrits})</span>
                       </>
                     )}
                   </button>
