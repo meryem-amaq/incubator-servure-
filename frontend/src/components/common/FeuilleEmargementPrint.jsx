@@ -384,24 +384,34 @@ export default function FeuilleEmargementPrint({
 
       // 5. Zone de signature du Formateur (sur la DERNIÈRE page uniquement)
       if (isLastPage) {
-        const boxWidth = 82;
-        const boxHeight = 24;
+        const boxWidth = 85;
+        const boxHeight = 26;
         const boxX = pageWidth - marginX - boxWidth;
-        const boxY = pageHeight - 16 - boxHeight; // 257mm
+        const boxY = pageHeight - 16 - boxHeight; // 255mm
+        const formateurNom = atelier.formateur || atelier.intervenant || 'Formateur responsable';
 
-        doc.setDrawColor(203, 213, 225);
+        // Bordure fine bleu clair élégante (#bfdbfe) & fond blanc
+        doc.setDrawColor(191, 219, 254);
         doc.setFillColor(255, 255, 255);
-        doc.roundedRect(boxX, boxY, boxWidth, boxHeight, 2, 2, 'D');
+        doc.setLineWidth(0.35);
+        doc.roundedRect(boxX, boxY, boxWidth, boxHeight, 2.5, 2.5, 'FD');
 
-        doc.setFontSize(8.5);
+        // Titre : « Signature du formateur : »
+        doc.setFontSize(8);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(30, 41, 59);
-        doc.text('Signature du formateur :', boxX + 4, boxY + 6);
+        doc.text('Signature du formateur :', boxX + 4, boxY + 5.5);
 
-        // Ligne de signature au bas
-        doc.setDrawColor(226, 232, 240);
-        doc.setLineWidth(0.3);
-        doc.line(boxX + 4, boxY + boxHeight - 3, boxX + boxWidth - 4, boxY + boxHeight - 3);
+        // Ligne horizontale discrète pour signer
+        doc.setDrawColor(203, 213, 225);
+        doc.setLineWidth(0.25);
+        doc.line(boxX + 4, boxY + boxHeight - 6.5, boxX + boxWidth - 4, boxY + boxHeight - 6.5);
+
+        // Nom du formateur ou de l'intervenant sous la zone de signature
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(100, 116, 139);
+        doc.text(formateurNom, boxX + 4, boxY + boxHeight - 2.5);
       }
 
       // 6. Pied de page officiel sur TOUTES les pages
@@ -774,9 +784,14 @@ export default function FeuilleEmargementPrint({
                   {/* 4. Zone de signature du Formateur (sur la DERNIÈRE page uniquement) */}
                   {isLastPage ? (
                     <div className="signatures-print-block pb-3 flex justify-end text-xs">
-                      <div className="border border-slate-300 rounded-xl p-3.5 h-28 w-80 flex flex-col justify-between bg-white shadow-sm">
-                        <p className="font-bold text-slate-800 text-[13px]">Signature du formateur :</p>
-                        <div className="border-b border-slate-200 w-full mb-1"></div>
+                      <div className="border border-blue-200/90 rounded-xl p-4 h-28 w-80 flex flex-col justify-between bg-white shadow-sm">
+                        <p className="font-bold text-slate-800 text-xs">Signature du formateur :</p>
+                        <div>
+                          <div className="border-b border-slate-300/80 mb-1.5 w-full"></div>
+                          <p className="text-slate-500 italic text-[11px] truncate">
+                            {atelier.formateur || atelier.intervenant || 'Formateur responsable'}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   ) : (
