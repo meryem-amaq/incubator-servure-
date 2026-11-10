@@ -982,35 +982,35 @@ export default function Formations() {
       {/* =========================================================================
           1. HEADER PRINCIPAL ÉPURÉ (SANS GRAND CADRE ENCOMBRANT)
           ========================================================================= */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
             <GraduationCap className="text-amber-500 shrink-0" size={28} />
             <span>Formations Pré/Post-Création</span>
           </h1>
-          <p className="text-sm text-slate-600 dark:text-dark-300 mt-1">
+          <p className="text-sm text-slate-600 dark:text-dark-300 mt-1 max-w-2xl">
             Organisation des parcours Pré-Création & Post-Création, formateurs, collaborateurs et suivi des émargements QR code
           </p>
         </div>
 
-        {/* Boutons d'action principaux */}
-        <div className="flex items-center gap-2.5 flex-wrap">
+        {/* Boutons d'action principaux alignés côte-à-côte sur la même ligne */}
+        <div className="flex items-center gap-3 shrink-0 flex-nowrap">
           <button
             type="button"
             onClick={() => handleOpenAddModule(selectedParcours)}
-            className="btn btn-secondary btn-sm flex items-center gap-2 border border-slate-200 dark:border-dark-700 bg-white dark:bg-dark-800 hover:border-amber-500/50 text-slate-800 dark:text-slate-100 font-bold py-2.5 px-4 rounded-xl cursor-pointer shadow-xs transition"
+            className="inline-flex items-center justify-center gap-2 border border-slate-200 dark:border-dark-700 bg-white dark:bg-dark-800 hover:border-amber-500/50 text-slate-800 dark:text-slate-100 font-bold py-2.5 px-4 rounded-xl cursor-pointer shadow-xs transition whitespace-nowrap text-xs"
             title="Ajouter un module pédagogique officiel"
           >
-            <BookOpen size={16} className="text-amber-500" />
+            <BookOpen size={16} className="text-amber-500 shrink-0" />
             <span>Nouveau Module</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleOpenAddFormation()}
-            className="btn btn-primary btn-sm flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/20 py-2.5 px-4 rounded-xl cursor-pointer transition"
+            className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/20 py-2.5 px-4 rounded-xl cursor-pointer transition whitespace-nowrap text-xs"
           >
-            <Plus size={16} className="stroke-[3]" />
+            <Plus size={16} className="stroke-[3] shrink-0" />
             <span>Ajouter une Formation</span>
           </button>
         </div>
