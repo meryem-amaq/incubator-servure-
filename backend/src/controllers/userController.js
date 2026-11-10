@@ -16,6 +16,11 @@ exports.getAll = async (req, res) => {
           as: 'incubes',
           attributes: ['id'],
         },
+        {
+          model: Incube,
+          as: 'porteurProjet',
+          attributes: ['id', 'nom_incube', 'pp_numero'],
+        },
       ],
       order: [['created_at', 'DESC']],
     });
@@ -28,8 +33,15 @@ exports.getAll = async (req, res) => {
       role: u.role,
       photo_url: u.photo_url,
       actif: u.actif,
+      type: u.type,
+      badge_id: u.badge_id,
       createdAt: u.createdAt,
       totalIncubes: u.incubes ? u.incubes.length : 0,
+      porteurProjet: u.porteurProjet ? {
+        id: u.porteurProjet.id,
+        nom_incube: u.porteurProjet.nom_incube,
+        pp_numero: u.porteurProjet.pp_numero
+      } : null,
     }));
 
     res.json(formatted);

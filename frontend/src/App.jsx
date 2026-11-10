@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
@@ -44,6 +44,17 @@ function PublicRoute({ children }) {
   return user ? <Navigate to="/" replace /> : children;
 }
 
+function IncubeDossierGuard() {
+  const { user } = useAuth();
+  const { id } = useParams();
+  if (user?.role === 'incube') {
+    if (user.pp_id && String(user.pp_id) !== String(id)) {
+      return <Navigate to={`/incube/${user.pp_id}`} replace />;
+    }
+  }
+  return <ProfilIncube />;
+}
+
 function AdminRoute({ children }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
@@ -83,15 +94,15 @@ function AppRoutes() {
           }
         />
         <Route path="incubes" element={<AdminRoute><Annuaire /></AdminRoute>} />
-        <Route path="incube/:id" element={<ProfilIncube />} />
-        <Route path="incubes/:id" element={<ProfilIncube />} />
+        <Route path="incube/:id" element={<IncubeDossierGuard />} />
+        <Route path="incubes/:id" element={<IncubeDossierGuard />} />
         <Route path="booking" element={<BookingPage />} />
         <Route path="engagement" element={<AdminRoute><Engagement /></AdminRoute>} />
         <Route path="rapports" element={<SuperAdminRoute><RapportsActivite /></SuperAdminRoute>} />
-        <Route path="formations" element={<Formations />} />
-        <Route path="evenements" element={<Evenements />} />
+        <Route path="formations" element={<AdminRoute><Formations /></AdminRoute>} />
+        <Route path="evenements" element={<AdminRoute><Evenements /></AdminRoute>} />
         <Route path="evenement" element={<Navigate to="/evenements" replace />} />
-        <Route path="espaces" element={<GestionEspaces />} />
+        <Route path="espaces" element={<AdminRoute><GestionEspaces /></AdminRoute>} />
         <Route path="materiel" element={<Navigate to="/espaces" replace />} />
         <Route
           path="utilisateurs"

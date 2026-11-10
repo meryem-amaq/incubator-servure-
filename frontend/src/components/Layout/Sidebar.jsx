@@ -247,53 +247,57 @@ export default function Sidebar({
             </NavLink>
           )}
 
-          <NavLink 
-            to="/formations" 
-            onClick={onMobileClose}
-            title={!isExpanded ? 'Formations Pré/Post-Création' : undefined}
-            className={({ isActive }) => 
-              `flex items-center px-3 py-3 rounded-xl transition-all duration-200 ${
-                isActive 
-                  ? 'bg-[#0A2744] text-amber-400 font-semibold shadow-inner' 
-                  : 'text-gray-300 hover:text-white hover:bg-[#0A2744]/70'
-              } ${!isExpanded ? 'justify-center' : ''}`
-            }
-          >
-            <GraduationCap size={20} className="shrink-0 text-amber-400" />
-            {isExpanded && <span className="ml-3 font-medium text-sm truncate">Formations Pré/Post-Création</span>}
-          </NavLink>
+          {!isIncube && (
+            <>
+              <NavLink 
+                to="/formations" 
+                onClick={onMobileClose}
+                title={!isExpanded ? 'Formations Pré/Post-Création' : undefined}
+                className={({ isActive }) => 
+                  `flex items-center px-3 py-3 rounded-xl transition-all duration-200 ${
+                    isActive 
+                      ? 'bg-[#0A2744] text-amber-400 font-semibold shadow-inner' 
+                      : 'text-gray-300 hover:text-white hover:bg-[#0A2744]/70'
+                  } ${!isExpanded ? 'justify-center' : ''}`
+                }
+              >
+                <GraduationCap size={20} className="shrink-0 text-amber-400" />
+                {isExpanded && <span className="ml-3 font-medium text-sm truncate">Formations Pré/Post-Création</span>}
+              </NavLink>
 
-          <NavLink 
-            to="/evenements" 
-            onClick={onMobileClose}
-            title={!isExpanded ? 'Événements & Ateliers' : undefined}
-            className={({ isActive }) => 
-              `flex items-center px-3 py-3 rounded-xl transition-all duration-200 ${
-                isActive 
-                  ? 'bg-[#0A2744] text-amber-400 font-semibold shadow-inner' 
-                  : 'text-gray-300 hover:text-white hover:bg-[#0A2744]/70'
-              } ${!isExpanded ? 'justify-center' : ''}`
-            }
-          >
-            <CalendarCheck size={20} className="shrink-0" />
-            {isExpanded && <span className="ml-3 font-medium text-sm truncate">Événements</span>}
-          </NavLink>
+              <NavLink 
+                to="/evenements" 
+                onClick={onMobileClose}
+                title={!isExpanded ? 'Événements & Ateliers' : undefined}
+                className={({ isActive }) => 
+                  `flex items-center px-3 py-3 rounded-xl transition-all duration-200 ${
+                    isActive 
+                      ? 'bg-[#0A2744] text-amber-400 font-semibold shadow-inner' 
+                      : 'text-gray-300 hover:text-white hover:bg-[#0A2744]/70'
+                  } ${!isExpanded ? 'justify-center' : ''}`
+                }
+              >
+                <CalendarCheck size={20} className="shrink-0" />
+                {isExpanded && <span className="ml-3 font-medium text-sm truncate">Événements</span>}
+              </NavLink>
 
-          <NavLink 
-            to="/espaces" 
-            onClick={onMobileClose}
-            title={!isExpanded ? 'Réservation Espaces' : undefined}
-            className={({ isActive }) => 
-              `flex items-center px-3 py-3 rounded-xl transition-all duration-200 ${
-                isActive 
-                  ? 'bg-[#0A2744] text-amber-400 font-semibold shadow-inner' 
-                  : 'text-gray-300 hover:text-white hover:bg-[#0A2744]/70'
-              } ${!isExpanded ? 'justify-center' : ''}`
-            }
-          >
-            <Building2 size={20} className="shrink-0 text-amber-400" />
-            {isExpanded && <span className="ml-3 font-medium text-sm truncate">Réservation Espaces</span>}
-          </NavLink>
+              <NavLink 
+                to="/espaces" 
+                onClick={onMobileClose}
+                title={!isExpanded ? 'Réservation Espaces' : undefined}
+                className={({ isActive }) => 
+                  `flex items-center px-3 py-3 rounded-xl transition-all duration-200 ${
+                    isActive 
+                      ? 'bg-[#0A2744] text-amber-400 font-semibold shadow-inner' 
+                      : 'text-gray-300 hover:text-white hover:bg-[#0A2744]/70'
+                  } ${!isExpanded ? 'justify-center' : ''}`
+                }
+              >
+                <Building2 size={20} className="shrink-0 text-amber-400" />
+                {isExpanded && <span className="ml-3 font-medium text-sm truncate">Réservation Espaces</span>}
+              </NavLink>
+            </>
+          )}
 
           {isSuperAdmin && (
             <NavLink 

@@ -50,8 +50,8 @@ const ADMINS_LIST = [
   {
     nom: 'BELAAZIZ',
     prenom: 'Hicham',
-    email: 'hicham@ctpes.ma',
-    role: 'admin',
+    email: 'hicham.belaaziz@ctpes.ma',
+    role: 'super_admin',
     type: 'Administration',
     badge_id: '227',
     all_badges: ['227', '6883058']

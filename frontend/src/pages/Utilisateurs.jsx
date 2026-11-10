@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { Link } from 'react-router-dom';
 import {
   UserPlus,
   ShieldCheck,
@@ -17,6 +18,9 @@ import {
   EyeOff,
   Sparkles,
   Pencil,
+  UsersRound,
+  GraduationCap,
+  ExternalLink,
 } from 'lucide-react';
 import api, { getPhotoUrl } from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -221,13 +225,51 @@ export default function Utilisateurs() {
     }
   };
 
-  const filteredUsers = users.filter(
-    (u) =>
-      !search ||
-      u.nom?.toLowerCase().includes(search.toLowerCase()) ||
-      u.prenom?.toLowerCase().includes(search.toLowerCase()) ||
-      u.email?.toLowerCase().includes(search.toLowerCase())
-  );
+  const [activeCategory, setActiveCategory] = useState('administration'); // 'administration' | 'accompagnateur' | 'incube' | 'all'
+
+  const getUserCategory = (u) => {
+    const role = (u?.role || '').toLowerCase();
+    if (['super_admin', 'administrateur', 'superadmin'].includes(role)) {
+      return 'administration';
+    }
+    if (['admin', 'accompagnateur', 'gestionnaire', 'consultant', 'coach'].includes(role)) {
+      return 'accompagnateur';
+    }
+    return 'incube';
+  };
+
+  const countAdministration = users.filter((u) => getUserCategory(u) === 'administration').length;
+  const countAccompagnateur = users.filter((u) => getUserCategory(u) === 'accompagnateur').length;
+  const countIncube = users.filter((u) => getUserCategory(u) === 'incube').length;
+
+  const filteredUsers = users.filter((u) => {
+    if (activeCategory !== 'all' && getUserCategory(u) !== activeCategory) {
+      return false;
+    }
+    if (!search) return true;
+    const s = search.toLowerCase();
+    return (
+      u.nom?.toLowerCase().includes(s) ||
+      u.prenom?.toLowerCase().includes(s) ||
+      u.email?.toLowerCase().includes(s)
+    );
+  });
+
+  const getNewButtonLabel = () => {
+    if (activeCategory === 'administration') return 'Nouvel Administrateur';
+    if (activeCategory === 'accompagnateur') return 'Nouvel Accompagnateur';
+    if (activeCategory === 'incube') return 'Nouveau Compte Incubé';
+    return 'Nouvel Utilisateur';
+  };
+
+  const openCreateModalForCategory = () => {
+    let defaultRole = 'admin';
+    if (activeCategory === 'administration') defaultRole = 'super_admin';
+    if (activeCategory === 'incube') defaultRole = 'incube';
+    setForm({ nom: '', prenom: '', email: '', mot_de_passe: '', role: defaultRole });
+    setPhotoFile(null);
+    setShowModal(true);
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -235,19 +277,85 @@ export default function Utilisateurs() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <ShieldCheck className="text-amber-500 dark:text-amber-400" size={22} />
+            <ShieldCheck className="text-amber-500 dark:text-amber-400" size={24} />
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Gestion des Utilisateurs</h1>
           </div>
           <p className="text-sm text-slate-600 dark:text-dark-300 mt-1">
-            Gérez les comptes des accompagnateurs (Admins) et des superviseurs (Super Admins) de l'incubateur.
+            Gestion séparée des comptes d'administration, des accompagnateurs et des porteurs de projet incubés.
           </p>
         </div>
         <button
-          onClick={() => setShowModal(true)}
+          onClick={openCreateModalForCategory}
           className="btn btn-primary flex items-center gap-2 shadow-lg shadow-primary-500/25 shrink-0"
         >
           <UserPlus size={18} />
-          Nouvel Accompagnateur
+          {getNewButtonLabel()}
+        </button>
+      </div>
+
+      {/* Onglets de classification stricte : Administration / Accompagnateurs / Incubés */}
+      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-100 dark:bg-dark-800/80 rounded-2xl border border-slate-200 dark:border-dark-700/60 w-fit">
+        <button
+          onClick={() => setActiveCategory('administration')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
+            activeCategory === 'administration'
+              ? 'bg-amber-500 text-white shadow-md shadow-amber-500/25'
+              : 'text-slate-600 dark:text-dark-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-dark-700/60'
+          }`}
+        >
+          <ShieldCheck size={16} />
+          <span>Administration</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+            activeCategory === 'administration' ? 'bg-amber-600/60 text-white' : 'bg-slate-200 dark:bg-dark-700 text-slate-700 dark:text-dark-200'
+          }`}>
+            {countAdministration}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveCategory('accompagnateur')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
+            activeCategory === 'accompagnateur'
+              ? 'bg-navy-600 text-white shadow-md shadow-navy-600/25'
+              : 'text-slate-600 dark:text-dark-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-dark-700/60'
+          }`}
+        >
+          <UsersRound size={16} />
+          <span>Accompagnateurs</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+            activeCategory === 'accompagnateur' ? 'bg-navy-700 text-white' : 'bg-slate-200 dark:bg-dark-700 text-slate-700 dark:text-dark-200'
+          }`}>
+            {countAccompagnateur}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveCategory('incube')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
+            activeCategory === 'incube'
+              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/25'
+              : 'text-slate-600 dark:text-dark-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-dark-700/60'
+          }`}
+        >
+          <GraduationCap size={16} />
+          <span>Porteurs Projet (Incubés)</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+            activeCategory === 'incube' ? 'bg-emerald-700 text-white' : 'bg-slate-200 dark:bg-dark-700 text-slate-700 dark:text-dark-200'
+          }`}>
+            {countIncube}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveCategory('all')}
+          className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200 ${
+            activeCategory === 'all'
+              ? 'bg-slate-800 text-white dark:bg-white dark:text-slate-900 shadow-sm'
+              : 'text-slate-500 dark:text-dark-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <span>Tous</span>
+          <span className="text-[10px] opacity-75">({users.length})</span>
         </button>
       </div>
 
@@ -276,7 +384,7 @@ export default function Utilisateurs() {
           </div>
         ) : filteredUsers.length === 0 ? (
           <div className="text-center py-16 text-slate-500 dark:text-dark-400 text-sm">
-            Aucun utilisateur trouvé.
+            Aucun utilisateur dans cette catégorie.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -286,7 +394,9 @@ export default function Utilisateurs() {
                   <th className="p-4 font-semibold">Utilisateur</th>
                   <th className="p-4 font-semibold">Email</th>
                   <th className="p-4 font-semibold">Rôle</th>
-                  <th className="p-4 font-semibold text-center">Incubés Assignés</th>
+                  <th className="p-4 font-semibold text-center">
+                    {activeCategory === 'incube' ? 'Dossier Projet' : 'Incubés Assignés'}
+                  </th>
                   <th className="p-4 font-semibold">Statut</th>
                   <th className="p-4 font-semibold text-right">Actions</th>
                 </tr>
@@ -294,6 +404,8 @@ export default function Utilisateurs() {
               <tbody className="divide-y divide-slate-100 dark:divide-dark-700/30">
                 {filteredUsers.map((item) => {
                   const isSuper = item.role === 'super_admin' || item.role === 'administrateur';
+                  const isAccomp = ['admin', 'accompagnateur', 'gestionnaire', 'consultant'].includes(item.role);
+                  const isIncube = !isSuper && !isAccomp;
                   const isCurrent = item.id === currentUser?.id;
 
                   return (
@@ -306,7 +418,13 @@ export default function Utilisateurs() {
                             className="w-9 h-9 rounded-lg object-cover shrink-0 border border-slate-200 dark:border-dark-700"
                           />
                         ) : (
-                          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary-600 to-navy-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                          <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0 ${
+                            isSuper
+                              ? 'bg-gradient-to-br from-amber-500 to-amber-700 shadow-sm'
+                              : isAccomp
+                                ? 'bg-gradient-to-br from-navy-700 to-primary-700 shadow-sm'
+                                : 'bg-gradient-to-br from-emerald-600 to-teal-700 shadow-sm'
+                          }`}>
                             {item.prenom?.[0]}{item.nom?.[0]}
                           </div>
                         )}
@@ -317,15 +435,20 @@ export default function Utilisateurs() {
                               <span className="text-[10px] text-primary-600 dark:text-primary-400 font-normal">(Vous)</span>
                             )}
                           </div>
+                          {item.badge_id && (
+                            <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                              Badge #{item.badge_id}
+                            </div>
+                          )}
                         </div>
                       </td>
                       <td className="p-4 text-slate-600 dark:text-dark-300 font-mono text-[11px]">{item.email}</td>
                       <td className="p-4">
                         {isSuper ? (
-                          <span className="px-2 py-1 text-[10px] font-bold rounded-md bg-amber-500/15 text-amber-500 dark:text-amber-300 border border-amber-500/30 flex items-center gap-1 w-fit">
+                          <span className="px-2 py-1 text-[10px] font-bold rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/30 flex items-center gap-1 w-fit">
                             <ShieldCheck size={12} /> Super Admin
                           </span>
-                        ) : ['admin', 'accompagnateur', 'gestionnaire', 'consultant'].includes(item.role) ? (
+                        ) : isAccomp ? (
                           <span className="px-2 py-1 text-[10px] font-semibold rounded-md bg-navy-500/15 text-navy-600 dark:text-navy-300 border border-navy-500/30 w-fit block">
                             Accompagnateur
                           </span>
@@ -336,9 +459,24 @@ export default function Utilisateurs() {
                         )}
                       </td>
                       <td className="p-4 text-center">
-                        <span className="px-2.5 py-1 rounded-full bg-slate-200 dark:bg-dark-700/60 text-slate-700 dark:text-white font-bold text-xs">
-                          {item.totalIncubes}
-                        </span>
+                        {isIncube ? (
+                          item.porteurProjet ? (
+                            <Link
+                              to={`/incube/${item.porteurProjet.id}`}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold text-xs border border-emerald-500/20 hover:bg-emerald-500/20 transition"
+                              title="Consulter le dossier projet"
+                            >
+                              <span>{item.porteurProjet.pp_numero || item.porteurProjet.nom_incube || 'Dossier'}</span>
+                              <ExternalLink size={12} />
+                            </Link>
+                          ) : (
+                            <span className="text-slate-400 dark:text-dark-500 text-[11px] italic">Non rattaché</span>
+                          )
+                        ) : (
+                          <span className="px-2.5 py-1 rounded-full bg-slate-200 dark:bg-dark-700/60 text-slate-700 dark:text-white font-bold text-xs">
+                            {item.totalIncubes}
+                          </span>
+                        )}
                       </td>
                       <td className="p-4">
                         {item.actif ? (
@@ -409,7 +547,7 @@ export default function Utilisateurs() {
           <div className="card w-full max-w-md p-6 bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 shadow-2xl relative">
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-dark-700 pb-4 mb-5">
               <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-                <UserPlus size={20} className="text-primary-600 dark:text-primary-400" /> Nouvel Accompagnateur
+                <UserPlus size={20} className="text-primary-600 dark:text-primary-400" /> {getNewButtonLabel()}
               </h2>
               <button onClick={() => setShowModal(false)} className="text-slate-500 dark:text-dark-400 hover:text-slate-900 dark:hover:text-white">
                 <X size={18} />
