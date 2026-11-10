@@ -114,9 +114,29 @@ export default function FeuilleEmargementPrint({
   if (!cleanSalle) cleanSalle = 'Salle de formation';
   const lieuSalleText = `IDS Salé — ${cleanSalle}`;
 
-  // 1. Impression navigateur standard avec gestion de pagination
+  // Horodatage de génération pour le pied de page
+  const generationDateStr = useMemo(() => {
+    const now = new Date();
+    const d = now.toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+    const t = now.toLocaleTimeString('fr-FR', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    return `${d} ${t}`;
+  }, []);
+
+  // 1. Impression navigateur standard (suppression du titre en haut pour n'avoir la mention qu'en bas de page)
   const handlePrint = () => {
+    const prevTitle = document.title;
+    document.title = '';
     window.print();
+    setTimeout(() => {
+      document.title = prevTitle;
+    }, 600);
   };
 
   // 2. Génération et téléchargement vectoriel natif PDF via jsPDF & AutoTable (avec logos officiels & sans cadre réf)
@@ -313,22 +333,24 @@ export default function FeuilleEmargementPrint({
           doc.line(marginX, 18, pageWidth - marginX, 18);
         }
 
-        // Bas de page numérotation
-        doc.setFontSize(8);
+        // Bas de page : Date/Heure + IDS — Incubateur Digital Solidaire
+        doc.setFontSize(7.5);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(148, 163, 184);
-        doc.text(`Page ${data.pageNumber}`, pageWidth / 2, pageHeight - 8, { align: 'center' });
+        doc.text(`${generationDateStr}   IDS — Incubateur Digital Solidaire`, marginX, pageHeight - 8);
+        doc.text(`Page ${data.pageNumber}`, pageWidth - marginX, pageHeight - 8, { align: 'right' });
       }
     });
 
-    // Numérotation totale
+    // Numérotation totale et pied de page
     const totalPages = doc.internal.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i);
-      doc.setFontSize(8);
+      doc.setFontSize(7.5);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(148, 163, 184);
-      doc.text(`Page ${i} sur ${totalPages}`, pageWidth / 2, pageHeight - 8, { align: 'center' });
+      doc.text(`${generationDateStr}   IDS — Incubateur Digital Solidaire`, marginX, pageHeight - 8);
+      doc.text(`Page ${i} sur ${totalPages}`, pageWidth - marginX, pageHeight - 8, { align: 'right' });
     }
 
     // Signatures sur la dernière page
@@ -450,7 +472,7 @@ export default function FeuilleEmargementPrint({
             @media print {
               @page {
                 size: A4 portrait;
-                margin: 10mm 12mm 15mm 12mm;
+                margin: 0;
               }
               html, body {
                 background: #ffffff !important;
@@ -496,12 +518,13 @@ export default function FeuilleEmargementPrint({
               .feuille-print-card {
                 border: none !important;
                 box-shadow: none !important;
-                padding: 0 !important;
+                padding: 10mm 12mm 12mm 12mm !important;
                 margin: 0 !important;
                 width: 100% !important;
                 max-width: 100% !important;
                 overflow: visible !important;
                 background: #ffffff !important;
+                box-sizing: border-box !important;
               }
               .print-area {
                 position: static !important;
@@ -653,6 +676,18 @@ export default function FeuilleEmargementPrint({
                 <div className="border-b border-dashed border-slate-300 pb-1 text-slate-500 italic text-[11px]">
                   {atelier.formateur || 'Formateur responsable'}
                 </div>
+              </div>
+            </div>
+
+            {/* Pied de page officiel : Date/Heure + IDS — Incubateur Digital Solidaire (remplace l'en-tête du haut par le bas de page) */}
+            <div className="pt-4 mt-6 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+              <div className="flex items-center gap-2">
+                <span>{generationDateStr}</span>
+                <span>•</span>
+                <span className="font-bold text-slate-700">IDS — Incubateur Digital Solidaire</span>
+              </div>
+              <div className="text-slate-400 text-[10px]">
+                Feuille d'émargement officielle certifiée • IDS Salé
               </div>
             </div>
           </div>
