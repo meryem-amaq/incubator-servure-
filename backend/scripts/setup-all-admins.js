@@ -3,13 +3,13 @@ const bcrypt = require('bcryptjs');
 
 const ADMINS_LIST = [
   {
-    nom: 'Administrateur',
-    prenom: 'IDS',
-    email: 'admin@cgs-incubateur.ma',
+    nom: 'Incubateur Digital Solidaire',
+    prenom: 'Administration',
+    email: 'incubateur.digital.solidaire@gmail.com',
     role: 'super_admin',
     type: 'Administration',
-    badge_id: '1',
-    all_badges: ['1']
+    badge_id: '145',
+    all_badges: ['145', '7600900']
   },
   {
     nom: 'SEFIANI',
@@ -82,21 +82,15 @@ const ADMINS_LIST = [
     type: 'Administration',
     badge_id: '142',
     all_badges: ['142', '6895052']
-  },
-  {
-    nom: 'AMA',
-    prenom: 'Test',
-    email: 'incubateur.digital.solidaire@gmail.com',
-    role: 'admin',
-    type: 'Administration',
-    badge_id: '145',
-    all_badges: ['145', '7600900']
   }
 ];
 
 async function setupAllAdmins() {
   console.log('--- Démarrage de la mise à jour des Administrateurs ---');
   const defaultPasswordHash = await bcrypt.hash('IdsAdmin2024!', 12);
+
+  // Nettoyage de l'ancien compte démo cgs
+  await User.destroy({ where: { email: 'admin@cgs-incubateur.ma' } }).catch(() => {});
 
   for (const adm of ADMINS_LIST) {
     const fullName = `${adm.prenom} ${adm.nom}`.trim() || adm.nom;

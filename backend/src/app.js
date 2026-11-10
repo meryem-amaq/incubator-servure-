@@ -502,14 +502,15 @@ sequelize.authenticate()
       if (count === 0) {
         const hash = await bcrypt.hash('Admin@2024', 12);
         await User.create({
-          nom: 'Administrateur',
-          prenom: 'IDS',
-          email: 'admin@cgs-incubateur.ma',
+          nom: 'Incubateur Digital Solidaire',
+          prenom: 'Administration',
+          email: 'incubateur.digital.solidaire@gmail.com',
           mot_de_passe: hash,
           role: 'super_admin',
+          type: 'Administration',
           actif: true,
         });
-        console.log('👤 Super Admin par défaut créé : admin@cgs-incubateur.ma / Admin@2024');
+        console.log('👤 Super Admin par défaut créé : incubateur.digital.solidaire@gmail.com');
       }
     } catch (adminErr) {
       console.error('Initialisation admin:', adminErr.message);

@@ -213,15 +213,17 @@ router.get('/superadmin/dashboard', auth, isSuperAdmin, async (req, res) => {
 
     // Cartographie officielle des badges de l'équipe administrative (PINs bornes & cartes RFID)
     const ADMIN_KNOWN_BADGES = {
-      '1': { nom: 'Administrateur IDS', email: 'admin@cgs-incubateur.ma' },
+      '1': { nom: 'Administrateur IDS', email: 'incubateur.digital.solidaire@gmail.com' },
+      '145': { nom: 'Incubateur Digital Solidaire', email: 'incubateur.digital.solidaire@gmail.com' },
+      '7600900': { nom: 'Incubateur Digital Solidaire', email: 'incubateur.digital.solidaire@gmail.com' },
       '6': { nom: 'Nadia SEFIANI', email: 'nadia.sefiani@ctpes.ma' },
       '3': { nom: 'Mustapha', email: 'mustapha@ctpes.ma' },
       '143': { nom: 'Ayoub EL BOUCHIKHI', email: 'ayoub.elbouchikhi@ctpes.ma' },
       '7587580': { nom: 'Ayoub EL BOUCHIKHI', email: 'ayoub.elbouchikhi@ctpes.ma' },
       '194': { nom: 'Ilham LAHBOUB', email: 'ilham.lahboub@ctpes.ma' },
       '7561307': { nom: 'Ilham LAHBOUB', email: 'ilham.lahboub@ctpes.ma' },
-      '227': { nom: 'Hicham BELAAZIZ', email: 'hicham@ctpes.ma' },
-      '6883058': { nom: 'Hicham BELAAZIZ', email: 'hicham@ctpes.ma' },
+      '227': { nom: 'Hicham BELAAZIZ', email: 'hicham.belaaziz@ctpes.ma' },
+      '6883058': { nom: 'Hicham BELAAZIZ', email: 'hicham.belaaziz@ctpes.ma' },
       '144': { nom: 'Kawtar SBAI', email: 'kawtar@ctpes.ma' },
       '7568112': { nom: 'Kawtar SBAI', email: 'kawtar@ctpes.ma' },
       '205': { nom: 'Charaf EL AMRANI', email: 'charaf@ctpes.ma' },

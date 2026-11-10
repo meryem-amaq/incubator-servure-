@@ -22,20 +22,10 @@ exports.login = async (req, res) => {
     const cleanEmail = email.trim();
     const emailAliases = [cleanEmail];
     const lowerEmail = cleanEmail.toLowerCase();
-    if (lowerEmail === 'admin@ids-incubateur.ma') emailAliases.push('admin@cgs-incubateur.ma', 'admin@cgs.ma');
-    if (lowerEmail === 'admin@cgs-incubateur.ma' || lowerEmail === 'admin@cgs.ma') emailAliases.push('admin@ids-incubateur.ma', 'admin@ids.ma');
 
-    // Alias tolérants pour Ilham LAHBOUB (avec ou sans 'e', avec ou sans nom de famille)
-    if (lowerEmail === 'ilhame.lahboub@ctpes.ma') emailAliases.push('ilham.lahboub@ctpes.ma');
-    if (lowerEmail === 'ilham.lahboub@ctpes.ma') emailAliases.push('ilhame.lahboub@ctpes.ma');
-    if (lowerEmail === 'ilham@ctpes.ma' || lowerEmail === 'ilhame@ctpes.ma') {
-      emailAliases.push('ilham.lahboub@ctpes.ma', 'ilhame.lahboub@ctpes.ma');
-    }
-
-    // Alias pour Hicham BELAAZIZ (ancien vs nouvel email)
-    if (lowerEmail === 'hicham.belaaziz@ctpes.ma') emailAliases.push('hicham@ctpes.ma');
-    if (lowerEmail === 'hicham@ctpes.ma' || lowerEmail === 'hichame@ctpes.ma') {
-      emailAliases.push('hicham.belaaziz@ctpes.ma', 'hicham@ctpes.ma');
+    // Tolérance orthographique pour Ilham LAHBOUB : si saisie avec 'e' (ilhame.lahboub@ctpes.ma), rediriger vers son compte officiel sans 'e' (ilham.lahboub@ctpes.ma)
+    if (lowerEmail === 'ilhame.lahboub@ctpes.ma') {
+      emailAliases.push('ilham.lahboub@ctpes.ma');
     }
 
     const user = await User.findOne({ where: { email: { [Op.in]: emailAliases }, actif: true } });
