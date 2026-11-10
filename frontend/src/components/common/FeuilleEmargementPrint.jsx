@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Printer, X, Download, CheckCircle2 } from 'lucide-react';
 import jsPDF from 'jspdf';
@@ -36,6 +36,23 @@ export default function FeuilleEmargementPrint({
   presences = []
 }) {
   if (!isOpen || !atelier) return null;
+
+  // Verrouillage du scroll arrière-plan (body) et support de la touche Echap
+  useEffect(() => {
+    if (!isOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose?.();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
 
   // Dédoublonnage strict par identifiant incubé
   const cleanPresences = useMemo(() => {
@@ -347,10 +364,41 @@ export default function FeuilleEmargementPrint({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] bg-slate-950/85 backdrop-blur-sm overflow-y-auto feuille-print-portal">
-      <div className="min-h-screen w-full flex flex-col items-center justify-start py-6 sm:py-10 px-2 sm:px-4">
+    <div 
+      className="feuille-print-portal"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100vw',
+        height: '100vh',
+        zIndex: 999999,
+        backgroundColor: 'rgba(2, 6, 23, 0.85)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        overflowY: 'auto'
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose?.();
+        }
+      }}
+    >
+      <div 
+        className="min-h-screen w-full flex flex-col items-center justify-start py-6 sm:py-10 px-2 sm:px-4"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            onClose?.();
+          }
+        }}
+      >
         {/* Barre d'outils (Non imprimée) */}
-        <div className="w-full max-w-4xl bg-slate-900 text-white rounded-2xl p-4 mb-4 flex items-center justify-between shadow-2xl border border-slate-800 print:hidden shrink-0">
+        <div 
+          onClick={e => e.stopPropagation()}
+          className="w-full max-w-4xl bg-slate-900 text-white rounded-2xl p-4 mb-4 flex items-center justify-between shadow-2xl border border-slate-800 print:hidden shrink-0"
+        >
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
               <Printer size={18} />
@@ -394,7 +442,10 @@ export default function FeuilleEmargementPrint({
         </div>
 
         {/* FEUILLE A4 OFFICIELLE IMPRIMABLE */}
-        <div className="w-full max-w-4xl bg-white text-slate-900 rounded-2xl p-6 sm:p-10 shadow-2xl border border-slate-200 feuille-print-card print:p-0 print:border-none print:shadow-none print:m-0 print:w-full print:max-w-none">
+        <div 
+          onClick={e => e.stopPropagation()}
+          className="w-full max-w-4xl bg-white text-slate-900 rounded-2xl p-6 sm:p-10 shadow-2xl border border-slate-200 feuille-print-card print:p-0 print:border-none print:shadow-none print:m-0 print:w-full print:max-w-none"
+        >
           <style dangerouslySetInnerHTML={{ __html: `
             @media print {
               @page {
@@ -426,11 +477,15 @@ export default function FeuilleEmargementPrint({
                 width: 100% !important;
                 min-height: auto !important;
                 height: auto !important;
-                background: transparent !important;
+                background: #ffffff !important;
+                background-color: #ffffff !important;
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
                 padding: 0 !important;
                 margin: 0 !important;
                 overflow: visible !important;
                 display: block !important;
+                z-index: auto !important;
               }
               .feuille-print-portal > div {
                 min-height: auto !important;
