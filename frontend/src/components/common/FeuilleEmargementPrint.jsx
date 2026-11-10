@@ -31,6 +31,22 @@ const loadImageAsDataUrl = (url) => {
 
 const PAGE_SIZE = 15;
 
+// Formatage propre du Numéro Porteur de Projet (PP)
+const formatPpNumero = (p, fallbackNum) => {
+  const raw = p?.pp_numero || p?.code_projet || p?.id_projet;
+  if (raw && String(raw).trim() && String(raw).trim().toUpperCase() !== 'PP') {
+    const val = String(raw).trim();
+    return val.toUpperCase().startsWith('PP') ? val : `PP-${val}`;
+  }
+  if (p?.incubeId) {
+    return `PP-${String(p.incubeId).padStart(3, '0')}`;
+  }
+  if (p?.id) {
+    return `PP-${String(p.id).padStart(3, '0')}`;
+  }
+  return `PP-${String(fallbackNum).padStart(3, '0')}`;
+};
+
 export default function FeuilleEmargementPrint({
   isOpen,
   onClose,
@@ -281,7 +297,7 @@ export default function FeuilleEmargementPrint({
         ['-', '-', 'Aucun participant inscrit à cette session', '-', '-', '-']
       ] : pageList.map((p, rIdx) => {
         const globalNum = pageIdx * PAGE_SIZE + rIdx + 1;
-        const pp = p.pp_numero || p.code_projet || p.id_projet || 'PP';
+        const pp = formatPpNumero(p, globalNum);
         const fullName = `${p.nom || ''} ${p.prenom && p.prenom !== '—' ? p.prenom : ''}`.trim() || '—';
         let statut = 'En attente';
         let heureScan = '—';
@@ -309,7 +325,7 @@ export default function FeuilleEmargementPrint({
 
       autoTable(doc, {
         startY: 61,
-        head: [['N°', 'N° Dossier / PP', "Nom & Prénom de l'incubé", 'Statut', 'Heure de scan', 'Signature / Visa']],
+        head: [['N°', 'N° Porteur de Projet', "Nom & Prénom de l'incubé", 'Statut', 'Heure de scan', 'Signature / Visa']],
         body: pageRows,
         styles: {
           fontSize: 8.5,
@@ -329,10 +345,10 @@ export default function FeuilleEmargementPrint({
         },
         columnStyles: {
           0: { cellWidth: 10, halign: 'center' },
-          1: { cellWidth: 26, halign: 'center' },
-          2: { cellWidth: 58, halign: 'left', fontStyle: 'bold' },
-          3: { cellWidth: 26, halign: 'center' },
-          4: { cellWidth: 24, halign: 'center' },
+          1: { cellWidth: 32, halign: 'center' },
+          2: { cellWidth: 54, halign: 'left', fontStyle: 'bold' },
+          3: { cellWidth: 25, halign: 'center' },
+          4: { cellWidth: 23, halign: 'center' },
           5: { cellWidth: 38, halign: 'center' }
         },
         margin: { left: marginX, right: marginX },
@@ -679,7 +695,7 @@ export default function FeuilleEmargementPrint({
                       <thead>
                         <tr className="bg-slate-100 border-b border-slate-300 text-[10px] font-black uppercase tracking-wider text-slate-600">
                           <th className="py-2 px-2.5 w-10 text-center border-r border-slate-300">N°</th>
-                          <th className="py-2 px-3 w-28 text-center border-r border-slate-300">N° Dossier / PP</th>
+                          <th className="py-2 px-3 w-32 text-center border-r border-slate-300">N° Porteur de Projet</th>
                           <th className="py-2 px-3.5 border-r border-slate-300">Nom & Prénom de l'incubé</th>
                           <th className="py-2 px-2.5 w-24 text-center border-r border-slate-300">Statut</th>
                           <th className="py-2 px-2.5 w-24 text-center border-r border-slate-300">Heure de scan</th>
@@ -696,7 +712,7 @@ export default function FeuilleEmargementPrint({
                         ) : (
                           pageList.map((p, rIdx) => {
                             const globalNum = pageIdx * PAGE_SIZE + rIdx + 1;
-                            const pp = p.pp_numero || p.code_projet || p.id_projet || 'PP';
+                            const pp = formatPpNumero(p, globalNum);
                             const fullName = `${p.nom || ''} ${p.prenom && p.prenom !== '—' ? p.prenom : ''}`.trim() || '—';
                             const heureScan = p.time && p.time !== '—' ? p.time : '09:30';
 

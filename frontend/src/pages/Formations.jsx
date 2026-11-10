@@ -290,7 +290,7 @@ export default function Formations() {
           atelierId: fId,
           incubeId: inc.id,
           nom: inc.nom_incube,
-          pp_numero: inc.code_projet || inc.id_projet || 'PP',
+          pp_numero: inc.pp_numero || (inc.id ? `PP-${String(inc.id).padStart(3, '0')}` : 'PP-001'),
           time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
           present: true
         });
@@ -336,11 +336,16 @@ export default function Formations() {
         String(sp.incubeId) === String(inc.id) ||
         (sp.nom && inc.nom_incube && sp.nom.toLowerCase().trim() === inc.nom_incube.toLowerCase().trim())
       );
+      const rawPp = inc.pp_numero || p?.pp_numero;
+      const cleanPp = (rawPp && String(rawPp).trim() && String(rawPp).trim().toUpperCase() !== 'PP')
+        ? (String(rawPp).trim().toUpperCase().startsWith('PP') ? String(rawPp).trim() : `PP-${String(rawPp).trim()}`)
+        : (inc.id ? `PP-${String(inc.id).padStart(3, '0')}` : 'PP-001');
+
       return {
         incubeId: inc.id,
         nom: inc.nom_incube,
         prenom: '—',
-        pp_numero: inc.code_projet || inc.id_projet || 'PP',
+        pp_numero: cleanPp,
         present: Boolean(p),
         time: p?.time || (p ? '09:30' : '—')
       };
