@@ -260,37 +260,24 @@ export default function FeuilleEmargementPrint({
       sigY = 25;
     }
 
-    const boxWidth = (pageWidth - (marginX * 2) - 10) / 2;
+    const boxWidth = 85;
     const boxHeight = 26;
+    const formateurBoxX = pageWidth - marginX - boxWidth;
 
-    // Formateur
+    // Signature du Formateur uniquement
     doc.setDrawColor(203, 213, 225);
     doc.setFillColor(255, 255, 255);
-    doc.roundedRect(marginX, sigY, boxWidth, boxHeight, 2, 2, 'D');
+    doc.roundedRect(formateurBoxX, sigY, boxWidth, boxHeight, 2, 2, 'D');
 
     doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(71, 85, 105);
-    doc.text('Visa & Signature du Formateur :', marginX + 3, sigY + 6);
+    doc.text('Signature du Formateur :', formateurBoxX + 3, sigY + 6);
 
     doc.setFontSize(7.5);
     doc.setFont('helvetica', 'italic');
     doc.setTextColor(148, 163, 184);
-    doc.text(atelier.formateur || 'Formateur responsable', marginX + 3, sigY + boxHeight - 4);
-
-    // Direction
-    const rightBoxX = marginX + boxWidth + 10;
-    doc.roundedRect(rightBoxX, sigY, boxWidth, boxHeight, 2, 2, 'D');
-
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(71, 85, 105);
-    doc.text("Cachet & Visa de la Direction :", rightBoxX + 3, sigY + 6);
-
-    doc.setFontSize(7.5);
-    doc.setFont('helvetica', 'italic');
-    doc.setTextColor(148, 163, 184);
-    doc.text("Incubateur Digital Solidaire (IDS Salé)", rightBoxX + 3, sigY + boxHeight - 4);
+    doc.text(atelier.formateur || 'Formateur responsable', formateurBoxX + 3, sigY + boxHeight - 4);
 
     const safeFilename = `Feuille_Emargement_${(atelier.titre || 'Formation').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 30)}_${new Date().toISOString().slice(0, 10)}.pdf`;
     doc.save(safeFilename);
@@ -511,18 +498,12 @@ export default function FeuilleEmargementPrint({
             </table>
           </div>
 
-          {/* Signatures officielles en bas de page */}
-          <div className="signatures-print-block pt-6 grid grid-cols-2 gap-8 text-xs border-t border-slate-300">
-            <div className="border border-slate-200 rounded-xl p-4 h-32 flex flex-col justify-between bg-white">
-              <p className="font-bold text-slate-600">Visa & Signature du Formateur :</p>
-              <div className="border-b border-dashed border-slate-300 pb-1 text-slate-400 italic text-[11px]">
+          {/* Signature officielle du Formateur en bas de page */}
+          <div className="signatures-print-block pt-6 flex justify-end text-xs border-t border-slate-300">
+            <div className="border border-slate-200 rounded-xl p-4 h-32 w-80 flex flex-col justify-between bg-white shadow-sm">
+              <p className="font-bold text-slate-700">Signature du Formateur :</p>
+              <div className="border-b border-dashed border-slate-300 pb-1 text-slate-500 italic text-[11px]">
                 {atelier.formateur || 'Formateur responsable'}
-              </div>
-            </div>
-            <div className="border border-slate-200 rounded-xl p-4 h-32 flex flex-col justify-between bg-white">
-              <p className="font-bold text-slate-600">Cachet & Visa de la Direction de l'Incubateur :</p>
-              <div className="border-b border-dashed border-slate-300 pb-1 text-slate-400 italic text-[11px]">
-                Incubateur Digital Solidaire (IDS Salé)
               </div>
             </div>
           </div>
