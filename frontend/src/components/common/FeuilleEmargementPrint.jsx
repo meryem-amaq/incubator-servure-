@@ -416,17 +416,10 @@ export default function FeuilleEmargementPrint({
         doc.text('Signature du formateur :', boxX + 6, boxY + 4.8);
 
         // 4. Longue ligne horizontale bleue presque sur toute la largeur intérieure du cadre
-        const lineY = boxY + boxHeight - 6.5;
+        const lineY = boxY + boxHeight - 4.5;
         doc.setDrawColor(30, 64, 175); // bleue
         doc.setLineWidth(0.3);
         doc.line(boxX + 8, lineY, boxX + boxWidth - 8, lineY);
-
-        // 5. Texte centré : « Nom : [Nom du formateur] »
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(30, 41, 59);
-        const textX = pageWidth / 2;
-        doc.text(`Nom : ${formateurNom}`, textX, boxY + boxHeight - 2, { align: 'center' });
 
         // Redessiner la bordure extérieure pour une netteté parfaite
         doc.setDrawColor(30, 64, 175);
@@ -815,13 +808,9 @@ export default function FeuilleEmargementPrint({
                         {/* Grande zone blanche pour une signature manuscrite confortable */}
                         <div className="h-20 w-full bg-white"></div>
 
-                        {/* Longue ligne horizontale bleue presque sur toute la largeur et Nom centré */}
-                        <div className="px-6 pb-2.5 pt-0">
-                          <div className="border-b-[1.5px] border-[#1e40af] w-full mb-1.5"></div>
-                          <p className="text-center text-[11px] text-slate-800">
-                            <span className="font-bold text-[#1e3a8a]">Nom :</span>{' '}
-                            <span>{atelier.formateur || atelier.intervenant || 'Intervenant IDS'}</span>
-                          </p>
+                        {/* Longue ligne horizontale bleue presque sur toute la largeur */}
+                        <div className="px-6 pb-4 pt-0">
+                          <div className="border-b-[1.5px] border-[#1e40af] w-full"></div>
                         </div>
                       </div>
                     </div>
