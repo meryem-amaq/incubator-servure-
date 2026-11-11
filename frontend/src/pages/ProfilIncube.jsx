@@ -290,19 +290,18 @@ export default function ProfilIncube() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={handleActiverCompte}
-                  disabled={actionLoading || !incube.email}
-                  className="btn btn-primary btn-sm flex items-center gap-1.5 text-xs font-bold shadow-md shadow-primary-500/20"
-                  title={!incube.email ? "Renseignez d'abord un email" : "Valider le compte et envoyer les accès par email"}
+                  disabled={true}
+                  className="btn btn-secondary btn-sm flex items-center gap-1.5 text-xs font-bold opacity-50 cursor-not-allowed border-slate-300 dark:border-dark-700 text-slate-400"
+                  title="L'envoi des identifiants d'accès par e-mail est temporairement désactivé dans l'attente du lancement officiel du portail incubé."
                 >
                   <KeyRound size={14} />
-                  {actionLoading ? "Activation en cours..." : "Activer le compte & Envoyer les accès"}
+                  <span>Activer les accès (Bientôt disponible)</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleDesactiverCompte}
                   disabled={actionLoading}
-                  className="btn btn-secondary btn-sm flex items-center gap-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-500/10"
+                  className="btn btn-secondary btn-sm flex items-center gap-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 cursor-pointer"
                   title="Suspendre cet incubé"
                 >
                   <UserX size={14} />
@@ -313,19 +312,18 @@ export default function ProfilIncube() {
               <>
                 <button
                   type="button"
-                  onClick={handleRenvoyerAcces}
-                  disabled={actionLoading}
-                  className="btn btn-secondary btn-sm flex items-center gap-1.5 text-xs font-bold text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/40"
-                  title="Générer un nouveau mot de passe et réexpédier les accès par email"
+                  disabled={true}
+                  className="btn btn-secondary btn-sm flex items-center gap-1.5 text-xs font-bold opacity-50 cursor-not-allowed border-slate-300 dark:border-dark-700 text-slate-400"
+                  title="L'envoi des identifiants d'accès par e-mail est temporairement désactivé dans l'attente du lancement officiel du portail incubé."
                 >
                   <Mail size={14} />
-                  {actionLoading ? "Envoi..." : "Renvoyer identifiants"}
+                  <span>Renvoyer identifiants (Bientôt disponible)</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleDesactiverCompte}
                   disabled={actionLoading}
-                  className="btn btn-secondary btn-sm flex items-center gap-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-500/10"
+                  className="btn btn-secondary btn-sm flex items-center gap-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 cursor-pointer"
                   title="Suspendre temporairement l'accès de cet incubé"
                 >
                   <UserX size={14} />

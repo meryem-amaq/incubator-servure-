@@ -872,6 +872,13 @@ const sendAlerteAssiduiteEmail = async (incube, { tauxPresence = 0, moyenneHeure
  */
 const sendWelcomeEmail = async (incube, passwordInitial = null, options = {}) => {
   const recipient = incube.email || 'incubé@ids.ma';
+
+  // Sécurité Lancement Portail : blocage temporaire des e-mails d'activation avant le lancement officiel
+  if (process.env.ENABLE_PORTAL_WELCOME_EMAILS !== 'true') {
+    console.log(`🔒 [SÉCURITÉ IDS] Envoi d'identifiants portail temporairement désactivé pour : ${recipient}`);
+    return { success: true, blocked: true, message: "Envoi d'identifiants portail temporairement désactivé avant le lancement officiel." };
+  }
+
   const nomIncube = incube.nom_incube || 'Porteur de Projet';
   const projet = incube.raison_sociale || 'Votre Projet d\'Incubation';
 

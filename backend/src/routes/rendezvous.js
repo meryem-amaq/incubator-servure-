@@ -88,9 +88,14 @@ router.post('/creer', requireStaff, async (req, res) => {
 
     const incIdsStr = typeof incubeIds === 'object' ? JSON.stringify(incubeIds) : String(incubeIds || '[]');
 
+    let cleanAccompagnateurNom = (accompagnateurNom || '').trim();
+    if (!cleanAccompagnateurNom || cleanAccompagnateurNom.toLowerCase().includes('administration') || cleanAccompagnateurNom.toLowerCase().includes('incubateur digital solidaire')) {
+      cleanAccompagnateurNom = 'Accompagnateur référent — IDS Salé';
+    }
+
     const rdv = await RendezVous.create({
       accompagnateurId: accompagnateurId || null,
-      accompagnateurNom: accompagnateurNom || 'Accompagnateur IDS',
+      accompagnateurNom: cleanAccompagnateurNom,
       incubeIds: incIdsStr,
       incubeNoms: incubeNoms || '',
       dateRdv,

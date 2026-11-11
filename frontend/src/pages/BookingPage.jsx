@@ -414,7 +414,7 @@ export default function BookingPage() {
       .map(i => i.nom_incube)
       .join(', ');
 
-    let accompagnateurNom = user ? `${user.prenom || ''} ${user.nom || ''}`.trim() : 'Accompagnateur IDS';
+    let accompagnateurNom = user ? `${user.prenom || ''} ${user.nom || ''}`.trim() : 'Accompagnateur référent';
     let accompagnateurId = user?.id || null;
 
     if (isRealSuperAdmin && selectedCoachId) {
@@ -422,6 +422,13 @@ export default function BookingPage() {
       if (selectedCoach) {
         accompagnateurNom = selectedCoach.nom;
         accompagnateurId = !isNaN(Number(selectedCoach.id)) ? Number(selectedCoach.id) : null;
+      }
+    } else if (accompagnateurNom.toLowerCase().includes('administration') || accompagnateurNom.toLowerCase().includes('incubateur')) {
+      const targetIncube = incubes.find(i => selectedIncubeIds.includes(i.id) || selectedIncubeIds.includes(String(i.id)));
+      if (targetIncube?.accompagnateur && targetIncube.accompagnateur.trim()) {
+        accompagnateurNom = targetIncube.accompagnateur.trim();
+      } else {
+        accompagnateurNom = 'Accompagnateur référent — IDS Salé';
       }
     }
 
