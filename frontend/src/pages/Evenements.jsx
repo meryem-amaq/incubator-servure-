@@ -540,67 +540,129 @@ export default function Evenements() {
 
   // Envoyer convocations & rappels par email à tous les incubés
   const [sendingEmails, setSendingEmails] = useState(false);
-  const handleSendConvocations = async () => {
-    if (!selectedAtelier) return;
-    setSendingEmails(true);
+
+  // Modal de personnalisation et prévisualisation avant envoi d'email
+  const [mailCustomModal, setMailCustomModal] = useState({
+    isOpen: false,
+    mode: 'convocation', // 'convocation' | 'rappel'
+    atelier: null,
+    targetList: [],
+    customSubject: '',
+    customMessage: '',
+    cc: '', // Champ CC vide par défaut
+    sending: false
+  });
+
+  const formatDateFrench = (dateInput) => {
+    if (!dateInput) return 'prochainement';
     try {
-      const res = await fetch(`/api/evenements/${selectedAtelier.id}/notifier`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          evenement: {
-            titre: selectedAtelier.titre,
-            formateur: selectedAtelier.formateur,
-            date: selectedAtelier.date,
-            heureDebut: selectedAtelier.heureDebut || '09:30',
-            heureFin: selectedAtelier.heureFin || '12:30',
-            duree: selectedAtelier.duree || '3h00',
-            description: selectedAtelier.description
-          }
-        })
-      });
-      const data = await res.json();
-      if (data.success) {
-        toast.success(data.message || `📧 Invitations transmises avec succès par email (${data.sentCount || allIncubes.length} incubé(s)) !`, { duration: 4000 });
-      } else {
-        toast.success("Invitations transmises par email !");
+      const d = new Date(dateInput);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
       }
-    } catch (err) {
-      console.error(err);
-      toast.error(err.message || "Erreur lors de l'envoi des invitations");
-    } finally {
-      setSendingEmails(false);
+    } catch (e) {}
+    return String(dateInput);
+  };
+
+  const handleOpenMailCustomModal = (mode, atelier, targetList) => {
+    if (!atelier) return;
+    const targets = targetList && targetList.length > 0 ? targetList : allIncubes;
+    const withEmail = targets.filter(i => i.email && i.email.trim());
+    if (withEmail.length === 0) {
+      toast.error("Aucun incubé avec adresse email valide");
+      return;
+    }
+
+    const dateStr = formatDateFrench(atelier.date);
+
+    if (mode === 'convocation') {
+      const defaultSubject = `🛠️ Invitation : Atelier pratique — ${atelier.titre}`;
+      const defaultMessage = `Bonjour à toutes et à tous,\n\nNous avons le plaisir de vous inviter à prendre part au prochain atelier pratique : "${atelier.titre}", qui se déroulera le ${dateStr}.\n\nCet atelier est conçu pour favoriser l'expérimentation, les échanges directs entre pairs et la progression concrète de vos réalisations.`;
+
+      setMailCustomModal({
+        isOpen: true,
+        mode: 'convocation',
+        atelier,
+        targetList: targets,
+        customSubject: defaultSubject,
+        customMessage: defaultMessage,
+        cc: '',
+        sending: false
+      });
+    } else {
+      const defaultSubject = `🔔 RAPPEL : Votre atelier pratique « ${atelier.titre} » a lieu prochainement !`;
+      const defaultMessage = `Bonjour à toutes et à tous,\n\nCeci est un rappel concernant votre atelier pratique : "${atelier.titre}", qui se déroulera le ${dateStr}.\n\nMerci d'arriver 10 minutes à l'avance afin de vous installer et d'émarger dès le début de la séance.`;
+
+      setMailCustomModal({
+        isOpen: true,
+        mode: 'rappel',
+        atelier,
+        targetList: targets,
+        customSubject: defaultSubject,
+        customMessage: defaultMessage,
+        cc: '',
+        sending: false
+      });
     }
   };
 
-  // Envoyer un email de rappel amical pour l'atelier sélectionné
-  const handleSendReminder = async () => {
-    if (!selectedAtelier) return;
-    setSendingReminder(true);
+  const handleConfirmSendAtelierMail = async () => {
+    const { atelier, targetList, mode, customSubject, customMessage, cc } = mailCustomModal;
+    if (!atelier) return;
+    const targets = targetList && targetList.length > 0 ? targetList : allIncubes;
+    const withEmail = targets.filter(i => i.email && i.email.trim());
+    if (withEmail.length === 0) {
+      toast.error("Aucun incubé avec adresse email valide");
+      return;
+    }
+
+    setMailCustomModal(prev => ({ ...prev, sending: true }));
     try {
-      const res = await fetch(`/api/evenements/${selectedAtelier.id}/rappel`, {
+      const endpoint = mode === 'rappel' ? `/api/evenements/${atelier.id}/rappel` : `/api/evenements/${atelier.id}/notifier`;
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
           evenement: {
-            titre: selectedAtelier.titre,
-            formateur: selectedAtelier.formateur,
-            date: selectedAtelier.date,
-            heureDebut: selectedAtelier.heureDebut || '09:30',
-            heureFin: selectedAtelier.heureFin || '12:30',
-            duree: selectedAtelier.duree || '3h00',
-            description: selectedAtelier.description
-          }
+            id: atelier.id,
+            titre: atelier.titre,
+            formateur: atelier.formateur,
+            intervenant: atelier.intervenant || atelier.formateur,
+            date: atelier.date,
+            heureDebut: atelier.heureDebut || '09:30',
+            heureFin: atelier.heureFin || '12:30',
+            duree: atelier.duree || '3h00',
+            description: atelier.description,
+            type: 'atelier',
+            lieu: atelier.salle || atelier.lieu || "Salle d'Atelier",
+            salle: atelier.salle || atelier.lieu || "Salle d'Atelier"
+          },
+          incubeIds: withEmail.map(i => i.id),
+          customMessage,
+          cc: (cc || '').trim(),
+          customSubject
         })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Erreur envoi rappel');
-      toast.success(data.message || 'Rappels envoyés par email aux participants !', { icon: '🔔' });
+      if (res.ok && data.success) {
+        toast.success(data.message || `Emails envoyés avec succès (${data.sentCount || withEmail.length} incubé(s)) !`, { duration: 4000 });
+      } else {
+        toast.success("Emails transmis avec succès !");
+      }
+      setMailCustomModal(prev => ({ ...prev, isOpen: false, sending: false }));
     } catch (err) {
-      toast.error(err.message || 'Erreur lors de l\'envoi des rappels');
-    } finally {
-      setSendingReminder(false);
+      console.error(err);
+      toast.error(err.message || "Erreur lors de l'envoi");
+      setMailCustomModal(prev => ({ ...prev, sending: false }));
     }
+  };
+
+  const handleSendConvocations = () => {
+    handleOpenMailCustomModal('convocation', selectedAtelier, allIncubes);
+  };
+
+  const handleSendReminder = () => {
+    handleOpenMailCustomModal('rappel', selectedAtelier, allIncubes);
   };
 
   // Ajuster l'horaire de l'atelier en temps réel (sauvegarde locale + serveur BDD)
@@ -2241,6 +2303,270 @@ export default function Evenements() {
 
       {/* Modal d'affichage du QR Code */}
       {renderQrModal()}
+
+      {/* =========================================================================
+          MODAL DE PERSONNALISATION ET APERÇU DE L'EMAIL D'ATELIER (STYLE IDS VALIDÉ)
+          ========================================================================= */}
+      {mailCustomModal.isOpen && mailCustomModal.atelier && (() => {
+        const atelier = mailCustomModal.atelier;
+        const targets = mailCustomModal.targetList || [];
+        const withEmail = targets.filter(i => i.email && i.email.trim());
+        const withoutEmail = targets.filter(i => !i.email || !i.email.trim());
+
+        const previewBadge = mailCustomModal.mode === 'rappel'
+          ? 'RAPPEL • ATELIER PRATIQUE'
+          : 'ATELIER PRATIQUE & ÉVÉNEMENT';
+
+        const previewTheme = atelier.titre;
+        const previewParcours = 'Atelier Pratique & Collaboratif';
+        const previewDate = formatDateFrench(atelier.date);
+        const previewHoraires = `${atelier.heureDebut || '09:30'} - ${atelier.heureFin || '12:30'} (${atelier.duree || '3h00'})`;
+        const previewIntervenant = atelier.intervenant || atelier.formateur || 'Équipe d’Animation IDS';
+        const rawLieu = atelier.salle || atelier.lieu;
+        const previewLieu = rawLieu
+          ? (rawLieu.startsWith('IDS') ? rawLieu : `IDS Salé — ${rawLieu}`)
+          : "IDS Salé — Salle d'Atelier";
+
+        const renderPreviewParagraphs = (text) => {
+          if (!text) return null;
+          return text.split(/\n\s*\n/).map((para, idx) => (
+            <p key={idx} className="mb-3 text-slate-800 dark:text-slate-200 text-xs sm:text-sm leading-relaxed whitespace-pre-line">
+              {para}
+            </p>
+          ));
+        };
+
+        return (
+          <div
+            className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+            onClick={() => !mailCustomModal.sending && setMailCustomModal(prev => ({ ...prev, isOpen: false }))}
+          >
+            <div
+              className="bg-white dark:bg-dark-900 rounded-3xl border border-slate-200 dark:border-dark-700 shadow-2xl w-full max-w-5xl overflow-hidden max-h-[92vh] flex flex-col text-slate-900 dark:text-white slide-up"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="p-4 sm:px-6 border-b border-slate-100 dark:border-dark-800 flex items-center justify-between bg-slate-50/70 dark:bg-dark-800/40 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black shrink-0 ${
+                    mailCustomModal.mode === 'rappel'
+                      ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                      : 'bg-primary-500/15 text-primary-600 dark:text-primary-400'
+                  }`}>
+                    {mailCustomModal.mode === 'rappel' ? <Bell size={20} /> : <Mail size={20} />}
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
+                      {mailCustomModal.mode === 'rappel' ? "Préparer le rappel d'atelier" : "Préparer l'invitation à l'atelier"}
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-dark-400 truncate max-w-md mt-0.5">
+                      {atelier.titre}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={mailCustomModal.sending}
+                  onClick={() => setMailCustomModal(prev => ({ ...prev, isOpen: false }))}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 dark:hover:bg-dark-700 transition cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Body: 2 colonnes */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-slate-100 dark:divide-dark-800 flex-1 overflow-y-auto">
+                {/* Colonne Gauche */}
+                <div className="lg:col-span-6 p-4 sm:p-6 space-y-4 overflow-y-auto">
+                  <div className="p-3 bg-primary-50/70 dark:bg-primary-950/20 border border-primary-200/80 dark:border-primary-800/40 rounded-2xl flex items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2 text-primary-900 dark:text-primary-200 font-bold">
+                      <Users size={15} className="text-primary-600" />
+                      <span>Destinataires : {withEmail.length} incubé(s)</span>
+                    </div>
+                    {withoutEmail.length > 0 && (
+                      <span className="text-[11px] text-amber-700 dark:text-amber-400 font-semibold">
+                        ({withoutEmail.length} sans email exclus)
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-dark-200 mb-1 flex items-center justify-between">
+                      <span>Copie (CC) — Optionnel :</span>
+                      <span className="text-[10px] text-slate-400 font-normal">Laisser vide si aucun</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={mailCustomModal.cc}
+                      onChange={e => setMailCustomModal(prev => ({ ...prev, cc: e.target.value }))}
+                      placeholder="ex: coordination@ids.ma (Optionnel, laisser vide par défaut)"
+                      className="input w-full text-xs bg-slate-50 dark:bg-dark-800 border-slate-200 dark:border-dark-700 rounded-xl"
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Vous pouvez renseigner ici l'adresse de l'accompagnateur ou de l'administration.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-dark-200 mb-1">
+                      Objet de l'email :
+                    </label>
+                    <input
+                      type="text"
+                      value={mailCustomModal.customSubject}
+                      onChange={e => setMailCustomModal(prev => ({ ...prev, customSubject: e.target.value }))}
+                      className="input w-full text-xs font-bold bg-slate-50 dark:bg-dark-800 border-slate-200 dark:border-dark-700 rounded-xl"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-dark-200 mb-1 flex items-center justify-between">
+                      <span>Texte du message (Personnalisable) :</span>
+                      <span className="text-[10px] text-primary-600 dark:text-primary-400 font-semibold">Modifiable</span>
+                    </label>
+                    <textarea
+                      rows={6}
+                      value={mailCustomModal.customMessage}
+                      onChange={e => setMailCustomModal(prev => ({ ...prev, customMessage: e.target.value }))}
+                      className="textarea w-full text-xs font-mono sm:text-xs leading-relaxed bg-slate-50 dark:bg-dark-800 border-slate-200 dark:border-dark-700 rounded-xl resize-y"
+                      placeholder="Saisissez ici le texte d'introduction..."
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Ce texte s'affiche en haut de l'email. Les détails de la session ci-dessous sont insérés automatiquement.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 bg-slate-100/70 dark:bg-dark-800/60 rounded-2xl border border-slate-200 dark:border-dark-700 space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-700 dark:text-slate-300">
+                      <Lock size={13} className="text-slate-500" />
+                      <span>Détails de l'atelier (Verrouillés depuis la base)</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 text-slate-600 dark:text-dark-300">
+                      <div>
+                        <span className="text-slate-400 block font-medium">Atelier :</span>
+                        <strong className="text-slate-900 dark:text-white truncate block">{previewTheme}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block font-medium">Format :</span>
+                        <strong className="text-slate-900 dark:text-white truncate block">{previewParcours}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block font-medium">Date & Horaires :</span>
+                        <strong className="text-slate-900 dark:text-white block">{previewDate} ({previewHoraires})</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block font-medium">Intervenant & Lieu :</span>
+                        <strong className="text-slate-900 dark:text-white block truncate">{previewIntervenant} • {previewLieu}</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Colonne Droite (Aperçu en Direct) */}
+                <div className="lg:col-span-6 p-4 sm:p-6 bg-slate-100/60 dark:bg-dark-950 flex flex-col overflow-y-auto">
+                  <div className="flex items-center justify-between mb-3 text-xs font-bold text-slate-500 dark:text-dark-400">
+                    <span className="flex items-center gap-1.5">
+                      <Eye size={14} className="text-primary-500" /> Aperçu en direct de l'email
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold">
+                      Format Officiel Validé
+                    </span>
+                  </div>
+
+                  <div className="bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-700 p-5 sm:p-7 shadow-sm text-slate-900 dark:text-white flex-1 overflow-y-auto">
+                    <h2 className="text-center font-extrabold text-xl text-slate-900 dark:text-white tracking-tight mb-2">
+                      Incubateur Digital Solidaire
+                    </h2>
+                    <div className="text-center mb-6">
+                      <span className="inline-block bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 text-[11px] font-extrabold tracking-wider uppercase px-4 py-1 rounded-full">
+                        {previewBadge}
+                      </span>
+                    </div>
+
+                    <div className="mb-4">
+                      {renderPreviewParagraphs(mailCustomModal.customMessage)}
+                    </div>
+
+                    <div className="bg-slate-50 dark:bg-dark-800/80 border border-slate-200/80 dark:border-dark-700 rounded-2xl p-4 sm:p-5 my-4">
+                      <table className="w-full text-xs sm:text-sm border-collapse leading-relaxed">
+                        <tbody>
+                          <tr>
+                            <td className="py-1 text-slate-500 dark:text-dark-400 font-medium w-28">Thème :</td>
+                            <td className="py-1 font-bold text-slate-900 dark:text-white">{previewTheme}</td>
+                          </tr>
+                          <tr>
+                            <td className="py-1 text-slate-500 dark:text-dark-400 font-medium">Parcours :</td>
+                            <td className="py-1 font-bold text-slate-900 dark:text-white">{previewParcours}</td>
+                          </tr>
+                          <tr>
+                            <td className="py-1 text-slate-500 dark:text-dark-400 font-medium">Date :</td>
+                            <td className="py-1 font-bold text-slate-900 dark:text-white">{previewDate}</td>
+                          </tr>
+                          <tr>
+                            <td className="py-1 text-slate-500 dark:text-dark-400 font-medium">Horaires :</td>
+                            <td className="py-1 font-bold text-slate-900 dark:text-white">{previewHoraires}</td>
+                          </tr>
+                          <tr>
+                            <td className="py-1 text-slate-500 dark:text-dark-400 font-medium">Intervenant :</td>
+                            <td className="py-1 font-bold text-slate-900 dark:text-white">{previewIntervenant}</td>
+                          </tr>
+                          <tr>
+                            <td className="py-1 text-slate-500 dark:text-dark-400 font-medium">Lieu :</td>
+                            <td className="py-1 font-bold text-slate-900 dark:text-white">{previewLieu}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <p className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 font-medium mt-4 mb-4">
+                      Nous comptons sur votre motivation et votre implication.
+                    </p>
+
+                    <hr className="border-t border-slate-200 dark:border-dark-700 my-4" />
+
+                    <div className="text-xs sm:text-sm leading-relaxed text-slate-800 dark:text-slate-200">
+                      <p className="mb-0.5">Bien cordialement,</p>
+                      <p className="font-bold text-slate-900 dark:text-white">Équipe d’Animation — IDS Salé</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-3.5 sm:p-4 border-t border-slate-100 dark:border-dark-800 bg-slate-50/80 dark:bg-dark-800/40 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+                <div className="text-xs text-slate-500 dark:text-dark-400 font-medium">
+                  Expéditeur officiel : <strong className="text-slate-700 dark:text-dark-200">Incubateur Digital Solidaire</strong>
+                </div>
+
+                <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
+                  <button
+                    type="button"
+                    disabled={mailCustomModal.sending}
+                    onClick={() => setMailCustomModal(prev => ({ ...prev, isOpen: false }))}
+                    className="btn btn-sm btn-secondary px-4 py-2 rounded-xl text-xs cursor-pointer"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    disabled={mailCustomModal.sending || withEmail.length === 0}
+                    onClick={handleConfirmSendAtelierMail}
+                    className="btn btn-sm bg-primary-600 hover:bg-primary-700 text-white font-black flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs shadow-md shadow-primary-700/20 cursor-pointer disabled:opacity-50"
+                  >
+                    <Send size={14} className={mailCustomModal.sending ? 'animate-spin' : ''} />
+                    <span>
+                      {mailCustomModal.sending
+                        ? 'Envoi en cours...'
+                        : `🚀 Confirmer l'envoi (${withEmail.length} emails)`}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

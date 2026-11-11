@@ -224,7 +224,7 @@ app.post(['/api/evenements/:id/rappel', '/api/presence/atelier/:id/rappel'], aut
   try {
     const { Incube, Atelier } = require('./models');
     const atelierId = req.params.id;
-    const { evenement = {}, incubeIds } = req.body;
+    const { evenement = {}, incubeIds, customMessage, cc, customSubject } = req.body;
 
     let dbAtelier = null;
     if (atelierId && Atelier) {
@@ -265,18 +265,21 @@ app.post(['/api/evenements/:id/rappel', '/api/presence/atelier/:id/rappel'], aut
       duree: evenement.duree || (dbAtelier ? dbAtelier.duree : null) || req.body.duree || '3h00',
       description: evenement.description || (dbAtelier ? dbAtelier.description : null) || req.body.description || '',
       type: evenement.type || (dbAtelier ? dbAtelier.type : null) || req.body.type || null,
-      typeParcours: evenement.typeParcours || (dbAtelier ? dbAtelier.typeParcours : null) || req.body.typeParcours || null
+      typeParcours: evenement.typeParcours || (dbAtelier ? dbAtelier.typeParcours : null) || req.body.typeParcours || null,
+      lieu: evenement.lieu || (dbAtelier ? dbAtelier.lieu : null) || req.body.lieu || null,
+      salle: evenement.salle || (dbAtelier ? dbAtelier.salle : null) || req.body.salle || null
     };
 
     const isFormation = emailService.detectIsFormation(eventData);
     let sentCount = 0;
+    const emailOptions = { customMessage, cc, customSubject };
     for (const inc of targetIncubes) {
       if (inc.email) {
         try {
           if (isFormation) {
-            await emailService.sendWorkshopReminderEmail(eventData, inc);
+            await emailService.sendWorkshopReminderEmail(eventData, inc, emailOptions);
           } else {
-            await emailService.sendAtelierReminderEmail(eventData, inc);
+            await emailService.sendAtelierReminderEmail(eventData, inc, emailOptions);
           }
           sentCount++;
         } catch (e) {
@@ -306,7 +309,7 @@ app.post(['/api/evenements/:id/notifier', '/api/presence/atelier/:id/notifier'],
   try {
     const { Incube, Atelier } = require('./models');
     const atelierId = String(req.params.id);
-    const { evenement = {}, incubeIds } = req.body;
+    const { evenement = {}, incubeIds, customMessage, cc, customSubject } = req.body;
 
     // Protection anti-double-clic / anti-flood (10 secondes de sécurité)
     const now = Date.now();
@@ -362,13 +365,16 @@ app.post(['/api/evenements/:id/notifier', '/api/presence/atelier/:id/notifier'],
       duree: evenement.duree || (dbAtelier ? dbAtelier.duree : null) || req.body.duree || '3h00',
       description: evenement.description || (dbAtelier ? dbAtelier.description : null) || req.body.description || '',
       type: evenement.type || (dbAtelier ? dbAtelier.type : null) || req.body.type || null,
-      typeParcours: evenement.typeParcours || (dbAtelier ? dbAtelier.typeParcours : null) || req.body.typeParcours || null
+      typeParcours: evenement.typeParcours || (dbAtelier ? dbAtelier.typeParcours : null) || req.body.typeParcours || null,
+      lieu: evenement.lieu || (dbAtelier ? dbAtelier.lieu : null) || req.body.lieu || null,
+      salle: evenement.salle || (dbAtelier ? dbAtelier.salle : null) || req.body.salle || null
     };
 
     const isFormation = emailService.detectIsFormation(eventData);
     let sentCount = 0;
     const errors = [];
     const alreadySentEmails = new Set();
+    const emailOptions = { customMessage, cc, customSubject };
 
     for (const inc of targetIncubes) {
       const email = (inc.email || '').trim().toLowerCase();
@@ -378,9 +384,9 @@ app.post(['/api/evenements/:id/notifier', '/api/presence/atelier/:id/notifier'],
 
       try {
         if (isFormation) {
-          await emailService.sendFormationInvitationEmail(eventData, inc);
+          await emailService.sendFormationInvitationEmail(eventData, inc, emailOptions);
         } else {
-          await emailService.sendAtelierInvitationEmail(eventData, inc);
+          await emailService.sendAtelierInvitationEmail(eventData, inc, emailOptions);
         }
         sentCount++;
       } catch (e) {

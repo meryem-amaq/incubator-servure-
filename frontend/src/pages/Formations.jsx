@@ -1,26 +1,26 @@
 import { useState, useEffect, useMemo } from 'react';
-import { 
-  GraduationCap, 
-  QrCode, 
-  Copy, 
-  ExternalLink, 
-  Printer, 
-  X, 
-  CheckCircle2, 
-  Building, 
-  Lightbulb, 
-  Clock, 
-  Users, 
-  Sparkles, 
-  BookOpen, 
-  Plus, 
-  Search, 
-  Calendar, 
-  Mail, 
-  Trash2, 
-  MapPin, 
-  Send, 
-  Check, 
+import {
+  GraduationCap,
+  QrCode,
+  Copy,
+  ExternalLink,
+  Printer,
+  X,
+  CheckCircle2,
+  Building,
+  Lightbulb,
+  Clock,
+  Users,
+  Sparkles,
+  BookOpen,
+  Plus,
+  Search,
+  Calendar,
+  Mail,
+  Trash2,
+  MapPin,
+  Send,
+  Check,
   CalendarCheck,
   UserCheck,
   User,
@@ -34,7 +34,9 @@ import {
   Layers,
   ChevronDown,
   ChevronUp,
-  Bell
+  Bell,
+  Lock,
+  Eye
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import api from '../api/axios';
@@ -228,6 +230,30 @@ export default function Formations() {
   const [showAddParticipantSelect, setShowAddParticipantSelect] = useState(false);
   const [selectedParticipantToAdd, setSelectedParticipantToAdd] = useState('');
 
+  // Modal de personnalisation et prévisualisation avant envoi d'email
+  const [mailCustomModal, setMailCustomModal] = useState({
+    isOpen: false,
+    mode: 'convocation', // 'convocation' | 'rappel'
+    formation: null,
+    targetList: [],
+    customSubject: '',
+    customMessage: '',
+    cc: '', // Toujours vide par défaut, libre choix à l'accompagnateur
+    sending: false
+  });
+
+  // Helper formatage date en français
+  const formatDateFrench = (dateInput) => {
+    if (!dateInput) return 'prochainement';
+    try {
+      const d = new Date(dateInput);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+      }
+    } catch (e) {}
+    return String(dateInput);
+  };
+
   // Charger les présences réelles d'une session de formation
   const loadSessionPresences = async (formationId) => {
     if (!formationId) return;
@@ -249,7 +275,7 @@ export default function Formations() {
             }));
           }
         }
-      } catch (e) {}
+      } catch (e) { }
 
       const map = {};
       localList.forEach(p => { map[String(p.incubeId)] = p; });
@@ -277,7 +303,7 @@ export default function Formations() {
   const handleToggleIncubePresence = async (inc) => {
     if (!participantsModalItem?.formation?.id) return;
     const fId = participantsModalItem.formation.id;
-    const isCurrentlyPresent = sessionPresences.some(p => 
+    const isCurrentlyPresent = sessionPresences.some(p =>
       String(p.incubeId) === String(inc.id) ||
       (p.nom && inc.nom_incube && p.nom.toLowerCase().trim() === inc.nom_incube.toLowerCase().trim())
     );
@@ -308,63 +334,67 @@ export default function Formations() {
     }
   };
 
-  // Envoyer la convocation officielle par email à tous les incubés inscrits
-  const handleSendFormationConvocations = async (formation, targetIncubesList) => {
-    if (!formation || !targetIncubesList || targetIncubesList.length === 0) {
+  // Ouvrir la modal de personnalisation et prévisualisation d'email
+  const handleOpenMailCustomModal = (mode, formation, targetList) => {
+    if (!formation || !targetList || targetList.length === 0) {
       toast.error("Aucun incubé inscrit pour l'envoi");
       return;
     }
-    const withEmail = targetIncubesList.filter(i => i.email && i.email.trim());
+    const withEmail = targetList.filter(i => i.email && i.email.trim());
     if (withEmail.length === 0) {
       toast.error("Aucun des incubés inscrits n'a d'adresse email valide");
       return;
     }
 
-    setSendingConvocations(true);
-    try {
-      const res = await api.post(`/evenements/${formation.id}/notifier`, {
-        evenement: {
-          id: formation.id,
-          titre: formation.titre,
-          formateur: formation.formateur,
-          intervenant: formation.intervenant,
-          date: formation.date,
-          dateFin: formation.dateFin,
-          heureDebut: formation.heureDebut,
-          heureFin: formation.heureFin,
-          duree: formation.duree,
-          description: formation.description
-        },
-        incubeIds: withEmail.map(i => i.id)
+    const parcoursLabel = selectedParcours === 'pre-creation' ? 'Pré-Création' : 'Post-Création';
+    const dateStr = formatDateFrench(formation.date);
+
+    if (mode === 'convocation') {
+      const defaultSubject = `🎓 Convocation : Session de formation ${parcoursLabel} — ${formation.titre}`;
+      const defaultMessage = `Bonjour à toutes et à tous,\n\nNous avons le plaisir de vous convier à la session de formation ${parcoursLabel.toLowerCase()}, qui se déroulera le ${dateStr}.\n\nCette session, animée par des experts partenaires, constitue une étape clé de votre parcours d'accompagnement. Votre participation est donc indispensable pour valider votre accompagnement au sein de IDS Salé.`;
+
+      setMailCustomModal({
+        isOpen: true,
+        mode: 'convocation',
+        formation,
+        targetList,
+        customSubject: defaultSubject,
+        customMessage: defaultMessage,
+        cc: '', // Champ CC vide par défaut, libre choix à l'accompagnateur
+        sending: false
       });
-      if (res.data?.success) {
-        toast.success(res.data.message || `📧 Convocations transmises avec succès à ${res.data.sentCount || withEmail.length} incubé(s) !`, { duration: 4500 });
-      } else {
-        toast.success("Convocations transmises par email !");
-      }
-    } catch (err) {
-      console.error('Erreur envoi convocations formation:', err);
-      toast.error(err.response?.data?.message || err.message || "Erreur lors de l'envoi des convocations");
-    } finally {
-      setSendingConvocations(false);
+    } else {
+      const defaultSubject = `🔔 RAPPEL : Session de formation ${parcoursLabel} — ${formation.titre}`;
+      const defaultMessage = `Bonjour à toutes et à tous,\n\nCeci est un rappel concernant votre session de formation ${parcoursLabel.toLowerCase()}, qui se déroulera le ${dateStr}.\n\nVotre participation est indispensable pour valider votre parcours au sein de l'Incubateur Digital Solidaire. Merci de bien vouloir arriver à l'heure indiquée.`;
+
+      setMailCustomModal({
+        isOpen: true,
+        mode: 'rappel',
+        formation,
+        targetList,
+        customSubject: defaultSubject,
+        customMessage: defaultMessage,
+        cc: '', // Champ CC vide par défaut
+        sending: false
+      });
     }
   };
 
-  // Envoyer un rappel par email à tous les participants
-  const handleSendFormationReminder = async (formation, targetIncubesList) => {
-    if (!formation || !targetIncubesList || targetIncubesList.length === 0) {
-      toast.error("Aucun incubé sélectionné");
-      return;
-    }
-    const withEmail = targetIncubesList.filter(i => i.email && i.email.trim());
+  // Confirmer et exécuter l'envoi de l'email personnalisé
+  const handleConfirmSendMail = async () => {
+    const { formation, targetList, mode, customSubject, customMessage, cc } = mailCustomModal;
+    if (!formation || !targetList || targetList.length === 0) return;
+
+    const withEmail = targetList.filter(i => i.email && i.email.trim());
     if (withEmail.length === 0) {
       toast.error("Aucun incubé avec adresse email valide");
       return;
     }
 
-    setSendingReminder(true);
+    setMailCustomModal(prev => ({ ...prev, sending: true }));
     try {
-      const res = await api.post(`/evenements/${formation.id}/rappel`, {
+      const endpoint = mode === 'rappel' ? `/evenements/${formation.id}/rappel` : `/evenements/${formation.id}/notifier`;
+      const res = await api.post(endpoint, {
         evenement: {
           id: formation.id,
           titre: formation.titre,
@@ -375,17 +405,39 @@ export default function Formations() {
           heureDebut: formation.heureDebut,
           heureFin: formation.heureFin,
           duree: formation.duree,
-          description: formation.description
+          description: formation.description,
+          type: 'formation',
+          isFormation: true,
+          typeParcours: formation.typeParcours || (selectedParcours === 'pre-creation' ? 'pre-creation' : 'post-creation'),
+          lieu: formation.lieu || formation.salle || 'Salle de formation',
+          salle: formation.salle || 'Salle de formation'
         },
-        incubeIds: withEmail.map(i => i.id)
+        incubeIds: withEmail.map(i => i.id),
+        customMessage,
+        cc: (cc || '').trim(),
+        customSubject
       });
-      toast.success(res.data?.message || `🔔 Rappels envoyés par email à ${res.data?.sentCount || withEmail.length} incubé(s) !`, { icon: '🔔' });
+
+      if (res.data?.success) {
+        toast.success(res.data.message || `Emails envoyés avec succès à ${res.data.sentCount || withEmail.length} incubé(s) !`, { duration: 4500 });
+      } else {
+        toast.success("Emails transmis avec succès !");
+      }
+      setMailCustomModal(prev => ({ ...prev, isOpen: false, sending: false }));
     } catch (err) {
-      console.error('Erreur envoi rappel formation:', err);
-      toast.error(err.response?.data?.message || err.message || "Erreur lors de l'envoi des rappels");
-    } finally {
-      setSendingReminder(false);
+      console.error('Erreur envoi email personnalisé:', err);
+      toast.error(err.response?.data?.message || err.message || "Erreur lors de l'envoi des emails");
+      setMailCustomModal(prev => ({ ...prev, sending: false }));
     }
+  };
+
+  // Raccourcis pour compatibilité
+  const handleSendFormationConvocations = (formation, targetIncubesList) => {
+    handleOpenMailCustomModal('convocation', formation, targetIncubesList);
+  };
+
+  const handleSendFormationReminder = (formation, targetIncubesList) => {
+    handleOpenMailCustomModal('rappel', formation, targetIncubesList);
   };
 
   // Retirer un incubé inscrit par erreur à cette session de formation (CRUD)
@@ -476,7 +528,7 @@ export default function Formations() {
       try {
         const meta = typeof formation.description === 'object' ? formation.description : JSON.parse(formation.description || '{}');
         invitesIds = meta.invitesIds || [];
-      } catch (e) {}
+      } catch (e) { }
     }
 
     const rawList = invitesIds.length > 0
@@ -493,7 +545,7 @@ export default function Formations() {
     const targetList = Array.from(uniqueMap.values());
 
     return targetList.map(inc => {
-      const p = sessionPresences.find(sp => 
+      const p = sessionPresences.find(sp =>
         String(sp.incubeId) === String(inc.id) ||
         (sp.nom && inc.nom_incube && sp.nom.toLowerCase().trim() === inc.nom_incube.toLowerCase().trim())
       );
@@ -577,7 +629,7 @@ export default function Formations() {
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase();
       let meta = {};
-      try { meta = JSON.parse(f.description || '{}'); } catch (e) {}
+      try { meta = JSON.parse(f.description || '{}'); } catch (e) { }
       return (
         (f.titre || '').toLowerCase().includes(q) ||
         (f.formateur || '').toLowerCase().includes(q) ||
@@ -601,7 +653,7 @@ export default function Formations() {
   const preCreationCount = useMemo(() => {
     return rawAteliers.filter(f => {
       let meta = {};
-      try { meta = JSON.parse(f.description || '{}'); } catch (e) {}
+      try { meta = JSON.parse(f.description || '{}'); } catch (e) { }
       const titreLower = (f.titre || '').toLowerCase().trim();
       return (
         meta.typeParcours === 'pre-creation' ||
@@ -614,7 +666,7 @@ export default function Formations() {
   const postCreationCount = useMemo(() => {
     return rawAteliers.filter(f => {
       let meta = {};
-      try { meta = JSON.parse(f.description || '{}'); } catch (e) {}
+      try { meta = JSON.parse(f.description || '{}'); } catch (e) { }
       const titreLower = (f.titre || '').toLowerCase().trim();
       return (
         meta.typeParcours === 'post-creation' ||
@@ -633,7 +685,7 @@ export default function Formations() {
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      list = list.filter(m => 
+      list = list.filter(m =>
         (m.code || '').toLowerCase().includes(q) ||
         (m.name || '').toLowerCase().includes(q) ||
         (m.points || []).some(pt => pt.toLowerCase().includes(q))
@@ -790,7 +842,7 @@ export default function Formations() {
       const exists = prev.selectedIncubes.includes(incubeId);
       return {
         ...prev,
-        selectedIncubes: exists 
+        selectedIncubes: exists
           ? prev.selectedIncubes.filter(id => id !== incubeId)
           : [...prev.selectedIncubes, incubeId]
       };
@@ -923,7 +975,7 @@ export default function Formations() {
       const exists = prev.selectedIncubes.includes(incubeId);
       return {
         ...prev,
-        selectedIncubes: exists 
+        selectedIncubes: exists
           ? prev.selectedIncubes.filter(id => id !== incubeId)
           : [...prev.selectedIncubes, incubeId]
       };
@@ -1036,8 +1088,8 @@ export default function Formations() {
       duree: moduleForm.duree || '3h00',
       points: pointsList.length > 0 ? pointsList : ['Acquisition des compétences pratiques'],
       color: targetParcours === 'pre-creation' ? 'from-blue-600 to-indigo-600' : 'from-amber-600 to-orange-600',
-      badgeColor: targetParcours === 'pre-creation' 
-        ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' 
+      badgeColor: targetParcours === 'pre-creation'
+        ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
         : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
       isCustom: true
     };
@@ -1062,7 +1114,7 @@ export default function Formations() {
 
   return (
     <div className="slide-up space-y-6 w-full pb-16">
-      
+
       {/* =========================================================================
           1. HEADER PRINCIPAL ÉPURÉ (SANS GRAND CADRE ENCOMBRANT)
           ========================================================================= */}
@@ -1103,19 +1155,17 @@ export default function Formations() {
               setActiveTab('pre-creation');
               setSelectedParcours('pre-creation');
             }}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
-              activeTab === 'pre-creation'
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${activeTab === 'pre-creation'
                 ? 'bg-white dark:bg-dark-900 text-slate-900 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
+              }`}
           >
             <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0"></span>
             <span>1. Pré-Création</span>
-            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
-              activeTab === 'pre-creation'
+            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${activeTab === 'pre-creation'
                 ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
                 : 'bg-slate-200 dark:bg-dark-700 text-slate-700 dark:text-slate-300'
-            }`}>
+              }`}>
               {preCreationCount} session{preCreationCount > 1 ? 's' : ''}
             </span>
           </button>
@@ -1127,19 +1177,17 @@ export default function Formations() {
               setActiveTab('post-creation');
               setSelectedParcours('post-creation');
             }}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
-              activeTab === 'post-creation'
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${activeTab === 'post-creation'
                 ? 'bg-white dark:bg-dark-900 text-slate-900 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
+              }`}
           >
             <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
             <span>2. Post-Création</span>
-            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
-              activeTab === 'post-creation'
+            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${activeTab === 'post-creation'
                 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
                 : 'bg-slate-200 dark:bg-dark-700 text-slate-700 dark:text-slate-300'
-            }`}>
+              }`}>
               {postCreationCount} session{postCreationCount > 1 ? 's' : ''}
             </span>
           </button>
@@ -1289,7 +1337,7 @@ export default function Formations() {
                               type="button"
                               onClick={() => setPrintModalFormation(formation)}
                               className="p-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow-2xs transition cursor-pointer"
-                              title="Imprimer la feuille d'émargement officielle A4"
+                              title="Imprimer la feuille d'émargement officielle "
                             >
                               <Printer size={15} />
                             </button>
@@ -1348,33 +1396,30 @@ export default function Formations() {
                 <button
                   type="button"
                   onClick={() => setModuleFilterParcours('all')}
-                  className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                    moduleFilterParcours === 'all'
+                  className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${moduleFilterParcours === 'all'
                       ? 'bg-white dark:bg-dark-900 text-slate-900 dark:text-white shadow-xs font-bold'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                  }`}
+                    }`}
                 >
                   Tous ({(modulesMap['pre-creation']?.length || 0) + (modulesMap['post-creation']?.length || 0)})
                 </button>
                 <button
                   type="button"
                   onClick={() => setModuleFilterParcours('pre-creation')}
-                  className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                    moduleFilterParcours === 'pre-creation'
+                  className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${moduleFilterParcours === 'pre-creation'
                       ? 'bg-white dark:bg-dark-900 text-blue-700 dark:text-blue-300 shadow-xs font-bold'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                  }`}
+                    }`}
                 >
                   Pré-Création ({modulesMap['pre-creation']?.length || 0})
                 </button>
                 <button
                   type="button"
                   onClick={() => setModuleFilterParcours('post-creation')}
-                  className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                    moduleFilterParcours === 'post-creation'
+                  className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${moduleFilterParcours === 'post-creation'
                       ? 'bg-white dark:bg-dark-900 text-amber-700 dark:text-amber-300 shadow-xs font-bold'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                  }`}
+                    }`}
                 >
                   Post-Création ({modulesMap['post-creation']?.length || 0})
                 </button>
@@ -1408,11 +1453,10 @@ export default function Formations() {
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className={`px-2 py-0.5 rounded-lg text-xs font-black tracking-wide border ${
-                          isPreCreation
+                        <span className={`px-2 py-0.5 rounded-lg text-xs font-black tracking-wide border ${isPreCreation
                             ? 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30'
                             : 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30'
-                        }`}>
+                          }`}>
                           [{m.code}]
                         </span>
                         <span className="text-[10px] font-bold text-slate-500 dark:text-dark-300 bg-white dark:bg-dark-900 border border-slate-200/80 dark:border-dark-700 px-1.5 py-0.5 rounded-md flex items-center gap-1">
@@ -1442,9 +1486,8 @@ export default function Formations() {
                       <ul className="space-y-1 mb-3 text-xs text-slate-600 dark:text-dark-300">
                         {m.points.map((pt, pIdx) => (
                           <li key={pIdx} className="flex items-start gap-1.5 text-[11px] leading-tight">
-                            <span className={`w-1.5 h-1.5 rounded-full mt-1 shrink-0 ${
-                              isPreCreation ? 'bg-blue-500' : 'bg-amber-500'
-                            }`} />
+                            <span className={`w-1.5 h-1.5 rounded-full mt-1 shrink-0 ${isPreCreation ? 'bg-blue-500' : 'bg-amber-500'
+                              }`} />
                             <span className="line-clamp-2">{pt}</span>
                           </li>
                         ))}
@@ -1478,11 +1521,11 @@ export default function Formations() {
           MODAL 1 : PROGRAMMER UNE FORMATION (AVEC LES 6 ÉLÉMENTS CLÉS)
           ========================================================================= */}
       {showAddFormationModal && (
-        <div 
+        <div
           className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
           onClick={() => setShowAddFormationModal(false)}
         >
-          <div 
+          <div
             className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white rounded-3xl border border-slate-200 dark:border-dark-700 shadow-2xl max-w-xl w-full overflow-hidden slide-up my-8 max-h-[90vh] flex flex-col"
             onClick={e => e.stopPropagation()}
           >
@@ -1499,7 +1542,7 @@ export default function Formations() {
                   <p className="text-xs text-slate-900/80">Type de module, formateur, collaborateur et invitation des incubés</p>
                 </div>
               </div>
-              <button 
+              <button
                 type="button"
                 onClick={() => setShowAddFormationModal(false)}
                 className="p-1.5 rounded-lg text-slate-900 hover:bg-black/10 transition-colors cursor-pointer"
@@ -1509,7 +1552,7 @@ export default function Formations() {
             </div>
 
             <form onSubmit={handleSaveFormation} className="p-5 overflow-y-auto space-y-4 flex-1">
-              
+
               {/* 1. TYPE DE MODULE */}
               <div>
                 <label className="text-xs font-bold text-slate-700 dark:text-dark-200 block mb-1 uppercase tracking-wider">
@@ -1657,11 +1700,10 @@ export default function Formations() {
                     <button
                       type="button"
                       onClick={() => handlePromoFilterChange('all')}
-                      className={`text-[10px] px-2 py-0.5 rounded-md font-bold border transition-colors cursor-pointer ${
-                        formationForm.promoFilter === 'all'
+                      className={`text-[10px] px-2 py-0.5 rounded-md font-bold border transition-colors cursor-pointer ${formationForm.promoFilter === 'all'
                           ? 'bg-amber-500 text-slate-950 border-amber-500'
                           : 'bg-white dark:bg-dark-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-dark-700'
-                      }`}
+                        }`}
                     >
                       Tous ({allIncubes.length})
                     </button>
@@ -1670,11 +1712,10 @@ export default function Formations() {
                         key={p}
                         type="button"
                         onClick={() => handlePromoFilterChange(p)}
-                        className={`text-[10px] px-2 py-0.5 rounded-md font-bold border transition-colors cursor-pointer ${
-                          formationForm.promoFilter === p
+                        className={`text-[10px] px-2 py-0.5 rounded-md font-bold border transition-colors cursor-pointer ${formationForm.promoFilter === p
                             ? 'bg-amber-500 text-slate-950 border-amber-500'
                             : 'bg-white dark:bg-dark-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-dark-700'
-                        }`}
+                          }`}
                       >
                         {p}
                       </button>
@@ -1775,11 +1816,11 @@ export default function Formations() {
           MODAL 1.5 : MODIFIER UNE FORMATION EXISTANTE
           ========================================================================= */}
       {editingFormationItem && (
-        <div 
+        <div
           className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
           onClick={() => setEditingFormationItem(null)}
         >
-          <div 
+          <div
             className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white rounded-3xl border border-slate-200 dark:border-dark-700 shadow-2xl max-w-xl w-full overflow-hidden slide-up my-8 max-h-[90vh] flex flex-col"
             onClick={e => e.stopPropagation()}
           >
@@ -1798,7 +1839,7 @@ export default function Formations() {
                   </p>
                 </div>
               </div>
-              <button 
+              <button
                 type="button"
                 onClick={() => setEditingFormationItem(null)}
                 className="p-1.5 rounded-lg text-white hover:bg-white/10 transition-colors cursor-pointer"
@@ -1808,7 +1849,7 @@ export default function Formations() {
             </div>
 
             <form onSubmit={handleSaveEditFormation} className="p-5 overflow-y-auto space-y-4 flex-1">
-              
+
               {/* 1. TYPE DE MODULE */}
               <div>
                 <label className="text-xs font-bold text-slate-700 dark:text-dark-200 block mb-1 uppercase tracking-wider">
@@ -1965,11 +2006,10 @@ export default function Formations() {
                       <div
                         key={inc.id}
                         onClick={() => toggleEditIncubeSelection(inc.id)}
-                        className={`flex items-center justify-between p-2 rounded-xl text-xs cursor-pointer border transition-all ${
-                          isSelected
+                        className={`flex items-center justify-between p-2 rounded-xl text-xs cursor-pointer border transition-all ${isSelected
                             ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-700 text-blue-900 dark:text-blue-200'
                             : 'bg-white dark:bg-dark-900 border-slate-200 dark:border-dark-700 text-slate-600 dark:text-dark-300 hover:border-slate-300'
-                        }`}
+                          }`}
                       >
                         <span className="font-bold truncate">
                           {inc.nom_incube} {inc.prenom_incube || ''}
@@ -2028,11 +2068,11 @@ export default function Formations() {
           MODAL 2 : AJOUTER UN MODULE (POUR LE PARCOURS ACTIF)
           ========================================================================= */}
       {showAddModuleModal && (
-        <div 
+        <div
           className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
           onClick={() => setShowAddModuleModal(false)}
         >
-          <div 
+          <div
             className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white rounded-3xl border border-slate-200 dark:border-dark-700 shadow-2xl max-w-md w-full overflow-hidden slide-up my-8"
             onClick={e => e.stopPropagation()}
           >
@@ -2043,9 +2083,9 @@ export default function Formations() {
                   Ajouter un Module ({selectedParcours === 'pre-creation' ? 'Pré-Création' : 'Post-Création'})
                 </h3>
               </div>
-              <button 
-                type="button" 
-                onClick={() => setShowAddModuleModal(false)} 
+              <button
+                type="button"
+                onClick={() => setShowAddModuleModal(false)}
                 className="p-1 rounded-lg text-slate-900 hover:bg-black/10"
               >
                 <X size={18} />
@@ -2148,12 +2188,12 @@ export default function Formations() {
         const baseList = allIncubes.filter(i => invitesIds.includes(Number(i.id)));
         const nonInvitedIncubes = allIncubes.filter(i => !invitesIds.includes(Number(i.id)));
 
-        const isIncubePresent = (inc) => sessionPresences.some(p => 
+        const isIncubePresent = (inc) => sessionPresences.some(p =>
           String(p.incubeId) === String(inc.id) ||
           (p.nom && inc.nom_incube && p.nom.toLowerCase().trim() === inc.nom_incube.toLowerCase().trim())
         );
 
-        const getIncubePresence = (inc) => sessionPresences.find(p => 
+        const getIncubePresence = (inc) => sessionPresences.find(p =>
           String(p.incubeId) === String(inc.id) ||
           (p.nom && inc.nom_incube && p.nom.toLowerCase().trim() === inc.nom_incube.toLowerCase().trim())
         );
@@ -2189,7 +2229,7 @@ export default function Formations() {
 
         if (participantFilter.trim()) {
           const q = participantFilter.toLowerCase();
-          filteredList = filteredList.filter(i => 
+          filteredList = filteredList.filter(i =>
             (i.nom_incube || '').toLowerCase().includes(q) ||
             (i.raison_sociale || '').toLowerCase().includes(q) ||
             (i.promotion || '').toLowerCase().includes(q) ||
@@ -2199,11 +2239,11 @@ export default function Formations() {
         }
 
         return (
-          <div 
+          <div
             className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
             onClick={() => { setParticipantsModalItem(null); setParticipantFilter(''); setPresenceStatusFilter('all'); }}
           >
-            <div 
+            <div
               className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white rounded-3xl border border-slate-200 dark:border-dark-700 shadow-2xl max-w-3xl w-full overflow-hidden slide-up max-h-[90vh] flex flex-col my-auto"
               onClick={e => e.stopPropagation()}
             >
@@ -2233,12 +2273,12 @@ export default function Formations() {
                     type="button"
                     onClick={() => setPrintModalFormation(formation)}
                     className="btn btn-sm bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs shadow-md shadow-emerald-700/20 cursor-pointer"
-                    title="Imprimer la feuille d'émargement officielle (A4)"
+                    title="Imprimer la feuille d'émargement officielle "
                   >
                     <Printer size={14} />
-                    <span className="hidden sm:inline">Imprimer Feuille (A4)</span>
+                    <span className="hidden sm:inline">Imprimer Feuille </span>
                   </button>
-                  <button 
+                  <button
                     onClick={() => { setParticipantsModalItem(null); setParticipantFilter(''); setPresenceStatusFilter('all'); setShowAddParticipantSelect(false); }}
                     className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 dark:hover:bg-dark-700 transition-colors cursor-pointer"
                   >
@@ -2291,35 +2331,32 @@ export default function Formations() {
                   <button
                     type="button"
                     onClick={() => setPresenceStatusFilter('all')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      presenceStatusFilter === 'all'
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${presenceStatusFilter === 'all'
                         ? 'bg-white dark:bg-dark-700 text-slate-900 dark:text-white shadow-xs'
                         : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                    }`}
+                      }`}
                   >
                     Tous ({totalInscrits})
                   </button>
                   <button
                     type="button"
                     onClick={() => setPresenceStatusFilter('presents')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                      presenceStatusFilter === 'presents'
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${presenceStatusFilter === 'presents'
                         ? 'bg-emerald-600 text-white shadow-xs'
                         : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10'
-                    }`}
+                      }`}
                   >
                     <CheckCircle2 size={12} /> Présents ({presentsCount})
                   </button>
                   <button
                     type="button"
                     onClick={() => setPresenceStatusFilter('absents')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                      presenceStatusFilter === 'absents'
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${presenceStatusFilter === 'absents'
                         ? (isSessionTerminee ? 'bg-rose-600' : 'bg-amber-600') + ' text-white shadow-xs'
                         : isSessionTerminee
                           ? 'text-rose-700 dark:text-rose-400 hover:bg-rose-500/10'
                           : 'text-amber-700 dark:text-amber-400 hover:bg-amber-500/10'
-                    }`}
+                      }`}
                   >
                     {isSessionTerminee ? (
                       <>
@@ -2425,24 +2462,22 @@ export default function Formations() {
                     const presInfo = getIncubePresence(inc);
 
                     return (
-                      <div 
+                      <div
                         key={inc.id || idx}
-                        className={`pt-2.5 pb-2.5 px-3 rounded-2xl transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                          present
+                        className={`pt-2.5 pb-2.5 px-3 rounded-2xl transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${present
                             ? 'bg-emerald-50/40 dark:bg-emerald-950/10 border border-emerald-500/20'
                             : 'bg-slate-50/70 dark:bg-dark-800/60 border border-slate-100 dark:border-dark-700/60'
-                        }`}
+                          }`}
                       >
                         {/* Identité Incubé */}
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                           <span className="font-mono text-xs font-bold text-slate-400 w-6 text-center shrink-0">
                             #{idx + 1}
                           </span>
-                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${
-                            present 
-                              ? 'bg-emerald-500 text-white shadow-xs' 
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${present
+                              ? 'bg-emerald-500 text-white shadow-xs'
                               : 'bg-slate-200 dark:bg-dark-700 text-slate-600 dark:text-slate-300'
-                          }`}>
+                            }`}>
                             {(inc.nom_incube || 'IN').substring(0, 2).toUpperCase()}
                           </div>
                           <div className="min-w-0 flex-1">
@@ -2486,10 +2521,10 @@ export default function Formations() {
                               </div>
                             )}
                             <p className="text-[10px] text-slate-400 mt-0.5 text-right font-mono">
-                              {present 
-                                ? `Émargé (${presInfo?.time || '09:30'})` 
-                                : isSessionTerminee 
-                                  ? 'Non-émargé' 
+                              {present
+                                ? `Émargé (${presInfo?.time || '09:30'})`
+                                : isSessionTerminee
+                                  ? 'Non-émargé'
                                   : "En attente d'émargement"}
                             </p>
                           </div>
@@ -2498,11 +2533,10 @@ export default function Formations() {
                           <button
                             type="button"
                             onClick={() => handleToggleIncubePresence(inc)}
-                            className={`px-3 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 border ${
-                              present
+                            className={`px-3 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 border ${present
                                 ? 'border-rose-200 dark:border-rose-900/50 hover:bg-rose-500/10 text-rose-600 dark:text-rose-400'
                                 : 'border-emerald-200 dark:border-emerald-900/50 hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                            }`}
+                              }`}
                             title={present ? 'Marquer absent' : 'Marquer présent'}
                           >
                             {present ? (
@@ -2574,10 +2608,10 @@ export default function Formations() {
                     type="button"
                     onClick={() => setPrintModalFormation(formation)}
                     className="btn btn-sm bg-emerald-600 hover:bg-emerald-700 text-white font-black flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs shadow-md shadow-emerald-700/20 cursor-pointer"
-                    title="Imprimer la feuille d'émargement officielle (A4)"
+                    title="Imprimer la feuille d'émargement officielle "
                   >
                     <Printer size={15} />
-                    <span>Imprimer feuille d'émargement (A4)</span>
+                    <span>Imprimer feuille d'émargement </span>
                   </button>
                 </div>
               </div>
@@ -2590,11 +2624,11 @@ export default function Formations() {
           MODAL 4 : QR CODE D'ÉMARGEMENT POUR LES PARTICIPANTS
           ========================================================================= */}
       {qrModalItem && (
-        <div 
+        <div
           className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => setQrModalItem(null)}
         >
-          <div 
+          <div
             className="bg-white dark:bg-dark-900 text-slate-900 dark:text-white rounded-3xl border border-slate-200 dark:border-dark-700 shadow-2xl max-w-md w-full overflow-hidden slide-up"
             onClick={e => e.stopPropagation()}
           >
@@ -2603,7 +2637,7 @@ export default function Formations() {
                 <QrCode size={20} />
                 <h3 className="font-black text-sm">QR Code d'Émargement</h3>
               </div>
-              <button 
+              <button
                 onClick={() => setQrModalItem(null)}
                 className="p-1 rounded-lg text-slate-900 hover:bg-black/10"
               >
@@ -2706,6 +2740,277 @@ export default function Formations() {
         atelier={printModalFormation}
         presences={fullPresencesForPrint}
       />
+
+      {/* =========================================================================
+          MODAL 6 : PERSONNALISATION & APERÇU EN DIRECT DE L'EMAIL OFFICIEL (STYLE IDS VALIDÉ)
+          ========================================================================= */}
+      {mailCustomModal.isOpen && mailCustomModal.formation && (() => {
+        const formation = mailCustomModal.formation;
+        const parcoursLabel = selectedParcours === 'pre-creation' ? 'Pré-Création' : 'Post-Création';
+        const withEmail = (mailCustomModal.targetList || []).filter(i => i.email && i.email.trim());
+        const withoutEmail = (mailCustomModal.targetList || []).filter(i => !i.email || !i.email.trim());
+
+        const previewBadge = mailCustomModal.mode === 'rappel'
+          ? `RAPPEL • FORMATION ${parcoursLabel.toUpperCase()}`
+          : `FORMATION ${parcoursLabel.toUpperCase()}`;
+
+        const previewTheme = formation.titre;
+        const previewParcours = `Session De Formation ${parcoursLabel}`;
+        const previewDate = formatDateFrench(formation.date);
+        const previewHoraires = `${formation.heureDebut || '09:30'} - ${formation.heureFin || '12:30'} (${formation.duree || '3h00'})`;
+        const previewIntervenant = formation.intervenant || formation.formateur || 'Intervenant IDS Salé';
+        const previewLieu = formation.salle
+          ? (formation.salle.startsWith('IDS') ? formation.salle : `IDS Salé — ${formation.salle}`)
+          : 'IDS Salé — Salle de formation';
+
+        const renderPreviewParagraphs = (text) => {
+          if (!text) return null;
+          return text.split(/\n\s*\n/).map((para, idx) => (
+            <p key={idx} className="mb-3 text-slate-800 dark:text-slate-200 text-xs sm:text-sm leading-relaxed whitespace-pre-line">
+              {para}
+            </p>
+          ));
+        };
+
+        return (
+          <div
+            className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+            onClick={() => !mailCustomModal.sending && setMailCustomModal(prev => ({ ...prev, isOpen: false }))}
+          >
+            <div
+              className="bg-white dark:bg-dark-900 rounded-3xl border border-slate-200 dark:border-dark-700 shadow-2xl w-full max-w-5xl overflow-hidden max-h-[92vh] flex flex-col text-slate-900 dark:text-white slide-up"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="p-4 sm:px-6 border-b border-slate-100 dark:border-dark-800 flex items-center justify-between bg-slate-50/70 dark:bg-dark-800/40 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black shrink-0 ${
+                    mailCustomModal.mode === 'rappel'
+                      ? 'bg-sky-500/15 text-sky-600 dark:text-sky-400'
+                      : 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
+                  }`}>
+                    {mailCustomModal.mode === 'rappel' ? <Bell size={20} /> : <Mail size={20} />}
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
+                      {mailCustomModal.mode === 'rappel' ? 'Préparer le rappel officiel' : 'Préparer la convocation officielle'}
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-dark-400 truncate max-w-md mt-0.5">
+                      {formation.titre} • Parcours {parcoursLabel}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={mailCustomModal.sending}
+                  onClick={() => setMailCustomModal(prev => ({ ...prev, isOpen: false }))}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 dark:hover:bg-dark-700 transition cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Body: 2 colonnes (Gauche: Configuration & Édition, Droite: Aperçu en direct) */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-slate-100 dark:divide-dark-800 flex-1 overflow-y-auto">
+                {/* Colonne Gauche (Formulaire) */}
+                <div className="lg:col-span-6 p-4 sm:p-6 space-y-4 overflow-y-auto">
+                  {/* Destinataires info */}
+                  <div className="p-3 bg-blue-50/70 dark:bg-blue-950/20 border border-blue-200/80 dark:border-blue-800/40 rounded-2xl flex items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2 text-blue-900 dark:text-blue-200 font-bold">
+                      <Users size={15} className="text-blue-600" />
+                      <span>Destinataires : {withEmail.length} incubé(s)</span>
+                    </div>
+                    {withoutEmail.length > 0 && (
+                      <span className="text-[11px] text-amber-700 dark:text-amber-400 font-semibold">
+                        ({withoutEmail.length} sans email exclus)
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Champ CC (Copie conforme) - Optionnel & Vide par défaut */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-dark-200 mb-1 flex items-center justify-between">
+                      <span>Copie (CC) — Optionnel :</span>
+                      <span className="text-[10px] text-slate-400 font-normal">Laisser vide si aucun</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={mailCustomModal.cc}
+                      onChange={e => setMailCustomModal(prev => ({ ...prev, cc: e.target.value }))}
+                      placeholder="ex: coordination@ids.ma (Optionnel, laisser vide par défaut)"
+                      className="input w-full text-xs bg-slate-50 dark:bg-dark-800 border-slate-200 dark:border-dark-700 rounded-xl"
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Vous pouvez renseigner ici l'adresse de l'accompagnateur ou de l'administration.
+                    </p>
+                  </div>
+
+                  {/* Objet de l'email */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-dark-200 mb-1">
+                      Objet de l'email :
+                    </label>
+                    <input
+                      type="text"
+                      value={mailCustomModal.customSubject}
+                      onChange={e => setMailCustomModal(prev => ({ ...prev, customSubject: e.target.value }))}
+                      className="input w-full text-xs font-bold bg-slate-50 dark:bg-dark-800 border-slate-200 dark:border-dark-700 rounded-xl"
+                    />
+                  </div>
+
+                  {/* Texte du message personnalisé */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-dark-200 mb-1 flex items-center justify-between">
+                      <span>Texte du message (Personnalisable) :</span>
+                      <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">Modifiable</span>
+                    </label>
+                    <textarea
+                      rows={6}
+                      value={mailCustomModal.customMessage}
+                      onChange={e => setMailCustomModal(prev => ({ ...prev, customMessage: e.target.value }))}
+                      className="textarea w-full text-xs font-mono sm:text-xs leading-relaxed bg-slate-50 dark:bg-dark-800 border-slate-200 dark:border-dark-700 rounded-xl resize-y"
+                      placeholder="Saisissez ici le texte d'introduction..."
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Ce texte s'affiche en haut de l'email. Les détails de la session ci-dessous sont insérés automatiquement.
+                    </p>
+                  </div>
+
+                  {/* Données verrouillées de la session */}
+                  <div className="p-3.5 bg-slate-100/70 dark:bg-dark-800/60 rounded-2xl border border-slate-200 dark:border-dark-700 space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-700 dark:text-slate-300">
+                      <Lock size={13} className="text-slate-500" />
+                      <span>Détails de la session (Verrouillés depuis la base)</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 text-slate-600 dark:text-dark-300">
+                      <div>
+                        <span className="text-slate-400 block font-medium">Thème :</span>
+                        <strong className="text-slate-900 dark:text-white truncate block">{previewTheme}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block font-medium">Parcours :</span>
+                        <strong className="text-slate-900 dark:text-white truncate block">{previewParcours}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block font-medium">Date & Horaires :</span>
+                        <strong className="text-slate-900 dark:text-white block">{previewDate} ({previewHoraires})</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block font-medium">Intervenant & Lieu :</span>
+                        <strong className="text-slate-900 dark:text-white block truncate">{previewIntervenant} • {previewLieu}</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Colonne Droite (Aperçu en Direct de l'email) */}
+                <div className="lg:col-span-6 p-4 sm:p-6 bg-slate-100/60 dark:bg-dark-950 flex flex-col overflow-y-auto">
+                  <div className="flex items-center justify-between mb-3 text-xs font-bold text-slate-500 dark:text-dark-400">
+                    <span className="flex items-center gap-1.5">
+                      <Eye size={14} className="text-blue-500" /> Aperçu en direct de l'email
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold">
+                      Format Officiel Validé
+                    </span>
+                  </div>
+
+                  {/* Boîte email avec le style exact de la capture */}
+                  <div className="bg-white dark:bg-dark-900 rounded-2xl border border-slate-200 dark:border-dark-700 p-5 sm:p-7 shadow-sm text-slate-900 dark:text-white flex-1 overflow-y-auto">
+                    <h2 className="text-center font-extrabold text-xl text-slate-900 dark:text-white tracking-tight mb-2">
+                      Incubateur Digital Solidaire
+                    </h2>
+                    <div className="text-center mb-6">
+                      <span className="inline-block bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 text-[11px] font-extrabold tracking-wider uppercase px-4 py-1 rounded-full">
+                        {previewBadge}
+                      </span>
+                    </div>
+
+                    {/* Paragraphes du message */}
+                    <div className="mb-4">
+                      {renderPreviewParagraphs(mailCustomModal.customMessage)}
+                    </div>
+
+                    {/* Carte récapitulative des données de session */}
+                    <div className="bg-slate-50 dark:bg-dark-800/80 border border-slate-200/80 dark:border-dark-700 rounded-2xl p-4 sm:p-5 my-4">
+                      <table className="w-full text-xs sm:text-sm border-collapse leading-relaxed">
+                        <tbody>
+                          <tr>
+                            <td className="py-1 text-slate-500 dark:text-dark-400 font-medium w-28">Thème :</td>
+                            <td className="py-1 font-bold text-slate-900 dark:text-white">{previewTheme}</td>
+                          </tr>
+                          <tr>
+                            <td className="py-1 text-slate-500 dark:text-dark-400 font-medium">Parcours :</td>
+                            <td className="py-1 font-bold text-slate-900 dark:text-white">{previewParcours}</td>
+                          </tr>
+                          <tr>
+                            <td className="py-1 text-slate-500 dark:text-dark-400 font-medium">Date :</td>
+                            <td className="py-1 font-bold text-slate-900 dark:text-white">{previewDate}</td>
+                          </tr>
+                          <tr>
+                            <td className="py-1 text-slate-500 dark:text-dark-400 font-medium">Horaires :</td>
+                            <td className="py-1 font-bold text-slate-900 dark:text-white">{previewHoraires}</td>
+                          </tr>
+                          <tr>
+                            <td className="py-1 text-slate-500 dark:text-dark-400 font-medium">Intervenant :</td>
+                            <td className="py-1 font-bold text-slate-900 dark:text-white">{previewIntervenant}</td>
+                          </tr>
+                          <tr>
+                            <td className="py-1 text-slate-500 dark:text-dark-400 font-medium">Lieu :</td>
+                            <td className="py-1 font-bold text-slate-900 dark:text-white">{previewLieu}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <p className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 font-medium mt-4 mb-4">
+                      Nous comptons sur votre motivation et votre implication.
+                    </p>
+
+                    <hr className="border-t border-slate-200 dark:border-dark-700 my-4" />
+
+                    <div className="text-xs sm:text-sm leading-relaxed text-slate-800 dark:text-slate-200">
+                      <p className="mb-0.5">Bien cordialement,</p>
+                      <p className="font-bold text-slate-900 dark:text-white">L'équipe IDS Salé</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-3.5 sm:p-4 border-t border-slate-100 dark:border-dark-800 bg-slate-50/80 dark:bg-dark-800/40 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+                <div className="text-xs text-slate-500 dark:text-dark-400 font-medium">
+                  Expéditeur officiel : <strong className="text-slate-700 dark:text-dark-200">Incubateur Digital Solidaire</strong>
+                </div>
+
+                <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
+                  <button
+                    type="button"
+                    disabled={mailCustomModal.sending}
+                    onClick={() => setMailCustomModal(prev => ({ ...prev, isOpen: false }))}
+                    className="btn btn-sm btn-secondary px-4 py-2 rounded-xl text-xs cursor-pointer"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    disabled={mailCustomModal.sending || withEmail.length === 0}
+                    onClick={handleConfirmSendMail}
+                    className="btn btn-sm bg-blue-600 hover:bg-blue-700 text-white font-black flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs shadow-md shadow-blue-700/20 cursor-pointer disabled:opacity-50"
+                  >
+                    <Send size={14} className={mailCustomModal.sending ? 'animate-spin' : ''} />
+                    <span>
+                      {mailCustomModal.sending
+                        ? 'Envoi en cours...'
+                        : `🚀 Confirmer l'envoi (${withEmail.length} emails)`}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
     </div>
   );

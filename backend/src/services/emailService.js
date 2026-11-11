@@ -252,14 +252,13 @@ const detectIsFormation = (evenement = {}) => {
 };
 
 /**
- * Gabarit HTML moderne, épuré et responsive harmonisé avec le style clair de l'application IDS
+ * Gabarit HTML moderne, épuré et responsive harmonisé avec le style officiel de l'Incubateur Digital Solidaire
+ * Conforme au modèle visuel validé (fond blanc épuré, centrage, badge pill, boîte récapitulative claire, signature officielle)
  */
-const renderEmailTemplate = ({ title, preheader, badgeText, badgeColor = '#0c87eb', contentHtml, ctaText, ctaUrl }) => {
-  const accentColor = badgeColor;
-  const appUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+const renderEmailTemplate = ({ title, preheader, badgeText, badgeColor = '#0284c7', contentHtml, ctaText, ctaUrl }) => {
   const actionButton = ctaText && ctaUrl ? `
-    <div style="text-align: center; margin: 32px 0 16px 0;">
-      <a href="${ctaUrl}" style="background: linear-gradient(135deg, #0c87eb 0%, #006ac9 100%); color: #ffffff; text-decoration: none; padding: 13px 32px; border-radius: 12px; font-weight: 700; font-size: 14px; display: inline-block; box-shadow: 0 4px 14px rgba(12, 135, 235, 0.28); letter-spacing: 0.2px;">
+    <div style="text-align: center; margin: 28px 0 14px 0;">
+      <a href="${ctaUrl}" style="background: linear-gradient(135deg, #0c87eb 0%, #006ac9 100%); color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 12px; font-weight: 700; font-size: 14px; display: inline-block; box-shadow: 0 4px 14px rgba(12, 135, 235, 0.28); letter-spacing: 0.2px;">
         ${escapeHtml(ctaText)} →
       </a>
     </div>
@@ -271,43 +270,30 @@ const renderEmailTemplate = ({ title, preheader, badgeText, badgeColor = '#0c87e
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(title)}</title>
+  <title>${escapeHtml(title || 'Incubateur Digital Solidaire')}</title>
   <style>
-    body { margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; -webkit-font-smoothing: antialiased; }
-    .container { max-width: 600px; margin: 32px auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.02); border: 1px solid #e2e8f0; }
-    .top-accent { height: 4px; background: linear-gradient(90deg, #0c87eb 0%, #36a3f7 50%, #f59e0b 100%); }
-    .header { background: #ffffff; padding: 28px 28px 22px 28px; text-align: center; border-bottom: 1px solid #f1f5f9; }
-    .header h1 { margin: 0; color: #00254d; font-size: 20px; font-weight: 800; letter-spacing: -0.3px; }
-    .header .subtitle-pill { display: inline-block; margin-top: 8px; background: #f0f7ff; color: #0c87eb; border: 1px solid #b9ddfd; padding: 3px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
-    .body { padding: 32px 28px; background: #ffffff; line-height: 1.6; font-size: 14px; color: #334155; }
-    .badge { display: inline-block; padding: 5px 14px; border-radius: 9999px; font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 18px; letter-spacing: 0.3px; }
-    .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 20px; margin: 20px 0; }
-    .footer { background: #f8fafc; padding: 22px 28px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; }
+    body { margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; -webkit-font-smoothing: antialiased; }
+    .container { max-width: 580px; margin: 30px auto; background: #ffffff; border-radius: 16px; padding: 36px 32px 28px 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05); }
+    .title { margin: 0 0 12px 0; color: #0f172a; font-size: 26px; font-weight: 800; text-align: center; letter-spacing: -0.3px; }
+    .badge-wrap { text-align: center; margin: 0 0 26px 0; }
+    .badge-pill { display: inline-block; background: #e0f2fe; color: #0284c7; padding: 6px 18px; border-radius: 9999px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
+    .body { font-size: 14px; line-height: 1.6; color: #1e293b; }
+    .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 22px; margin: 24px 0; }
+    .footer { margin-top: 24px; padding-top: 14px; border-top: 1px solid #f1f5f9; text-align: center; font-size: 11px; color: #94a3b8; }
   </style>
 </head>
 <body>
   <div class="container">
-    <!-- Barre d'accentuation IDS (Bleu Navy -> Cyan -> Ambre Or) -->
-    <div class="top-accent"></div>
+    <h1 class="title">Incubateur Digital Solidaire</h1>
+    ${badgeText ? `<div class="badge-wrap"><span class="badge-pill">${escapeHtml(badgeText)}</span></div>` : ''}
 
-    <!-- En-tête style clair IDS -->
-    <div class="header">
-      <h1>Incubateur Digital Solidaire</h1>
-      <span class="subtitle-pill">Fablab & Innovation • Plateforme IDS</span>
-    </div>
-
-    <!-- Contenu -->
     <div class="body">
-      ${badgeText ? `<div style="text-align: left;"><span class="badge" style="background: ${accentColor}15; color: ${accentColor}; border: 1px solid ${accentColor}35;">${escapeHtml(badgeText)}</span></div>` : ''}
       ${contentHtml}
       ${actionButton}
     </div>
 
-    <!-- Pied de page style clair -->
     <div class="footer">
-      <p style="margin: 0 0 6px 0; font-weight: 700; color: #00254d;">Incubateur Digital Solidaire (IDS) & Fablab</p>
-      <p style="margin: 0 0 6px 0;">Cet email automatique a été généré par la plateforme de gestion de l'incubateur.</p>
-      <p style="margin: 0; font-size: 10px; color: #94a3b8;">Pour toute question, contactez votre chargé d'accompagnement ou l'administration IDS.</p>
+      <p style="margin: 0;">Plateforme Officielle • Incubateur Digital Solidaire Salé</p>
     </div>
   </div>
 </body>
@@ -316,36 +302,61 @@ const renderEmailTemplate = ({ title, preheader, badgeText, badgeColor = '#0c87e
 };
 
 /**
- * Fonction générique d'envoi d'email
+ * Helper de mise en forme des paragraphes pour un message personnalisé
  */
-const sendEmail = async ({ to, subject, text, html }) => {
+const formatCustomMessageHtml = (text) => {
+  if (!text || !text.trim()) return '';
+  const paragraphs = text.trim().split(/\n\s*\n/);
+  return paragraphs
+    .map(p => `<p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #1e293b;">${escapeHtml(p).replace(/\n/g, '<br/>')}</p>`)
+    .join('');
+};
+
+/**
+ * Fonction générique d'envoi d'email avec support du champ Copie (CC)
+ */
+const sendEmail = async ({ to, cc, subject, text, html }) => {
   const transporter = getTransporter();
+  const rawFromName = process.env.MAIL_FROM_NAME || 'Incubateur Digital Solidaire';
+  const cleanFromName = rawFromName.replace(/^["']|["']$/g, '').trim() || 'Incubateur Digital Solidaire';
   const from = process.env.MAIL_FROM_ADDRESS
-    ? `"${process.env.MAIL_FROM_NAME || 'Incubateur Digital Solidaire'}" <${process.env.MAIL_FROM_ADDRESS}>`
-    : '"Incubateur Digital Solidaire" <incubateur.ids.contact@gmail.com>';
+    ? `"${cleanFromName}" <${process.env.MAIL_FROM_ADDRESS}>`
+    : `"${cleanFromName}" <incubateur.ids.contact@gmail.com>`;
 
   const recipient = to || process.env.ADMIN_NOTIFY_EMAIL || 'contact@ids-incubateur.ma';
+
+  const mailOptions = {
+    from,
+    to: recipient,
+    subject,
+    text: text || '',
+    html
+  };
+
+  if (cc && typeof cc === 'string' && cc.trim()) {
+    mailOptions.cc = cc.trim();
+  } else if (Array.isArray(cc) && cc.length > 0) {
+    const validCc = cc.filter(c => c && String(c).trim()).map(c => String(c).trim());
+    if (validCc.length > 0) {
+      mailOptions.cc = validCc.join(', ');
+    }
+  }
 
   if (!transporter) {
     console.log(`\n======================================================`);
     console.log(`📧 [SIMULATION EMAIL IDS] (SMTP non configuré dans .env)`);
     console.log(`➡️ Destinataire : ${recipient}`);
+    if (mailOptions.cc) console.log(`📋 Copie (CC)   : ${mailOptions.cc}`);
     console.log(`📌 Sujet        : ${subject}`);
     console.log(`💬 Message brut : ${text || 'Contenu HTML généré'}`);
     console.log(`======================================================\n`);
-    return { success: true, simulated: true, recipient, subject };
+    return { success: true, simulated: true, recipient, subject, cc: mailOptions.cc };
   }
 
   try {
-    const info = await transporter.sendMail({
-      from,
-      to: recipient,
-      subject,
-      text: text || '',
-      html
-    });
-    console.log(`✅ [EMAIL ENVOYÉ RÉELLEMENT] ID: ${info.messageId} vers ${recipient}`);
-    return { success: true, simulated: false, messageId: info.messageId, recipient, subject };
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`✅ [EMAIL ENVOYÉ RÉELLEMENT] ID: ${info.messageId} vers ${recipient}${mailOptions.cc ? ` (CC: ${mailOptions.cc})` : ''}`);
+    return { success: true, simulated: false, messageId: info.messageId, recipient, subject, cc: mailOptions.cc };
   } catch (error) {
     console.error(`❌ [ERREUR SMTP ENVOI EMAIL] vers ${recipient}:`, error.message);
     return { success: false, error: error.message, recipient, subject };
@@ -484,7 +495,7 @@ const sendRdvConfirmationEmail = async (rdv, incube = {}) => {
 /**
  * 3. Invitation & Convocation à une Session de Formation (Pré-création & Post-création)
  */
-const sendFormationInvitationEmail = async (evenement, incube = {}) => {
+const sendFormationInvitationEmail = async (evenement, incube = {}, options = {}) => {
   const recipient = incube.email || 'incubé@ids.ma';
   const typeFormation = detectFormationType(evenement, incube);
   const theme = detectFormationTheme(evenement);
@@ -498,94 +509,116 @@ const sendFormationInvitationEmail = async (evenement, incube = {}) => {
   }
 
   const { textPhrase: datePhrase, display: dateDisplay } = formatDateIntervalFrench(evenement.date, dateFin);
-  const formateur = evenement.intervenant || evenement.formateur || 'Experts Partenaires IDS';
+  const rawIntervenant = evenement.intervenant || evenement.formateur || 'Intervenant IDS Salé';
   const heureDebutStr = evenement.heureDebut || '09:30';
   const heureFinStr = evenement.heureFin || '12:30';
   const duree = evenement.duree || '3h00';
 
-  const subject = `🎓 Invitation : Session de formation ${typeFormation} — ${theme}`;
+  const rawLieu = evenement.lieu || evenement.salle;
+  let lieuDisplay = 'IDS Salé — Salle de formation';
+  if (rawLieu && String(rawLieu).trim()) {
+    const trimmed = String(rawLieu).trim();
+    lieuDisplay = trimmed.startsWith('IDS') ? trimmed : `IDS Salé — ${trimmed}`;
+  }
+
+  const badgeText = typeFormation === 'pré-création'
+    ? 'FORMATION PRÉ-CRÉATION'
+    : (typeFormation === 'post-création' ? 'FORMATION POST-CRÉATION' : 'FORMATION PROFESSIONNELLE');
+
+  const parcoursDisplay = typeFormation === 'pré-création'
+    ? 'Session De Formation Pré-Création'
+    : (typeFormation === 'post-création' ? 'Session De Formation Post-Création' : 'Session De Formation IDS');
+
+  const subject = options.customSubject || `🎓 Convocation : Session de formation ${typeFormation} — ${theme}`;
 
   const safeType = escapeHtml(typeFormation);
   const safeTheme = escapeHtml(theme);
+  const safeParcours = escapeHtml(parcoursDisplay);
   const safeDateDisplay = escapeHtml(dateDisplay);
-  const safeFormateur = escapeHtml(formateur);
+  const safeIntervenant = escapeHtml(rawIntervenant);
   const safeHeureDebut = escapeHtml(heureDebutStr);
   const safeHeureFin = escapeHtml(heureFinStr);
   const safeDuree = escapeHtml(duree);
+  const safeLieu = escapeHtml(lieuDisplay);
 
-  const contentHtml = `
+  const defaultIntroHtml = `
     <p style="margin: 0 0 16px 0; font-size: 15px; color: #1e293b;">Bonjour à toutes et à tous,</p>
 
     <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #334155;">
-      Nous avons le plaisir de vous convier à la session de formation <strong>${safeType}</strong>, qui se déroulera ${escapeHtml(datePhrase)} sous le thème <strong>${safeTheme}</strong>.
+      Nous avons le plaisir de vous convier à la session de formation <strong>${safeType}</strong>, qui se déroulera ${escapeHtml(datePhrase)}.
     </p>
 
-    <div class="card" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 20px; margin: 20px 0;">
-      <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600; width: 35%;">Thème :</td><td style="padding: 6px 0; font-weight: 800; color: #00254d;">${safeTheme}</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Parcours :</td><td style="padding: 6px 0; font-weight: 700; color: #0c87eb; text-transform: capitalize;">Session de formation ${safeType}</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Date :</td><td style="padding: 6px 0; font-weight: 800; color: #0c87eb;">${safeDateDisplay}</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Horaires :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeHeureDebut} - ${safeHeureFin} (${safeDuree})</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Intervenant :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeFormateur}</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Lieu :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">Incubateur IDS — Salle de formation</td></tr>
+    <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      Cette session, animée par des experts partenaires, constitue une étape clé de votre parcours d'accompagnement. Votre participation est donc indispensable pour valider votre accompagnement au sein de IDS Salé.
+    </p>
+  `;
+
+  const customIntroHtml = options.customMessage ? formatCustomMessageHtml(options.customMessage) : null;
+  const introHtml = customIntroHtml || defaultIntroHtml;
+
+  const contentHtml = `
+    ${introHtml}
+
+    <div class="card" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 22px; margin: 24px 0;">
+      <table style="width: 100%; font-size: 14px; border-collapse: collapse; line-height: 1.6;">
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500; width: 32%;">Thème :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeTheme}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Parcours :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeParcours}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Date :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeDateDisplay}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Horaires :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeHeureDebut} - ${safeHeureFin} (${safeDuree})</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Intervenant :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeIntervenant}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Lieu :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeLieu}</td></tr>
       </table>
     </div>
 
-    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #334155;">
-      Cette session, animée par des experts partenaires, constitue une étape clé de votre parcours d’incubation. Votre participation est donc indispensable pour valider votre accompagnement au sein de l’IDS-Salé.
-    </p>
-
-    <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+    <p style="margin: 20px 0 0 0; font-size: 14px; line-height: 1.6; color: #0f172a;">
       Nous comptons sur votre motivation et votre implication.
     </p>
 
-    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #334155;">
+    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0 20px 0;" />
+
+    <div style="font-size: 14px; line-height: 1.6; color: #0f172a;">
       <p style="margin: 0 0 4px 0;">Bien cordialement,</p>
-      <p style="margin: 0 0 4px 0; color: #94a3b8;">----</p>
-      <p style="margin: 0; font-weight: 800; color: #00254d;">Equipe IDS – Salé</p>
+      <p style="margin: 0; font-weight: 700; color: #00254d;">L'équipe IDS Salé</p>
     </div>
   `;
 
   const html = renderEmailTemplate({
     title: `Session de Formation ${safeType} : ${safeTheme}`,
-    preheader: `Convocation ${datePhrase} sous le thème ${safeTheme}`,
-    badgeText: `Formation ${typeFormation === 'pré-création' ? 'Pré-Création' : 'Post-Création'}`,
-    badgeColor: '#0c87eb',
+    badgeText,
+    badgeColor: '#0284c7',
     contentHtml
   });
 
-  const text = `Bonjour à toutes et à tous,
+  const defaultText = `Bonjour à toutes et à tous,
 
-Nous avons le plaisir de vous convier à la session de formation ${typeFormation}, qui se déroulera ${datePhrase} sous le thème ${theme}.
+Nous avons le plaisir de vous convier à la session de formation ${typeFormation}, qui se déroulera ${datePhrase}.
 
 Détails de la session :
 - Thème : ${theme}
-- Parcours : Session de formation ${typeFormation}
+- Parcours : ${parcoursDisplay}
 - Date : ${dateDisplay}
 - Horaires : ${heureDebutStr} - ${heureFinStr} (${duree})
-- Intervenant : ${formateur}
-- Lieu : Incubateur IDS — Salle de formation
-
-Cette session, animée par des experts partenaires, constitue une étape clé de votre parcours d’incubation. Votre participation est donc indispensable pour valider votre accompagnement au sein de l’IDS-Salé.
+- Intervenant : ${rawIntervenant}
+- Lieu : ${lieuDisplay}
 
 Nous comptons sur votre motivation et votre implication.
 
 Bien cordialement,
-----
-Equipe IDS – Salé`;
+L'équipe IDS Salé`;
 
   return await sendEmail({
     to: recipient,
+    cc: options.cc,
     subject,
     html,
-    text
+    text: options.customMessage ? `${options.customMessage}\n\n${defaultText}` : defaultText
   });
 };
 
 /**
- * 3.bis Invitation & Convocation à un Atelier Pratique / Événement Collaboratif (FabLab, Pitch, etc.)
+ * 3.bis Invitation & Convocation à un Atelier Pratique / Événement Collaboratif
  */
-const sendAtelierInvitationEmail = async (evenement, incube = {}) => {
+const sendAtelierInvitationEmail = async (evenement, incube = {}, options = {}) => {
   const recipient = incube.email || 'incubé@ids.ma';
   const nomIncube = incube.nom_incube || incube.nom || 'Porteur de Projet';
   const titreAtelier = (evenement.titre || 'Atelier Pratique IDS').trim();
@@ -599,11 +632,18 @@ const sendAtelierInvitationEmail = async (evenement, incube = {}) => {
   }
 
   const { textPhrase: datePhrase, display: dateDisplay } = formatDateIntervalFrench(evenement.date, dateFin);
-  const animateur = evenement.intervenant || evenement.formateur || 'Équipe d’Animation IDS & Experts Invités';
+  const rawAnimateur = evenement.intervenant || evenement.formateur || 'Équipe d’Animation IDS';
   const heureDebutStr = evenement.heureDebut || '09:30';
   const heureFinStr = evenement.heureFin || '12:30';
   const duree = evenement.duree || '3h00';
-  const lieu = evenement.lieu || 'Incubateur IDS — FabLab & Espace Collaboratif';
+
+  const rawLieu = evenement.lieu || evenement.salle;
+  let lieuDisplay = "IDS Salé — Salle d'Atelier";
+  if (rawLieu && String(rawLieu).trim()) {
+    const trimmed = String(rawLieu).trim();
+    const cleanLieu = trimmed.replace(/fablab\s*(&\s*)?/gi, '').replace(/\s{2,}/g, ' ').trim();
+    lieuDisplay = cleanLieu.startsWith('IDS') ? cleanLieu : `IDS Salé — ${cleanLieu || "Salle d'Atelier"}`;
+  }
 
   let descriptionText = '';
   if (typeof evenement.description === 'string') {
@@ -617,33 +657,44 @@ const sendAtelierInvitationEmail = async (evenement, incube = {}) => {
     descriptionText = evenement.description.description || evenement.description.notes || '';
   }
 
-  const subject = `🛠️ Invitation : Atelier pratique — ${titreAtelier}`;
+  const subject = options.customSubject || `🛠️ Invitation : Atelier pratique — ${titreAtelier}`;
 
   const safeNom = escapeHtml(nomIncube);
   const safeTitre = escapeHtml(titreAtelier);
   const safeDateDisplay = escapeHtml(dateDisplay);
-  const safeAnimateur = escapeHtml(animateur);
+  const safeAnimateur = escapeHtml(rawAnimateur);
   const safeHeureDebut = escapeHtml(heureDebutStr);
   const safeHeureFin = escapeHtml(heureFinStr);
   const safeDuree = escapeHtml(duree);
-  const safeLieu = escapeHtml(lieu);
+  const safeLieu = escapeHtml(lieuDisplay);
   const safeDescription = escapeHtml(descriptionText);
 
-  const contentHtml = `
+  const defaultIntroHtml = `
     <p style="margin: 0 0 16px 0; font-size: 15px; color: #1e293b;">Bonjour <strong>${safeNom}</strong>,</p>
 
     <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #334155;">
       Nous avons le plaisir de vous inviter à prendre part au prochain atelier pratique : <strong>${safeTitre}</strong>, qui se déroulera ${escapeHtml(datePhrase)}.
     </p>
 
-    <div class="card" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 20px; margin: 20px 0;">
-      <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600; width: 35%;">Atelier :</td><td style="padding: 6px 0; font-weight: 800; color: #00254d;">${safeTitre}</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Format :</td><td style="padding: 6px 0; font-weight: 700; color: #0ea5e9;">Atelier Pratique & Collaboratif</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Date :</td><td style="padding: 6px 0; font-weight: 800; color: #0c87eb;">${safeDateDisplay}</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Horaires :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeHeureDebut} - ${safeHeureFin} (${safeDuree})</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Animateur :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeAnimateur}</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Lieu :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeLieu}</td></tr>
+    <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      Cet atelier est conçu pour favoriser l'expérimentation, les échanges directs entre pairs et la progression concrète de vos réalisations.
+    </p>
+  `;
+
+  const customIntroHtml = options.customMessage ? formatCustomMessageHtml(options.customMessage) : null;
+  const introHtml = customIntroHtml || defaultIntroHtml;
+
+  const contentHtml = `
+    ${introHtml}
+
+    <div class="card" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 22px; margin: 24px 0;">
+      <table style="width: 100%; font-size: 14px; border-collapse: collapse; line-height: 1.6;">
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500; width: 32%;">Thème :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeTitre}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Parcours :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">Atelier Pratique & Collaboratif</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Date :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeDateDisplay}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Horaires :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeHeureDebut} - ${safeHeureFin} (${safeDuree})</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Intervenant :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeAnimateur}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Lieu :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeLieu}</td></tr>
       </table>
     </div>
 
@@ -654,57 +705,48 @@ const sendAtelierInvitationEmail = async (evenement, incube = {}) => {
       </div>
     ` : ''}
 
-    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #334155;">
-      💡 Cet atelier est conçu pour favoriser l'expérimentation, les échanges directs entre pairs et la progression concrète de vos réalisations.
+    <p style="margin: 20px 0 0 0; font-size: 14px; line-height: 1.6; color: #0f172a;">
+      Nous comptons sur votre motivation et votre implication.
     </p>
 
-    <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 14px; margin: 18px 0; font-size: 13px; color: #92400e;">
-      <strong>🎒 Matériel recommandé :</strong>
-      <p style="margin: 4px 0 0 0;">Pensez à vous munir de votre ordinateur portable, de vos éléments de travail en cours et de vos éventuels prototypes pour des retours en direct.</p>
-    </div>
+    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0 20px 0;" />
 
-    <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #334155;">
-      Au plaisir de vous y retrouver pour cette séance collaborative !
-    </p>
-
-    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #334155;">
+    <div style="font-size: 14px; line-height: 1.6; color: #0f172a;">
       <p style="margin: 0 0 4px 0;">Bien cordialement,</p>
-      <p style="margin: 0 0 4px 0; color: #94a3b8;">----</p>
-      <p style="margin: 0; font-weight: 800; color: #00254d;">Équipe d’Animation & FabLab — IDS Salé</p>
+      <p style="margin: 0; font-weight: 700; color: #00254d;">Équipe d’Animation — IDS Salé</p>
     </div>
   `;
 
   const html = renderEmailTemplate({
     title: `Atelier Pratique : ${safeTitre}`,
-    preheader: `${safeTitre} • ${dateDisplay} de ${heureDebutStr} à ${heureFinStr}`,
-    badgeText: 'Atelier Pratique & Événement',
-    badgeColor: '#0ea5e9',
+    badgeText: 'ATELIER PRATIQUE & ÉVÉNEMENT',
+    badgeColor: '#0284c7',
     contentHtml
   });
 
-  const text = `Bonjour ${nomIncube},
+  const defaultText = `Bonjour ${nomIncube},
 
-Nous avons le plaisir de vous convier au prochain atelier pratique : "${titreAtelier}", qui se déroulera ${datePhrase}.
+Nous avons le plaisir de vous inviter au prochain atelier pratique : "${titreAtelier}", qui se déroulera ${datePhrase}.
 
 Détails de l'atelier :
-- Atelier : ${titreAtelier}
-- Format : Atelier Pratique & Collaboratif
+- Thème : ${titreAtelier}
+- Parcours : Atelier Pratique & Collaboratif
 - Date : ${dateDisplay}
 - Horaires : ${heureDebutStr} - ${heureFinStr} (${duree})
-- Animateur : ${animateur}
-- Lieu : ${lieu}
-${descriptionText ? `\nÀ propos : ${descriptionText}\n` : ''}
-🎒 Matériel recommandé : Pensez à vous munir de votre ordinateur portable et de vos éléments de travail en cours.
+- Intervenant : ${rawAnimateur}
+- Lieu : ${lieuDisplay}
+
+Nous comptons sur votre motivation et votre implication.
 
 Bien cordialement,
-----
-Équipe d’Animation & FabLab — IDS Salé`;
+Équipe d’Animation — IDS Salé`;
 
   return await sendEmail({
     to: recipient,
+    cc: options.cc,
     subject,
     html,
-    text
+    text: options.customMessage ? `${options.customMessage}\n\n${defaultText}` : defaultText
   });
 };
 
@@ -809,7 +851,7 @@ const sendWelcomeEmail = async (incube, passwordInitial = null) => {
 /**
  * 6. Rappel Automatique d'Atelier / Formation (24h ou 2h avant la session)
  */
-const sendWorkshopReminderEmail = async (evenement, incube = {}) => {
+const sendWorkshopReminderEmail = async (evenement, incube = {}, options = {}) => {
   const recipient = incube.email || 'incubé@ids.ma';
   const typeFormation = detectFormationType(evenement, incube);
   const theme = detectFormationTheme(evenement);
@@ -823,94 +865,116 @@ const sendWorkshopReminderEmail = async (evenement, incube = {}) => {
   }
 
   const { textPhrase: datePhrase, display: dateDisplay } = formatDateIntervalFrench(evenement.date, dateFin);
-  const formateur = evenement.intervenant || evenement.formateur || 'Experts Partenaires IDS';
+  const rawIntervenant = evenement.intervenant || evenement.formateur || 'Intervenant IDS Salé';
   const heureDebutStr = evenement.heureDebut || '09:30';
   const heureFinStr = evenement.heureFin || '12:30';
   const duree = evenement.duree || '3h00';
 
-  const subject = `🔔 RAPPEL : Session de formation ${typeFormation} — ${theme}`;
+  const rawLieu = evenement.lieu || evenement.salle;
+  let lieuDisplay = 'IDS Salé — Salle de formation';
+  if (rawLieu && String(rawLieu).trim()) {
+    const trimmed = String(rawLieu).trim();
+    lieuDisplay = trimmed.startsWith('IDS') ? trimmed : `IDS Salé — ${trimmed}`;
+  }
+
+  const badgeText = typeFormation === 'pré-création'
+    ? 'RAPPEL • FORMATION PRÉ-CRÉATION'
+    : (typeFormation === 'post-création' ? 'RAPPEL • FORMATION POST-CRÉATION' : 'RAPPEL • FORMATION IDS');
+
+  const parcoursDisplay = typeFormation === 'pré-création'
+    ? 'Session De Formation Pré-Création'
+    : (typeFormation === 'post-création' ? 'Session De Formation Post-Création' : 'Session De Formation IDS');
+
+  const subject = options.customSubject || `🔔 RAPPEL : Session de formation ${typeFormation} — ${theme}`;
 
   const safeType = escapeHtml(typeFormation);
   const safeTheme = escapeHtml(theme);
+  const safeParcours = escapeHtml(parcoursDisplay);
   const safeDateDisplay = escapeHtml(dateDisplay);
-  const safeFormateur = escapeHtml(formateur);
+  const safeIntervenant = escapeHtml(rawIntervenant);
   const safeHeureDebut = escapeHtml(heureDebutStr);
   const safeHeureFin = escapeHtml(heureFinStr);
   const safeDuree = escapeHtml(duree);
+  const safeLieu = escapeHtml(lieuDisplay);
 
-  const contentHtml = `
+  const defaultIntroHtml = `
     <p style="margin: 0 0 16px 0; font-size: 15px; color: #1e293b;">Bonjour à toutes et à tous,</p>
 
     <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #334155;">
-      Ceci est un rappel concernant votre session de formation <strong>${safeType}</strong>, qui se déroulera ${escapeHtml(datePhrase)} sous le thème <strong>${safeTheme}</strong>.
+      Ceci est un rappel concernant votre session de formation <strong>${safeType}</strong>, qui se déroulera ${escapeHtml(datePhrase)}.
     </p>
 
-    <div class="card" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 20px; margin: 20px 0;">
-      <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600; width: 35%;">Thème :</td><td style="padding: 6px 0; font-weight: 800; color: #00254d;">${safeTheme}</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Parcours :</td><td style="padding: 6px 0; font-weight: 700; color: #0c87eb; text-transform: capitalize;">Session de formation ${safeType}</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Date :</td><td style="padding: 6px 0; font-weight: 800; color: #0c87eb;">${safeDateDisplay}</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Horaires :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeHeureDebut} - ${safeHeureFin} (${safeDuree})</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Intervenant :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeFormateur}</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Lieu :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">Incubateur IDS — Salle de formation</td></tr>
+    <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      Votre participation est indispensable pour valider votre parcours au sein de l'Incubateur Digital Solidaire. Merci de bien vouloir arriver à l'heure indiquée.
+    </p>
+  `;
+
+  const customIntroHtml = options.customMessage ? formatCustomMessageHtml(options.customMessage) : null;
+  const introHtml = customIntroHtml || defaultIntroHtml;
+
+  const contentHtml = `
+    ${introHtml}
+
+    <div class="card" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 22px; margin: 24px 0;">
+      <table style="width: 100%; font-size: 14px; border-collapse: collapse; line-height: 1.6;">
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500; width: 32%;">Thème :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeTheme}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Parcours :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeParcours}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Date :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeDateDisplay}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Horaires :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeHeureDebut} - ${safeHeureFin} (${safeDuree})</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Intervenant :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeIntervenant}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Lieu :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeLieu}</td></tr>
       </table>
     </div>
 
-    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #334155;">
-      Cette session, animée par des experts partenaires, constitue une étape clé de votre parcours d’incubation. Votre participation est donc indispensable pour valider votre accompagnement au sein de l’IDS-Salé.
+    <p style="margin: 20px 0 0 0; font-size: 14px; line-height: 1.6; color: #0f172a;">
+      Nous comptons sur votre motivation et votre ponctualité.
     </p>
 
-    <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #334155;">
-      Nous comptons sur votre motivation et votre implication.
-    </p>
+    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0 20px 0;" />
 
-    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #334155;">
+    <div style="font-size: 14px; line-height: 1.6; color: #0f172a;">
       <p style="margin: 0 0 4px 0;">Bien cordialement,</p>
-      <p style="margin: 0 0 4px 0; color: #94a3b8;">----</p>
-      <p style="margin: 0; font-weight: 800; color: #00254d;">Equipe IDS – Salé</p>
+      <p style="margin: 0; font-weight: 700; color: #00254d;">L'équipe IDS Salé</p>
     </div>
   `;
 
   const html = renderEmailTemplate({
     title: `Rappel : Formation ${safeType} — ${safeTheme}`,
-    preheader: `Votre session débute ${datePhrase} sous le thème ${safeTheme}`,
-    badgeText: `Rappel • Formation ${typeFormation === 'pré-création' ? 'Pré-Création' : 'Post-Création'}`,
-    badgeColor: '#0c87eb',
+    badgeText,
+    badgeColor: '#0284c7',
     contentHtml
   });
 
-  const text = `Bonjour à toutes et à tous,
+  const defaultText = `Bonjour à toutes et à tous,
 
-Ceci est un rappel concernant votre session de formation ${typeFormation}, qui se déroulera ${datePhrase} sous le thème ${theme}.
+Ceci est un rappel concernant votre session de formation ${typeFormation}, prévue ${datePhrase}.
 
 Détails de la session :
 - Thème : ${theme}
-- Parcours : Session de formation ${typeFormation}
+- Parcours : ${parcoursDisplay}
 - Date : ${dateDisplay}
 - Horaires : ${heureDebutStr} - ${heureFinStr} (${duree})
-- Intervenant : ${formateur}
-- Lieu : Incubateur IDS — Salle de formation
+- Intervenant : ${rawIntervenant}
+- Lieu : ${lieuDisplay}
 
-Cette session, animée par des experts partenaires, constitue une étape clé de votre parcours d’incubation. Votre participation est donc indispensable pour valider votre accompagnement au sein de l’IDS-Salé.
-
-Nous comptons sur votre motivation et votre implication.
+Nous comptons sur votre ponctualité.
 
 Bien cordialement,
-----
-Equipe IDS – Salé`;
+L'équipe IDS Salé`;
 
   return await sendEmail({
     to: recipient,
+    cc: options.cc,
     subject,
     html,
-    text
+    text: options.customMessage ? `${options.customMessage}\n\n${defaultText}` : defaultText
   });
 };
 
 /**
  * 6.bis Rappel Automatique pour un Atelier Pratique / Événement Collaboratif (24h avant la session)
  */
-const sendAtelierReminderEmail = async (evenement, incube = {}) => {
+const sendAtelierReminderEmail = async (evenement, incube = {}, options = {}) => {
   const recipient = incube.email || 'incubé@ids.ma';
   const nomIncube = incube.nom_incube || incube.nom || 'Porteur de Projet';
   const titreAtelier = (evenement.titre || 'Atelier Pratique IDS').trim();
@@ -924,88 +988,101 @@ const sendAtelierReminderEmail = async (evenement, incube = {}) => {
   }
 
   const { textPhrase: datePhrase, display: dateDisplay } = formatDateIntervalFrench(evenement.date, dateFin);
-  const animateur = evenement.intervenant || evenement.formateur || 'Équipe d’Animation IDS & Experts Invités';
+  const rawAnimateur = evenement.intervenant || evenement.formateur || 'Équipe d’Animation IDS';
   const heureDebutStr = evenement.heureDebut || '09:30';
   const heureFinStr = evenement.heureFin || '12:30';
   const duree = evenement.duree || '3h00';
-  const lieu = evenement.lieu || 'Incubateur IDS — FabLab & Espace Collaboratif';
 
-  const subject = `🔔 RAPPEL : Votre atelier pratique « ${titreAtelier} » a lieu prochainement !`;
+  const rawLieu = evenement.lieu || evenement.salle;
+  let lieuDisplay = "IDS Salé — Salle d'Atelier";
+  if (rawLieu && String(rawLieu).trim()) {
+    const trimmed = String(rawLieu).trim();
+    const cleanLieu = trimmed.replace(/fablab\s*(&\s*)?/gi, '').replace(/\s{2,}/g, ' ').trim();
+    lieuDisplay = cleanLieu.startsWith('IDS') ? cleanLieu : `IDS Salé — ${cleanLieu || "Salle d'Atelier"}`;
+  }
+
+  const subject = options.customSubject || `🔔 RAPPEL : Votre atelier pratique « ${titreAtelier} » a lieu prochainement !`;
 
   const safeNom = escapeHtml(nomIncube);
   const safeTitre = escapeHtml(titreAtelier);
   const safeDateDisplay = escapeHtml(dateDisplay);
-  const safeAnimateur = escapeHtml(animateur);
+  const safeAnimateur = escapeHtml(rawAnimateur);
   const safeHeureDebut = escapeHtml(heureDebutStr);
   const safeHeureFin = escapeHtml(heureFinStr);
   const safeDuree = escapeHtml(duree);
-  const safeLieu = escapeHtml(lieu);
+  const safeLieu = escapeHtml(lieuDisplay);
 
-  const contentHtml = `
+  const defaultIntroHtml = `
     <p style="margin: 0 0 16px 0; font-size: 15px; color: #1e293b;">Bonjour <strong>${safeNom}</strong>,</p>
 
     <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #334155;">
-      Ceci est un petit rappel concernant votre atelier pratique <strong>${safeTitre}</strong>, qui se déroulera <strong>${escapeHtml(datePhrase)}</strong>.
+      Ceci est un rappel concernant votre atelier pratique <strong>${safeTitre}</strong>, qui se déroulera <strong>${escapeHtml(datePhrase)}</strong>.
     </p>
 
-    <div class="card" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 20px; margin: 20px 0;">
-      <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600; width: 35%;">Atelier :</td><td style="padding: 6px 0; font-weight: 800; color: #00254d;">${safeTitre}</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Format :</td><td style="padding: 6px 0; font-weight: 700; color: #0ea5e9;">Atelier Pratique & Collaboratif</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Date :</td><td style="padding: 6px 0; font-weight: 800; color: #0c87eb;">${safeDateDisplay}</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Horaires :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeHeureDebut} - ${safeHeureFin} (${safeDuree})</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Animateur :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeAnimateur}</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Lieu :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeLieu}</td></tr>
+    <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      Merci d'arriver 10 minutes à l'avance afin de vous installer et d'émarger dès le début de la séance.
+    </p>
+  `;
+
+  const customIntroHtml = options.customMessage ? formatCustomMessageHtml(options.customMessage) : null;
+  const introHtml = customIntroHtml || defaultIntroHtml;
+
+  const contentHtml = `
+    ${introHtml}
+
+    <div class="card" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 22px; margin: 24px 0;">
+      <table style="width: 100%; font-size: 14px; border-collapse: collapse; line-height: 1.6;">
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500; width: 32%;">Thème :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeTitre}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Parcours :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">Atelier Pratique & Collaboratif</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Date :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeDateDisplay}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Horaires :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeHeureDebut} - ${safeHeureFin} (${safeDuree})</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Intervenant :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeAnimateur}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Lieu :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeLieu}</td></tr>
       </table>
     </div>
 
-    <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 14px; margin: 18px 0; font-size: 13px; color: #92400e;">
-      <strong>⏰ Conseil pratique :</strong>
-      <p style="margin: 4px 0 0 0;">Merci d'arriver 10 minutes à l'avance afin de vous installer, de brancher vos équipements et d'émarger votre présence dès le début de la séance.</p>
-    </div>
-
-    <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+    <p style="margin: 20px 0 0 0; font-size: 14px; line-height: 1.6; color: #0f172a;">
       À très vite pour cet atelier interactif !
     </p>
 
-    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #334155;">
+    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0 20px 0;" />
+
+    <div style="font-size: 14px; line-height: 1.6; color: #0f172a;">
       <p style="margin: 0 0 4px 0;">Bien cordialement,</p>
-      <p style="margin: 0 0 4px 0; color: #94a3b8;">----</p>
-      <p style="margin: 0; font-weight: 800; color: #00254d;">Équipe d’Animation & FabLab — IDS Salé</p>
+      <p style="margin: 0; font-weight: 700; color: #00254d;">Équipe d’Animation — IDS Salé</p>
     </div>
   `;
 
   const html = renderEmailTemplate({
     title: `Rappel : Atelier ${safeTitre}`,
-    preheader: `Rappel atelier ${safeTitre} • ${dateDisplay} à ${safeHeureDebut}`,
-    badgeText: 'Rappel • Atelier Pratique',
-    badgeColor: '#f59e0b',
+    badgeText: 'RAPPEL • ATELIER PRATIQUE',
+    badgeColor: '#0284c7',
     contentHtml
   });
 
-  const text = `Bonjour ${nomIncube},
+  const defaultText = `Bonjour ${nomIncube},
 
 Ceci est un rappel concernant votre atelier pratique : "${titreAtelier}", prévu ${datePhrase}.
 
 Détails de l'atelier :
-- Atelier : ${titreAtelier}
-- Format : Atelier Pratique & Collaboratif
+- Thème : ${titreAtelier}
+- Parcours : Atelier Pratique & Collaboratif
 - Date : ${dateDisplay}
 - Horaires : ${heureDebutStr} - ${heureFinStr} (${duree})
-- Animateur : ${animateur}
-- Lieu : ${lieu}
+- Intervenant : ${rawAnimateur}
+- Lieu : ${lieuDisplay}
 
-Merci d'arriver 10 minutes à l'avance avec votre matériel.
+Merci d'arriver 10 minutes à l'avance.
 
 Bien cordialement,
-----
-Équipe d’Animation & FabLab — IDS Salé`;
+Équipe d’Animation — IDS Salé`;
 
   return await sendEmail({
     to: recipient,
+    cc: options.cc,
     subject,
     html,
-    text
+    text: options.customMessage ? `${options.customMessage}\n\n${defaultText}` : defaultText
   });
 };
 
