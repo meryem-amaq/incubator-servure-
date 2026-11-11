@@ -366,21 +366,20 @@ const sendEmail = async ({ to, cc, subject, text, html }) => {
 /**
  * 1. Notification de statut de Réservation d'Espace
  */
-const sendReservationStatusEmail = async (reservation, statut, motifRefus = '') => {
+const sendReservationStatusEmail = async (reservation, statut, motifRefus = '', options = {}) => {
   const isValide = statut === 'valide';
   const recipient = reservation.emailIncube || reservation.email || 'incubé@ids.ma';
   const nomIncube = reservation.nomIncube || reservation.nomComplet || 'Incubé';
   const precisionSalle = reservation.salleSpecifique ? ` (${reservation.salleSpecifique})` : '';
   const espace = `${(reservation.espace || 'Espace').toUpperCase()}${precisionSalle}`;
-  const dateStr = reservation.dateReservation || 'Date non précisée';
-  const horaire = `${reservation.heureDebut || '—'} à ${reservation.heureFin || '—'}`;
+  const dateStr = formatDateFrench(reservation.dateReservation) || 'Date non précisée';
+  const horaire = `${reservation.heureDebut || '—'} - ${reservation.heureFin || '—'}`;
 
-  const subject = isValide
-    ? `✅ Confirmation de votre réservation : ${espace}`
-    : `❌ Information concernant votre réservation : ${espace}`;
+  const subject = (options.customSubject && options.customSubject.trim())
+    ? options.customSubject.trim()
+    : (isValide ? `✅ Confirmation de réservation : ${espace}` : `❌ Information réservation : ${espace}`);
 
-  const badgeText = isValide ? 'Réservation Validée' : 'Réservation Non Retenue';
-  const badgeColor = isValide ? '#059669' : '#dc2626';
+  const badgeText = isValide ? 'RÉSERVATION VALIDÉE' : 'RÉSERVATION NON RETENUE';
 
   const safeNom = escapeHtml(nomIncube);
   const safeEspace = escapeHtml(espace);
@@ -388,40 +387,62 @@ const sendReservationStatusEmail = async (reservation, statut, motifRefus = '') 
   const safeHoraire = escapeHtml(horaire);
   const safeMotif = escapeHtml(motifRefus || 'Créneau indisponible ou maintenance planifiée');
 
-  const contentHtml = isValide ? `
-    <p>Bonjour <strong>${safeNom}</strong>,</p>
-    <p>Nous avons le plaisir de vous informer que votre demande de réservation d'espace a été <strong>VALIDÉE</strong> par l'équipe d'administration de l'incubateur.</p>
-    
-    <div class="card">
-      <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Espace réservé :</td><td style="padding: 6px 0; font-weight: 800; color: #00254d;">${safeEspace}</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Date :</td><td style="padding: 6px 0; font-weight: 700; color: #0c87eb;">${safeDate}</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Créneau horaire :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeHoraire}</td></tr>
+  const defaultIntroHtml = isValide ? `
+    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #1e293b;">Bonjour <strong>${safeNom}</strong>,</p>
+    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      Nous avons le plaisir de vous informer que votre demande de réservation d'espace au sein de l'incubateur a été <strong>validée</strong>.
+    </p>
+  ` : `
+    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #1e293b;">Bonjour <strong>${safeNom}</strong>,</p>
+    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      Nous vous informons que votre demande de réservation d'espace n'a pas pu être retenue pour le motif suivant :
+    </p>
+    <div style="background: #fef2f2; border-left: 3px solid #ef4444; border-radius: 8px; padding: 12px 16px; margin: 16px 0; font-size: 13px; color: #991b1b;">
+      « ${safeMotif} »
+    </div>
+  `;
+
+  const customIntroHtml = options.customMessage ? formatCustomMessageHtml(options.customMessage) : null;
+  const introHtml = customIntroHtml || defaultIntroHtml;
+
+  const contentHtml = `
+    ${introHtml}
+
+    <div class="card" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 22px; margin: 24px 0;">
+      <table style="width: 100%; font-size: 14px; border-collapse: collapse; line-height: 1.6;">
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500; width: 34%;">Espace réservé :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeEspace}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Date :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeDate}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Créneau horaire :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeHoraire}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Statut :</td><td style="padding: 6px 0; font-weight: 600; color: ${isValide ? '#059669' : '#dc2626'};">${isValide ? 'Confirmée' : 'Non retenue'}</td></tr>
       </table>
     </div>
 
-    <p style="font-size: 13px; color: #475569;">⚠️ <strong>Consignes d'accès :</strong> Merci d'arriver à l'heure, de respecter le matériel mis à votre disposition et d'enregistrer la fiche d'état des lieux avant et après votre séance.</p>
-  ` : `
-    <p>Bonjour <strong>${safeNom}</strong>,</p>
-    <p>Nous vous informons que votre demande de réservation pour l'espace <strong>${safeEspace}</strong> le <strong>${safeDate}</strong> (${safeHoraire}) n'a pas pu être validée pour le motif suivant :</p>
-    
-    <div class="card" style="border-left: 4px solid #dc2626; background: #fef2f2; border-top: 1px solid #fee2e2; border-right: 1px solid #fee2e2; border-bottom: 1px solid #fee2e2;">
-      <p style="margin: 0; color: #991b1b; font-weight: 600; font-size: 13px;">« ${safeMotif} »</p>
-    </div>
+    <p style="margin: 20px 0 0 0; font-size: 14px; line-height: 1.6; color: #0f172a;">
+      ${isValide
+        ? "Merci de veiller au respect des horaires, du matériel et de l'état des lieux de l'espace."
+        : "Nous vous invitons à vous reconnecter sur la plateforme pour choisir un autre créneau disponible."
+      }
+    </p>
 
-    <p style="font-size: 13px;">Nous vous invitons à vous reconnecter sur la plateforme pour choisir un autre créneau ou réserver un espace alternatif.</p>
+    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0 20px 0;" />
+
+    <div style="font-size: 14px; line-height: 1.6; color: #0f172a;">
+      <p style="margin: 0 0 4px 0;">Bien cordialement,</p>
+      <p style="margin: 0; font-weight: 700; color: #00254d;">L'équipe IDS Salé</p>
+    </div>
   `;
 
   const html = renderEmailTemplate({
     title: isValide ? 'Réservation Validée' : 'Réservation Non Retenue',
     preheader: `${safeEspace} - ${safeDate}`,
     badgeText,
-    badgeColor,
+    badgeColor: '#0284c7',
     contentHtml
   });
 
   return await sendEmail({
     to: recipient,
+    cc: options.cc,
     subject,
     html,
     text: `Bonjour ${nomIncube}, votre réservation pour ${espace} le ${dateStr} (${horaire}) est ${isValide ? 'VALIDÉE' : 'REFUSÉE'}.${motifRefus ? ` Motif : ${motifRefus}` : ''}`
@@ -431,17 +452,24 @@ const sendReservationStatusEmail = async (reservation, statut, motifRefus = '') 
 /**
  * 2. Notification de Confirmation de Rendez-vous d'accompagnement / Mentoring
  */
-const sendRdvConfirmationEmail = async (rdv, incube = {}) => {
+const sendRdvConfirmationEmail = async (rdv, incube = {}, options = {}) => {
   const recipient = incube.email || rdv.emailIncube || 'incubé@ids.ma';
   const nomIncube = incube.nom_incube || rdv.incubeNoms || 'Porteur de Projet';
   const accompagnateur = rdv.accompagnateurNom || 'Accompagnateur IDS';
   const sujet = rdv.sujet || 'Point d’étape & Diagnostic';
-  const dateStr = rdv.dateRdv || 'Date à définir';
-  const heureStr = rdv.heureRdv || '—';
-  const duree = rdv.duree || '1h';
-  const lieu = rdv.lieu || 'Bureaux Incubateur IDS / Fablab';
+  const rawDate = rdv.dateRdv || 'Date à définir';
+  const dateStr = formatDateFrench(rawDate);
+  const heureStr = rdv.heureRdv || '09:30';
+  const duree = rdv.duree || '1h00';
+  let rawLieu = rdv.lieu || 'IDS Salé — Bureaux d’accompagnement';
+  if (!rawLieu.toLowerCase().includes('ids') && !rawLieu.toLowerCase().includes('visio') && !rawLieu.toLowerCase().includes('distance')) {
+    rawLieu = `IDS Salé — ${rawLieu}`;
+  }
+  rawLieu = rawLieu.replace(/\s*\/\s*fablab/gi, '').replace(/fablab/gi, 'Bureaux d’accompagnement');
 
-  const subject = `📅 Rendez-vous d'accompagnement : ${sujet}`;
+  const subject = (options.customSubject && options.customSubject.trim())
+    ? options.customSubject.trim()
+    : `📅 Rendez-vous d'accompagnement : ${sujet}`;
 
   const safeNom = escapeHtml(nomIncube);
   const safeSujet = escapeHtml(sujet);
@@ -449,46 +477,68 @@ const sendRdvConfirmationEmail = async (rdv, incube = {}) => {
   const safeDate = escapeHtml(dateStr);
   const safeHeure = escapeHtml(heureStr);
   const safeDuree = escapeHtml(duree);
-  const safeLieu = escapeHtml(lieu);
+  const safeLieu = escapeHtml(rawLieu);
   const safeCommentaire = escapeHtml(rdv.commentaireEmail || '');
 
+  const defaultIntroHtml = `
+    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #1e293b;">Bonjour <strong>${safeNom}</strong>,</p>
+    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      Nous vous confirmons la programmation de votre rendez-vous individuel d'accompagnement, qui se déroulera le <strong>${safeDate}</strong>.
+    </p>
+    <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      Cette séance d'échange constitue une étape clé pour faire le point sur vos priorités, vos livrables et la progression concrète de votre projet au sein de IDS Salé.
+    </p>
+  `;
+
+  const customIntroHtml = options.customMessage ? formatCustomMessageHtml(options.customMessage) : null;
+  const introHtml = customIntroHtml || defaultIntroHtml;
+
   const contentHtml = `
-    <p>Bonjour <strong>${safeNom}</strong>,</p>
-    <p>Un rendez-vous de suivi et d'accompagnement personnalisé a été programmé avec votre référent.</p>
-    
-    <div class="card">
-      <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-        <tr><td style="padding: 7px 0; color: #64748b; font-weight: 600; width: 35%;">Objet :</td><td style="padding: 7px 0; font-weight: 800; color: #00254d;">${safeSujet}</td></tr>
-        <tr><td style="padding: 7px 0; color: #64748b; font-weight: 600;">Accompagnateur :</td><td style="padding: 7px 0; font-weight: 700; color: #0c87eb;">${safeAccomp}</td></tr>
-        <tr><td style="padding: 7px 0; color: #64748b; font-weight: 600;">Date de début :</td><td style="padding: 7px 0; font-weight: 800; color: #0c87eb;">${safeDate} à ${safeHeure}</td></tr>
-        <tr><td style="padding: 7px 0; color: #64748b; font-weight: 600;">Durée prévue :</td><td style="padding: 7px 0; font-weight: 700; color: #00254d;">${safeDuree}</td></tr>
-        <tr><td style="padding: 7px 0; color: #64748b; font-weight: 600;">Lieu / Visio :</td><td style="padding: 7px 0; font-weight: 700; color: #00254d;">${safeLieu}</td></tr>
+    ${introHtml}
+
+    <div class="card" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 22px; margin: 24px 0;">
+      <table style="width: 100%; font-size: 14px; border-collapse: collapse; line-height: 1.6;">
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500; width: 32%;">Objet :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeSujet}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Accompagnateur :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeAccomp}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Date :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeDate}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Horaires :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeHeure} (${safeDuree})</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Lieu :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeLieu}</td></tr>
       </table>
     </div>
 
     ${safeCommentaire ? `
-      <div class="card" style="border-left: 4px solid #0c87eb; background: #f0f7ff; border-top: 1px solid #e0effe; border-right: 1px solid #e0effe; border-bottom: 1px solid #e0effe; margin: 16px 0;">
-        <strong style="color: #0054a3; font-size: 12px; display: block; margin-bottom: 4px;">Note de l'accompagnateur :</strong>
-        <p style="margin: 0; color: #334155; font-size: 13px;">${safeCommentaire}</p>
+      <div style="background: #f1f5f9; border-left: 3px solid #0284c7; border-radius: 8px; padding: 12px 16px; margin: 18px 0; font-size: 13px; color: #334155;">
+        <strong style="color: #0f172a; display: block; margin-bottom: 4px;">Note de l'accompagnateur :</strong>
+        <span>« ${safeCommentaire} »</span>
       </div>
     ` : ''}
 
-    <p style="font-size: 12px; color: #64748b; margin-top: 16px;">Merci de vous munir de votre plan d'action et de l'état d'avancement de vos livrables.</p>
+    <p style="margin: 20px 0 0 0; font-size: 14px; line-height: 1.6; color: #0f172a;">
+      Nous comptons sur votre ponctualité et votre implication.
+    </p>
+
+    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0 20px 0;" />
+
+    <div style="font-size: 14px; line-height: 1.6; color: #0f172a;">
+      <p style="margin: 0 0 4px 0;">Bien cordialement,</p>
+      <p style="margin: 0; font-weight: 700; color: #00254d;">L'équipe IDS Salé</p>
+    </div>
   `;
 
   const html = renderEmailTemplate({
     title: `Point de Suivi : ${safeSujet}`,
     preheader: `RDV programmé le ${safeDate} à ${safeHeure}`,
-    badgeText: 'Rendez-vous de Suivi',
-    badgeColor: '#0c87eb',
+    badgeText: 'RENDEZ-VOUS D\'ACCOMPAGNEMENT',
+    badgeColor: '#0284c7',
     contentHtml
   });
 
   return await sendEmail({
     to: recipient,
+    cc: options.cc,
     subject,
     html,
-    text: `Bonjour ${nomIncube}, votre rendez-vous "${sujet}" avec ${accompagnateur} est fixé le ${dateStr} à ${heureStr} (Durée : ${duree}) à ${lieu}.`
+    text: options.customMessage ? `${options.customMessage}\n\nDate: ${dateStr} à ${heureStr}\nLieu: ${rawLieu}` : `Bonjour ${nomIncube}, votre rendez-vous "${sujet}" avec ${accompagnateur} est fixé le ${dateStr} à ${heureStr} (${duree}) à ${rawLieu}.`
   });
 };
 
@@ -753,54 +803,74 @@ Bien cordialement,
 /**
  * 4. Alerte d'Assiduité / Heures de Présence Insuffisantes
  */
-const sendAlerteAssiduiteEmail = async (incube, { tauxPresence = 0, moyenneHeures = 0, annee = 2026 } = {}) => {
+const sendAlerteAssiduiteEmail = async (incube, { tauxPresence = 0, moyenneHeures = 0, annee = 2026 } = {}, options = {}) => {
   const recipient = incube.email || 'incubé@ids.ma';
   const nomIncube = incube.nom_incube || 'Porteur de Projet';
   const safeNom = escapeHtml(nomIncube);
 
-  const subject = `⚠️ Alerte Suivi d'Engagement & Assiduité — Année ${annee}`;
+  const subject = (options.customSubject && options.customSubject.trim())
+    ? options.customSubject.trim()
+    : `⚠️ Alerte Suivi d'Engagement & Assiduité — Année ${Number(annee)}`;
+
+  const defaultIntroHtml = `
+    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #1e293b;">Bonjour <strong>${safeNom}</strong>,</p>
+    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      Nous vous adressons ce point relatif à votre assiduité et à votre implication dans le cadre de votre parcours d'accompagnement pour l'année <strong>${Number(annee)}</strong>.
+    </p>
+    <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      L'assiduité aux ateliers, aux formations et le respect de votre calendrier constituent une condition indispensable pour valider votre accompagnement au sein de IDS Salé.
+    </p>
+  `;
+
+  const customIntroHtml = options.customMessage ? formatCustomMessageHtml(options.customMessage) : null;
+  const introHtml = customIntroHtml || defaultIntroHtml;
 
   const contentHtml = `
-    <p>Bonjour <strong>${safeNom}</strong>,</p>
-    <p>L'équipe pédagogique et administrative de l'Incubateur Digital Solidaire a procédé à l'analyse de votre assiduité et de votre engagement pour l'année <strong>${Number(annee)}</strong>.</p>
-    
-    <div class="card" style="border-left: 4px solid #f59e0b; background: #fffbeb; border-top: 1px solid #fef3c7; border-right: 1px solid #fef3c7; border-bottom: 1px solid #fef3c7;">
-      <h3 style="margin: 0 0 10px 0; color: #b45309; font-size: 14px;">Indicateurs Actuels enregistrés :</h3>
-      <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #78350f;">
-        <li style="margin-bottom: 6px;">Taux de présence aux formations : <strong>${Number(tauxPresence)}%</strong> (Objectif contractuel minimal : 80%)</li>
-        <li>Présence hebdomadaire moyenne : <strong>${Number(moyenneHeures)}h / sem</strong> (Engagement attendu : 15h / sem)</li>
-      </ul>
+    ${introHtml}
+
+    <div class="card" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 22px; margin: 24px 0;">
+      <table style="width: 100%; font-size: 14px; border-collapse: collapse; line-height: 1.6;">
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500; width: 40%;">Taux de présence :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${Number(tauxPresence)}% (Objectif minimal : 80%)</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Présence hebdomadaire :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${Number(moyenneHeures)}h / sem (Attendu : 15h / sem)</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Période évaluée :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">Année ${Number(annee)}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Statut du suivi :</td><td style="padding: 6px 0; font-weight: 600; color: #b45309;">Régularisation requise</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Référent :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">Accompagnateur IDS Salé</td></tr>
+      </table>
     </div>
 
-    <p style="font-size: 13px; color: #334155;">
-      Nous vous rappelons que l'assiduité aux ateliers et la présence active au sein du Fablab / Coworking sont indispensables pour bénéficier du soutien financier, technique et matériel de l'incubateur.
+    <p style="margin: 20px 0 0 0; font-size: 14px; line-height: 1.6; color: #0f172a;">
+      Nous vous invitons à contacter rapidement votre accompagnateur référent pour faire le point sur votre calendrier ou régulariser vos présences.
     </p>
 
-    <p style="font-size: 13px; font-weight: 600; color: #00254d;">
-      👉 Merci de contacter rapidement votre accompagnateur pour faire le point ou régulariser vos déclarations de présence.
-    </p>
+    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0 20px 0;" />
+
+    <div style="font-size: 14px; line-height: 1.6; color: #0f172a;">
+      <p style="margin: 0 0 4px 0;">Bien cordialement,</p>
+      <p style="margin: 0; font-weight: 700; color: #00254d;">L'équipe Pédagogique — IDS Salé</p>
+    </div>
   `;
 
   const html = renderEmailTemplate({
     title: `Point d'Assiduité & Engagement`,
     preheader: `Rappel d'assiduité : taux actuel à ${tauxPresence}%`,
-    badgeText: 'Alerte Assiduité',
-    badgeColor: '#d97706',
+    badgeText: 'SUIVI D\'ASSIDUITÉ & ENGAGEMENT',
+    badgeColor: '#0284c7',
     contentHtml
   });
 
   return await sendEmail({
     to: recipient,
+    cc: options.cc,
     subject,
     html,
-    text: `Bonjour ${nomIncube}, votre taux d'assiduité actuel (${tauxPresence}%) ou vos heures de présence (${moyenneHeures}h) nécessitent une régularisation auprès de l'administration.`
+    text: options.customMessage ? `${options.customMessage}\n\nTaux: ${tauxPresence}%` : `Bonjour ${nomIncube}, votre taux d'assiduité actuel (${tauxPresence}%) nécessite une régularisation auprès de votre accompagnateur IDS Salé.`
   });
 };
 
 /**
  * 5. Email de Bienvenue & Accès à la Plateforme (Création de compte incubé)
  */
-const sendWelcomeEmail = async (incube, passwordInitial = null) => {
+const sendWelcomeEmail = async (incube, passwordInitial = null, options = {}) => {
   const recipient = incube.email || 'incubé@ids.ma';
   const nomIncube = incube.nom_incube || 'Porteur de Projet';
   const projet = incube.raison_sociale || 'Votre Projet d\'Incubation';
@@ -813,35 +883,57 @@ const sendWelcomeEmail = async (incube, passwordInitial = null) => {
   const safeRecipient = escapeHtml(recipient);
   const safePassword = escapeHtml(resolvedPassword);
 
-  const subject = `🚀 Bienvenue au sein de l'Incubateur Digital Solidaire ! Vos Accès Plateforme`;
+  const subject = (options.customSubject && options.customSubject.trim())
+    ? options.customSubject.trim()
+    : `🚀 Bienvenue au sein de l'Incubateur Digital Solidaire ! Vos Accès Plateforme`;
+
+  const defaultIntroHtml = `
+    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #1e293b;">Bonjour <strong>${safeNom}</strong>,</p>
+    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      Toute l'équipe de l'<strong>Incubateur Digital Solidaire (IDS)</strong> est ravie de vous accueillir dans le programme d'accompagnement pour le projet <strong>${safeProjet}</strong>.
+    </p>
+    <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      Votre espace incubé personnel a été créé. Il vous permet de suivre vos formations, vos ateliers pratiques, vos rendez-vous de mentoring et de gérer vos réservations d'espaces de travail.
+    </p>
+  `;
+
+  const customIntroHtml = options.customMessage ? formatCustomMessageHtml(options.customMessage) : null;
+  const introHtml = customIntroHtml || defaultIntroHtml;
 
   const contentHtml = `
-    <p>Bonjour <strong>${safeNom}</strong>,</p>
-    <p>Toute l'équipe de l'<strong>Incubateur Digital Solidaire (IDS)</strong> est ravie de vous accueillir dans le programme d'accompagnement pour le projet <strong>${safeProjet}</strong>.</p>
-    
-    <p>Votre espace incubé personnel a été créé. Il vous permet de suivre vos formations, vos rendez-vous de mentoring, vos plans d'action et de réserver vos espaces de travail (coworking, fablab, studio vidéo).</p>
+    ${introHtml}
 
-    <div class="card" style="border: 1px solid #b9ddfd; background: #f0f7ff;">
-      <h3 style="margin: 0 0 10px 0; color: #0054a3; font-size: 14px;">Vos Identifiants de Connexion :</h3>
-      <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-        <tr><td style="padding: 5px 0; color: #64748b;">Identifiant / Email :</td><td style="padding: 5px 0; font-weight: 800; color: #00254d;">${safeRecipient}</td></tr>
-        <tr><td style="padding: 5px 0; color: #64748b;">Mot de passe temporaire :</td><td style="padding: 5px 0; font-family: monospace; font-weight: 800; color: #0c87eb; font-size: 14px;">${safePassword}</td></tr>
+    <div class="card" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 22px; margin: 24px 0;">
+      <table style="width: 100%; font-size: 14px; border-collapse: collapse; line-height: 1.6;">
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500; width: 36%;">Projet accompagné :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeProjet}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Identifiant / Email :</td><td style="padding: 6px 0; font-weight: 600; color: #0f172a;">${safeRecipient}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Mot de passe initial :</td><td style="padding: 6px 0; font-family: monospace; font-weight: 700; color: #0284c7;">${safePassword}</td></tr>
       </table>
     </div>
 
-    <p style="font-size: 12px; color: #64748b;">🔒 Pour des raisons de sécurité, nous vous recommandons de modifier ce mot de passe dès votre première connexion.</p>
+    <p style="margin: 20px 0 0 0; font-size: 14px; line-height: 1.6; color: #0f172a;">
+      🔒 Pour des raisons de sécurité, nous vous recommandons de personnaliser ce mot de passe dès votre première connexion.
+    </p>
+
+    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0 20px 0;" />
+
+    <div style="font-size: 14px; line-height: 1.6; color: #0f172a;">
+      <p style="margin: 0 0 4px 0;">Bien cordialement,</p>
+      <p style="margin: 0; font-weight: 700; color: #00254d;">L'équipe IDS Salé</p>
+    </div>
   `;
 
   const html = renderEmailTemplate({
     title: `Bienvenue à l'Incubateur Digital Solidaire`,
     preheader: `Vos identifiants d'accès au portail incubateur`,
-    badgeText: 'Nouveau Compte Incubé',
-    badgeColor: '#0c87eb',
+    badgeText: 'BIENVENUE SUR LA PLATEFORME IDS',
+    badgeColor: '#0284c7',
     contentHtml
   });
 
   return await sendEmail({
     to: recipient,
+    cc: options.cc,
     subject,
     html,
     text: `Bonjour ${nomIncube}, bienvenue à l'Incubateur Digital Solidaire ! Vos identifiants : Email: ${recipient} | Mot de passe: ${resolvedPassword}`
@@ -1089,16 +1181,18 @@ Bien cordialement,
 /**
  * 7. Rappel Automatique de Réservation d'Espace (2h avant le créneau)
  */
-const sendReservationReminderEmail = async (reservation) => {
+const sendReservationReminderEmail = async (reservation, options = {}) => {
   const recipient = reservation.emailIncube || reservation.email || 'incubé@ids.ma';
   const nomIncube = reservation.nomIncube || reservation.nomComplet || 'Incubé';
   const precisionSalle = reservation.salleSpecifique ? ` (${reservation.salleSpecifique})` : '';
   const espace = `${(reservation.espace || 'Espace').toUpperCase()}${precisionSalle}`;
-  const dateStr = reservation.dateReservation ? new Date(reservation.dateReservation).toLocaleDateString('fr-FR') : 'Aujourd\'hui';
-  const horaire = `${reservation.heureDebut || '—'} à ${reservation.heureFin || '—'}`;
-  const materiel = reservation.equipementsUtilises || 'Général';
+  const dateStr = formatDateFrench(reservation.dateReservation) || 'Aujourd\'hui';
+  const horaire = `${reservation.heureDebut || '—'} - ${reservation.heureFin || '—'}`;
+  const materiel = reservation.equipementsUtilises || 'Équipements standards';
 
-  const subject = `🔔 RAPPEL : Votre créneau ${espace} commence dans 2h !`;
+  const subject = (options.customSubject && options.customSubject.trim())
+    ? options.customSubject.trim()
+    : `🔔 RAPPEL : Votre réservation pour ${espace} commence dans 2h !`;
 
   const safeNom = escapeHtml(nomIncube);
   const safeEspace = escapeHtml(espace);
@@ -1106,39 +1200,51 @@ const sendReservationReminderEmail = async (reservation) => {
   const safeHoraire = escapeHtml(horaire);
   const safeMateriel = escapeHtml(materiel);
 
+  const defaultIntroHtml = `
+    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #1e293b;">Bonjour <strong>${safeNom}</strong>,</p>
+    <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      Ceci est un rappel : votre créneau de réservation d'espace au sein de l'incubateur commence dans <strong>2 heures</strong>.
+    </p>
+  `;
+
+  const customIntroHtml = options.customMessage ? formatCustomMessageHtml(options.customMessage) : null;
+  const introHtml = customIntroHtml || defaultIntroHtml;
+
   const contentHtml = `
-    <p>Bonjour <strong>${safeNom}</strong>,</p>
-    <p>Votre créneau de réservation d'espace au sein du Fablab / Incubateur commence dans <strong>2 heures</strong> :</p>
-    
-    <div class="card" style="border-left: 4px solid #059669; background: #f0fdf4; border-top: 1px solid #dcfce7; border-right: 1px solid #dcfce7; border-bottom: 1px solid #dcfce7;">
-      <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Espace réservé :</td><td style="padding: 6px 0; font-weight: 800; color: #00254d;">${safeEspace}</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Date :</td><td style="padding: 6px 0; font-weight: 700; color: #0c87eb;">${safeDate}</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Créneau horaire :</td><td style="padding: 6px 0; font-weight: 700; color: #00254d;">${safeHoraire}</td></tr>
-        <tr><td style="padding: 6px 0; color: #64748b; font-weight: 600;">Matériel alloué :</td><td style="padding: 6px 0; font-weight: 700; color: #b45309;">${safeMateriel}</td></tr>
+    ${introHtml}
+
+    <div class="card" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 22px; margin: 24px 0;">
+      <table style="width: 100%; font-size: 14px; border-collapse: collapse; line-height: 1.6;">
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500; width: 34%;">Espace réservé :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeEspace}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Date :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeDate}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Créneau horaire :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeHoraire}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Matériel alloué :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeMateriel}</td></tr>
       </table>
     </div>
 
-    <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 14px; margin: 16px 0; font-size: 12px; color: #92400e;">
-      <strong>⚠️ Consignes de sécurité et restitution :</strong>
-      <ul style="margin: 6px 0 0 0; padding-left: 18px; line-height: 1.5;">
-        <li>Vérifiez l'état de la machine avant utilisation avec le responsable.</li>
-        <li>Nettoyez et remettez en ordre votre poste de travail avant de quitter les lieux.</li>
-        <li>Signalez tout incident ou anomalie immédiatement sur la plateforme.</li>
-      </ul>
+    <p style="margin: 20px 0 0 0; font-size: 14px; line-height: 1.6; color: #0f172a;">
+      Merci d'arriver à l'heure, de respecter le matériel et de laisser le poste propre et ordonné après votre séance.
+    </p>
+
+    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0 20px 0;" />
+
+    <div style="font-size: 14px; line-height: 1.6; color: #0f172a;">
+      <p style="margin: 0 0 4px 0;">Bien cordialement,</p>
+      <p style="margin: 0; font-weight: 700; color: #00254d;">L'équipe IDS Salé</p>
     </div>
   `;
 
   const html = renderEmailTemplate({
     title: `Rappel de Réservation : ${safeEspace}`,
     preheader: `Votre créneau débute à ${reservation.heureDebut}`,
-    badgeText: 'Rappel de Créneau',
-    badgeColor: '#059669',
+    badgeText: 'RAPPEL DE RÉSERVATION',
+    badgeColor: '#0284c7',
     contentHtml
   });
 
   return await sendEmail({
     to: recipient,
+    cc: options.cc,
     subject,
     html,
     text: `Bonjour ${nomIncube}, rappel : votre réservation pour ${espace} (${materiel}) a lieu aujourd'hui de ${horaire}.`
@@ -1148,30 +1254,56 @@ const sendReservationReminderEmail = async (reservation) => {
 /**
  * 8. Email de Réinitialisation de Mot de Passe (Lien sécurisé)
  */
-const sendForgotPasswordEmail = async (user, resetUrl) => {
+const sendForgotPasswordEmail = async (user, resetUrl, options = {}) => {
   const recipient = user.email;
   const nomComplet = `${user.prenom || ''} ${user.nom || ''}`.trim() || 'Utilisateur';
 
   const safeNom = escapeHtml(nomComplet);
-  const subject = `🔐 Réinitialisation de votre mot de passe - Plateforme IDS`;
+  const subject = (options.customSubject && options.customSubject.trim())
+    ? options.customSubject.trim()
+    : `🔐 Réinitialisation de votre mot de passe - Plateforme IDS`;
+
+  const defaultIntroHtml = `
+    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #1e293b;">Bonjour <strong>${safeNom}</strong>,</p>
+    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      Une demande de réinitialisation de mot de passe a été initiée pour votre compte sur la plateforme de l'<strong>Incubateur Digital Solidaire</strong>.
+    </p>
+    <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      Pour définir un nouveau mot de passe sécurisé, veuillez cliquer sur le bouton ci-dessous :
+    </p>
+  `;
+
+  const customIntroHtml = options.customMessage ? formatCustomMessageHtml(options.customMessage) : null;
+  const introHtml = customIntroHtml || defaultIntroHtml;
 
   const contentHtml = `
-    <p>Bonjour <strong>${safeNom}</strong>,</p>
-    <p>Une demande de réinitialisation de mot de passe a été initiée pour votre compte sur la plateforme de l'<strong>Incubateur Digital Solidaire</strong>.</p>
-    
-    <p>Pour définir un nouveau mot de passe sécurisé, veuillez cliquer sur le bouton ci-dessous :</p>
+    ${introHtml}
 
-    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; margin: 16px 0; font-size: 13px; color: #475569;">
-      ⏱️ <strong>Ce lien est sécurisé, à usage unique et expire dans 30 minutes.</strong><br/>
+    <div class="card" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 22px; margin: 24px 0;">
+      <table style="width: 100%; font-size: 14px; border-collapse: collapse; line-height: 1.6;">
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500; width: 36%;">Identifiant / Email :</td><td style="padding: 6px 0; font-weight: 600; color: #0f172a;">${escapeHtml(recipient)}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Délai de validité :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">30 minutes</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Usage :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">Lien unique et strictement personnel</td></tr>
+      </table>
+    </div>
+
+    <p style="margin: 20px 0 0 0; font-size: 13px; line-height: 1.6; color: #64748b;">
       Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email en toute sécurité. Votre mot de passe actuel restera inchangé.
+    </p>
+
+    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0 20px 0;" />
+
+    <div style="font-size: 14px; line-height: 1.6; color: #0f172a;">
+      <p style="margin: 0 0 4px 0;">Bien cordialement,</p>
+      <p style="margin: 0; font-weight: 700; color: #00254d;">Support Technique — IDS Salé</p>
     </div>
   `;
 
   const html = renderEmailTemplate({
     title: `Réinitialisation de Mot de Passe`,
     preheader: `Lien sécurisé valable 30 minutes`,
-    badgeText: 'Sécurité du Compte',
-    badgeColor: '#0c87eb',
+    badgeText: 'RÉINITIALISATION DE MOT DE PASSE',
+    badgeColor: '#0284c7',
     contentHtml,
     ctaText: "Réinitialiser mon mot de passe",
     ctaUrl: resetUrl
@@ -1179,6 +1311,7 @@ const sendForgotPasswordEmail = async (user, resetUrl) => {
 
   return await sendEmail({
     to: recipient,
+    cc: options.cc,
     subject,
     html,
     text: `Bonjour ${nomComplet}, pour réinitialiser votre mot de passe IDS, cliquez sur ce lien (valable 30 minutes) : ${resetUrl}`
@@ -1188,67 +1321,88 @@ const sendForgotPasswordEmail = async (user, resetUrl) => {
 /**
  * 9. Email de Confirmation de Réinitialisation par le Super Admin
  */
-const sendPasswordResetByAdminEmail = async (user, newPassword) => {
+const sendPasswordResetByAdminEmail = async (user, newPassword, options = {}) => {
   const recipient = user.email;
   const nomComplet = `${user.prenom || ''} ${user.nom || ''}`.trim() || 'Utilisateur';
 
   const safeNom = escapeHtml(nomComplet);
   const safeEmail = escapeHtml(recipient);
   const safePassword = escapeHtml(newPassword);
-  const subject = `🔑 Vos nouveaux identifiants de connexion - Plateforme IDS`;
+  const subject = (options.customSubject && options.customSubject.trim())
+    ? options.customSubject.trim()
+    : `🔑 Vos nouveaux identifiants de connexion - Plateforme IDS`;
+
+  const defaultIntroHtml = `
+    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #1e293b;">Bonjour <strong>${safeNom}</strong>,</p>
+    <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      Votre mot de passe d'accès à la plateforme de l'<strong>Incubateur Digital Solidaire</strong> a été réinitialisé par l'administration.
+    </p>
+  `;
+
+  const customIntroHtml = options.customMessage ? formatCustomMessageHtml(options.customMessage) : null;
+  const introHtml = customIntroHtml || defaultIntroHtml;
 
   const contentHtml = `
-    <p>Bonjour <strong>${safeNom}</strong>,</p>
-    <p>Votre mot de passe d'accès à la plateforme de l'<strong>Incubateur Digital Solidaire</strong> a été réinitialisé par l'administration.</p>
-    
-    <div class="card" style="border: 1px solid #b9ddfd; background: #f0f7ff;">
-      <h3 style="margin: 0 0 10px 0; color: #0054a3; font-size: 14px;">Vos Nouveaux Identifiants :</h3>
-      <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-        <tr><td style="padding: 5px 0; color: #64748b;">Identifiant / Email :</td><td style="padding: 5px 0; font-weight: 800; color: #00254d;">${safeEmail}</td></tr>
-        <tr><td style="padding: 5px 0; color: #64748b;">Nouveau mot de passe :</td><td style="padding: 5px 0; font-family: monospace; font-weight: 800; color: #0c87eb; font-size: 15px;">${safePassword}</td></tr>
+    ${introHtml}
+
+    <div class="card" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 22px; margin: 24px 0;">
+      <table style="width: 100%; font-size: 14px; border-collapse: collapse; line-height: 1.6;">
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500; width: 36%;">Identifiant / Email :</td><td style="padding: 6px 0; font-weight: 600; color: #0f172a;">${safeEmail}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Nouveau mot de passe :</td><td style="padding: 6px 0; font-family: monospace; font-weight: 700; color: #0284c7;">${safePassword}</td></tr>
       </table>
     </div>
 
-    <p style="font-size: 12px; color: #64748b;">🔒 Pour votre sécurité, nous vous recommandons de personnaliser ce mot de passe dès votre prochaine connexion dans votre profil utilisateur.</p>
+    <p style="margin: 20px 0 0 0; font-size: 14px; line-height: 1.6; color: #0f172a;">
+      🔒 Pour votre sécurité, nous vous recommandons de personnaliser ce mot de passe dès votre prochaine connexion dans votre profil utilisateur.
+    </p>
+
+    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0 20px 0;" />
+
+    <div style="font-size: 14px; line-height: 1.6; color: #0f172a;">
+      <p style="margin: 0 0 4px 0;">Bien cordialement,</p>
+      <p style="margin: 0; font-weight: 700; color: #00254d;">L'équipe IDS Salé</p>
+    </div>
   `;
 
   const html = renderEmailTemplate({
     title: `Nouveaux Identifiants de Connexion`,
     preheader: `Votre mot de passe a été mis à jour`,
-    badgeText: 'Administration IDS',
-    badgeColor: '#10b981',
+    badgeText: 'NOUVEAUX IDENTIFIANTS DE CONNEXION',
+    badgeColor: '#0284c7',
     contentHtml
   });
 
   return await sendEmail({
     to: recipient,
+    cc: options.cc,
     subject,
     html,
     text: `Bonjour ${nomComplet}, votre mot de passe IDS a été réinitialisé. Identifiant : ${recipient} | Mot de passe : ${newPassword}`
   });
 };
 
-
 /**
  * 1.bis Notification envoyée à l'Accompagnateur pour validation en 1-Clic Sécurisé
  */
-const sendDemandeReservationAccompagnateurEmail = async (reservation, accompagnateur = {}, { urlValide, urlRefuse }) => {
+const sendDemandeReservationAccompagnateurEmail = async (reservation, accompagnateur = {}, { urlValide, urlRefuse }, options = {}) => {
   const recipient = accompagnateur.email || process.env.ADMIN_NOTIFY_EMAIL || 'incubateur.digital.solidaire@gmail.com';
   const nomAccomp = accompagnateur.prenom ? `${accompagnateur.prenom} ${accompagnateur.nom || ''}`.trim() : (accompagnateur.nom || 'Accompagnateur');
   const nomIncube = reservation.nomIncube || reservation.nomComplet || 'Un incubé';
-  const dateStr = reservation.dateReservation ? String(reservation.dateReservation).split('T')[0] : 'Date à venir';
-  const horaire = `${reservation.heureDebut || '—'} à ${reservation.heureFin || '—'}`;
+  const dateStr = formatDateFrench(reservation.dateReservation) || 'Date à venir';
+  const horaire = `${reservation.heureDebut || '—'} - ${reservation.heureFin || '—'}`;
   const duree = reservation.duree || `${Math.round((reservation.dureeMinutes || 120) / 60)}h`;
 
   const espaceLabels = {
-    fablab: '🛠️ Espace FabLab',
-    studio: '🎥 Studio IDS',
-    salle_reunion: '🏢 Les Salles'
+    fablab: 'Espace FabLab',
+    studio: 'Studio Média IDS',
+    salle_reunion: 'Salle de Réunion'
   };
   const espace = espaceLabels[reservation.espace] || reservation.espace || 'Espace Incubateur';
   const salle = reservation.salleSpecifique || reservation.salle ? ` (${reservation.salleSpecifique || reservation.salle})` : '';
 
-  const subject = `🔔 Demande de Réservation à Valider : ${nomIncube} — ${espace}${salle}`;
+  const subject = (options.customSubject && options.customSubject.trim())
+    ? options.customSubject.trim()
+    : `🔔 Demande de Réservation à Valider : ${nomIncube} — ${espace}${salle}`;
 
   const safeNomAccomp = escapeHtml(nomAccomp);
   const safeNomIncube = escapeHtml(nomIncube);
@@ -1260,27 +1414,36 @@ const sendDemandeReservationAccompagnateurEmail = async (reservation, accompagna
   const safeMotif = escapeHtml(reservation.motifUtilisation || reservation.motif || 'Non renseigné');
   const safeEquip = escapeHtml(reservation.equipementsUtilises || 'Aucun équipement spécifique');
 
-  const contentHtml = `
-    <p>Bonjour <strong>${safeNomAccomp}</strong>,</p>
-    <p>Votre incubé <strong>${safeNomIncube}</strong> a formulé une nouvelle demande de réservation d'espace nécessitant votre approbation.</p>
+  const defaultIntroHtml = `
+    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #1e293b;">Bonjour <strong>${safeNomAccomp}</strong>,</p>
+    <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+      Votre incubé <strong>${safeNomIncube}</strong> a formulé une nouvelle demande de réservation d'espace nécessitant votre approbation.
+    </p>
+  `;
 
-    <div class="card" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 20px; margin: 20px 0;">
-      <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-        <tr><td style="padding: 7px 0; color: #64748b; font-weight: 600; width: 35%;">Porteur de Projet :</td><td style="padding: 7px 0; font-weight: 800; color: #00254d;">${safeNomIncube}</td></tr>
-        <tr><td style="padding: 7px 0; color: #64748b; font-weight: 600;">Espace & Salle :</td><td style="padding: 7px 0; font-weight: 800; color: #0c87eb;">${safeEspace}${safeSalle}</td></tr>
-        <tr><td style="padding: 7px 0; color: #64748b; font-weight: 600;">Date du créneau :</td><td style="padding: 7px 0; font-weight: 800; color: #00254d;">${safeDate}</td></tr>
-        <tr><td style="padding: 7px 0; color: #64748b; font-weight: 600;">Horaires :</td><td style="padding: 7px 0; font-weight: 700; color: #00254d;">${safeHoraire} (Durée : ${safeDuree})</td></tr>
-        <tr><td style="padding: 7px 0; color: #64748b; font-weight: 600;">Motif / Activité :</td><td style="padding: 7px 0; color: #475569; font-style: italic;">« ${safeMotif} »</td></tr>
-        ${reservation.equipementsUtilises ? `<tr><td style="padding: 7px 0; color: #64748b; font-weight: 600;">Matériel demandé :</td><td style="padding: 7px 0; color: #475569;">${safeEquip}</td></tr>` : ''}
+  const customIntroHtml = options.customMessage ? formatCustomMessageHtml(options.customMessage) : null;
+  const introHtml = customIntroHtml || defaultIntroHtml;
+
+  const contentHtml = `
+    ${introHtml}
+
+    <div class="card" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 22px; margin: 24px 0;">
+      <table style="width: 100%; font-size: 14px; border-collapse: collapse; line-height: 1.6;">
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500; width: 34%;">Porteur de projet :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeNomIncube}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Espace & Salle :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeEspace}${safeSalle}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Date du créneau :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeDate}</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Horaires :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeHoraire} (${safeDuree})</td></tr>
+        <tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Motif / Activité :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">« ${safeMotif} »</td></tr>
+        ${reservation.equipementsUtilises ? `<tr><td style="padding: 6px 0; color: #0f172a; font-weight: 500;">Matériel demandé :</td><td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${safeEquip}</td></tr>` : ''}
       </table>
     </div>
 
     <!-- BOUTONS D'ACTION 1-CLIC SÉCURISÉS -->
-    <div style="text-align: center; margin: 30px 0 16px 0;">
-      <a href="${urlValide}" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-weight: 800; font-size: 14px; display: inline-block; margin: 6px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35); letter-spacing: 0.2px;">
+    <div style="text-align: center; margin: 28px 0 16px 0;">
+      <a href="${urlValide}" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; text-decoration: none; padding: 12px 26px; border-radius: 12px; font-weight: 700; font-size: 13px; display: inline-block; margin: 6px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3); letter-spacing: 0.2px;">
         ✅ Valider la Réservation
       </a>
-      <a href="${urlRefuse}" style="background: #ffffff; color: #ef4444; border: 1.5px solid #ef4444; text-decoration: none; padding: 13px 24px; border-radius: 12px; font-weight: 700; font-size: 13px; display: inline-block; margin: 6px;">
+      <a href="${urlRefuse}" style="background: #ffffff; color: #ef4444; border: 1.5px solid #ef4444; text-decoration: none; padding: 11px 22px; border-radius: 12px; font-weight: 700; font-size: 13px; display: inline-block; margin: 6px;">
         ❌ Refuser
       </a>
     </div>
@@ -1288,18 +1451,26 @@ const sendDemandeReservationAccompagnateurEmail = async (reservation, accompagna
     <p style="font-size: 11px; color: #94a3b8; text-align: center; margin-top: 18px;">
       🔒 <strong>Lien sécurisé et strictement personnel</strong> (valable 48h). Aucune connexion par mot de passe n'est requise.
     </p>
+
+    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0 20px 0;" />
+
+    <div style="font-size: 14px; line-height: 1.6; color: #0f172a;">
+      <p style="margin: 0 0 4px 0;">Bien cordialement,</p>
+      <p style="margin: 0; font-weight: 700; color: #00254d;">Système de Gestion — IDS Salé</p>
+    </div>
   `;
 
   const html = renderEmailTemplate({
     title: `Demande de Réservation : ${safeNomIncube}`,
     preheader: `${safeNomIncube} a réservé ${safeEspace}${safeSalle} pour le ${safeDate}`,
-    badgeText: 'Action Requise • Accompagnement',
-    badgeColor: '#f59e0b',
+    badgeText: 'DEMANDE DE RÉSERVATION À VALIDER',
+    badgeColor: '#0284c7',
     contentHtml
   });
 
   return await sendEmail({
     to: recipient,
+    cc: options.cc,
     subject,
     html,
     text: `Bonjour ${nomAccomp}, ${nomIncube} a réservé ${espace}${salle} le ${dateStr} (${horaire}). Pour valider : ${urlValide} | Pour refuser : ${urlRefuse}`

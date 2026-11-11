@@ -66,7 +66,11 @@ router.post('/creer', requireStaff, async (req, res) => {
       duree,
       sujet,
       commentaireEmail,
-      lieu
+      lieu,
+      customMessage,
+      customSubject,
+      cc,
+      envoyerEmail = true
     } = req.body;
 
     if (!sujet || !dateRdv || !heureRdv) {
@@ -91,46 +95,98 @@ router.post('/creer', requireStaff, async (req, res) => {
       incubeNoms: incubeNoms || '',
       dateRdv,
       heureRdv,
-      duree: duree || '1h',
+      duree: duree || '1h00',
       sujet: sujet.trim(),
       commentaireEmail: commentaireEmail ? commentaireEmail.trim() : null,
-      lieu: lieu || 'Bureaux Incubateur IDS / Fablab',
+      lieu: lieu || 'Bureaux Incubateur IDS — Salé',
       statut: 'programme'
     });
 
     // Répondre immédiatement au client pour ne pas bloquer l'UI
-    res.status(201).json({ success: true, message: 'Rendez-vous créé avec succès et invitations transmises par email', data: rdv });
+    res.status(201).json({ success: true, message: 'Rendez-vous créé avec succès' + (envoyerEmail ? ' et invitations transmises par email' : ''), data: rdv });
 
     // Envoi asynchrone des emails et mise à jour en arrière-plan hors cycle HTTP
-    (async () => {
-      try {
-        const parsedIds = typeof incubeIds === 'object' && Array.isArray(incubeIds) ? incubeIds : JSON.parse(incIdsStr);
-        if (Array.isArray(parsedIds) && parsedIds.length > 0) {
-          await Incube.update(
-            { last_rdv_date: dateRdv },
-            { where: { id: { [Op.in]: parsedIds } } }
-          ).catch(() => {});
+    if (envoyerEmail) {
+      (async () => {
+        try {
+          const parsedIds = typeof incubeIds === 'object' && Array.isArray(incubeIds) ? incubeIds : JSON.parse(incIdsStr);
+          if (Array.isArray(parsedIds) && parsedIds.length > 0) {
+            await Incube.update(
+              { last_rdv_date: dateRdv },
+              { where: { id: { [Op.in]: parsedIds } } }
+            ).catch(() => {});
 
-          const incubesConcerned = await Incube.findAll({
-            where: { id: { [Op.in]: parsedIds } },
-            attributes: ['id', 'nom_incube', 'email']
-          });
+            const incubesConcerned = await Incube.findAll({
+              where: { id: { [Op.in]: parsedIds } },
+              attributes: ['id', 'nom_incube', 'email']
+            });
 
-          await Promise.allSettled(
-            incubesConcerned
-              .filter(inc => Boolean(inc.email))
-              .map(inc => emailService.sendRdvConfirmationEmail(rdv, inc).catch(err => {
-                console.warn(`Avertissement envoi email RDV à ${inc.email}:`, err.message);
-              }))
-          );
+            await Promise.allSettled(
+              incubesConcerned
+                .filter(inc => Boolean(inc.email))
+                .map(inc => emailService.sendRdvConfirmationEmail(rdv, inc, {
+                  customMessage,
+                  customSubject,
+                  cc
+                }).catch(err => {
+                  console.warn(`Avertissement envoi email RDV à ${inc.email}:`, err.message);
+                }))
+            );
+          }
+        } catch (notifErr) {
+          console.warn('Notification email RDV non transmise:', notifErr.message);
         }
-      } catch (notifErr) {
-        console.warn('Notification email RDV non transmise:', notifErr.message);
-      }
-    })();
+      })();
+    }
   } catch (err) {
     console.error('Erreur création rendez-vous:', err);
     res.status(500).json({ message: 'Erreur lors de la création du rendez-vous', error: err.message });
+  }
+});
+
+// POST /api/rendezvous/:id/notifier - Notifier / relancer manuellement les incubés pour un RDV
+router.post('/:id/notifier', requireStaff, async (req, res) => {
+  try {
+    const rdv = await RendezVous.findByPk(req.params.id);
+    if (!rdv) {
+      return res.status(404).json({ message: 'Rendez-vous introuvable' });
+    }
+
+    const { customMessage, customSubject, cc, incubeIds } = req.body;
+    let targetIds = incubeIds;
+    if (!targetIds || !Array.isArray(targetIds) || targetIds.length === 0) {
+      try {
+        targetIds = JSON.parse(rdv.incubeIds || '[]');
+      } catch (e) {
+        targetIds = [];
+      }
+    }
+
+    const incubesConcerned = await Incube.findAll({
+      where: { id: { [Op.in]: targetIds } },
+      attributes: ['id', 'nom_incube', 'email']
+    });
+
+    const targetsWithEmail = incubesConcerned.filter(inc => Boolean(inc.email));
+    if (targetsWithEmail.length === 0) {
+      return res.status(400).json({ message: "Aucun incubé concerné ne possède d'adresse email valide" });
+    }
+
+    await Promise.allSettled(
+      targetsWithEmail.map(inc => emailService.sendRdvConfirmationEmail(rdv, inc, {
+        customMessage,
+        customSubject,
+        cc
+      }))
+    );
+
+    res.json({
+      success: true,
+      message: `Invitation envoyée avec succès à ${targetsWithEmail.length} participant(s)`
+    });
+  } catch (err) {
+    console.error('Erreur notification RDV:', err);
+    res.status(500).json({ message: 'Erreur lors de la notification', error: err.message });
   }
 });
 

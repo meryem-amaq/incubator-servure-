@@ -74,9 +74,34 @@ export default function Evenements() {
     try {
       setLoadingFormations(true);
       const res = await api.get('/ateliers');
-      setFormations(res.data || []);
-      // Mettre à jour aussi le localStorage en cache si besoin, ou on l'enlève
-      localStorage.setItem('ids_ateliers_list', JSON.stringify(res.data || []));
+      const apiList = res.data || [];
+      const saved = localStorage.getItem('ids_ateliers_list');
+      const savedMap = {};
+      if (saved) {
+        try {
+          JSON.parse(saved).forEach(a => { if (a && a.id) savedMap[String(a.id)] = a; });
+        } catch (e) {}
+      }
+      const merged = apiList.map(a => {
+        const local = savedMap[String(a.id)] || {};
+        let meta = {};
+        if (a.description) {
+          try {
+            const parsed = typeof a.description === 'object' ? a.description : JSON.parse(a.description);
+            if (parsed && typeof parsed === 'object') meta = parsed;
+          } catch (e) {}
+        }
+        return {
+          ...local,
+          ...a,
+          targetMode: a.targetMode || meta.targetMode || local.targetMode || 'all',
+          selectedIncubes: a.selectedIncubes || meta.selectedIncubes || local.selectedIncubes || [],
+          invitedNames: a.invitedNames || meta.invitedNames || local.invitedNames || [],
+          invitedCount: a.invitedCount || meta.invitedCount || local.invitedCount
+        };
+      });
+      setFormations(merged);
+      localStorage.setItem('ids_ateliers_list', JSON.stringify(merged));
     } catch (err) {
       console.error('Erreur chargement ateliers', err);
       // Fallback au localstorage
@@ -267,6 +292,7 @@ export default function Evenements() {
       description: newFormation.description?.trim() || '',
       statutOuverture: 'auto',
       targetMode: newFormation.targetMode,
+      selectedIncubes: targetIncubeIds,
       invitedCount: targetIncubeIds.length,
       invitedNames: invitedNames
     };
@@ -275,8 +301,9 @@ export default function Evenements() {
     try {
       const res = await api.post('/ateliers', item);
       createdId = res.data.id;
-      setFormations([res.data, ...formations]);
-      localStorage.setItem('ids_ateliers_list', JSON.stringify([res.data, ...formations]));
+      const savedItem = { ...item, ...res.data };
+      setFormations([savedItem, ...formations]);
+      localStorage.setItem('ids_ateliers_list', JSON.stringify([savedItem, ...formations]));
     } catch (err) {
       console.error('Erreur creation atelier api:', err);
       // Fallback
@@ -636,12 +663,64 @@ export default function Evenements() {
     }
   };
 
+  const getAtelierTargetList = (atelier) => {
+    if (!atelier) return allIncubes;
+    if (atelier.targetMode === 'selection') {
+      const selectedIds = Array.isArray(atelier.selectedIncubes) && atelier.selectedIncubes.length > 0
+        ? atelier.selectedIncubes.map(String)
+        : [];
+      if (selectedIds.length > 0) {
+        const idSet = new Set(selectedIds);
+        return allIncubes.filter(i => idSet.has(String(i.id)));
+      }
+      if (Array.isArray(atelier.invitedNames) && atelier.invitedNames.length > 0) {
+        const nameSet = new Set(atelier.invitedNames.map(n => n.toLowerCase().trim()));
+        return allIncubes.filter(i => nameSet.has(String(i.nom_incube || '').toLowerCase().trim()));
+      }
+    }
+    return allIncubes;
+  };
+
   const handleSendConvocations = () => {
-    handleOpenMailCustomModal('convocation', selectedAtelier, allIncubes);
+    if (!selectedAtelier) return;
+    const targets = getAtelierTargetList(selectedAtelier);
+    handleOpenMailCustomModal('convocation', selectedAtelier, targets);
   };
 
   const handleSendReminder = () => {
-    handleOpenMailCustomModal('rappel', selectedAtelier, allIncubes);
+    if (!selectedAtelier) return;
+    const targets = getAtelierTargetList(selectedAtelier);
+    handleOpenMailCustomModal('rappel', selectedAtelier, targets);
+  };
+
+  const handleRemoveFromAtelier = (incubeId) => {
+    if (!selectedAtelier) return;
+    if (!window.confirm("Retirer cet incubé de la feuille de présence de l'atelier ?")) return;
+
+    const currentSelected = Array.isArray(selectedAtelier.selectedIncubes) && selectedAtelier.selectedIncubes.length > 0
+      ? selectedAtelier.selectedIncubes.map(String)
+      : allIncubes.map(i => String(i.id));
+
+    const updatedSelected = currentSelected.filter(id => id !== String(incubeId));
+    const updatedNames = allIncubes.filter(i => updatedSelected.includes(String(i.id))).map(i => i.nom_incube);
+
+    const updatedAtelier = {
+      ...selectedAtelier,
+      targetMode: 'selection',
+      selectedIncubes: updatedSelected,
+      invitedCount: updatedSelected.length,
+      invitedNames: updatedNames
+    };
+
+    setSelectedAtelier(updatedAtelier);
+    setFormations(prev => prev.map(f => f.id === updatedAtelier.id ? updatedAtelier : f));
+    try {
+      const saved = localStorage.getItem('ids_ateliers_list');
+      const list = saved ? JSON.parse(saved) : [];
+      const updatedList = list.map(f => f.id === updatedAtelier.id ? updatedAtelier : f);
+      localStorage.setItem('ids_ateliers_list', JSON.stringify(updatedList));
+    } catch(e) {}
+    toast.success("Incubé retiré de la feuille de présence");
   };
 
   // Ajuster l'horaire de l'atelier en temps réel (sauvegarde locale + serveur BDD)
@@ -964,9 +1043,24 @@ export default function Evenements() {
       presenceMap[String(p.incubeId)] = p;
     });
 
-    // Identifier les participants ayant signé via QR code qui ne sont pas dans allIncubes
-    const knownIncubeIds = new Set(allIncubes.map(i => String(i.id)));
-    const extraAttendees = presencesList.filter(p => !knownIncubeIds.has(String(p.incubeId))).map(p => ({
+    // Filtrage des incubés ciblés pour cet atelier
+    let targetedIncubes = allIncubes;
+    if (selectedAtelier.targetMode === 'selection') {
+      const selectedIds = Array.isArray(selectedAtelier.selectedIncubes) && selectedAtelier.selectedIncubes.length > 0
+        ? selectedAtelier.selectedIncubes.map(String)
+        : [];
+      if (selectedIds.length > 0) {
+        const idSet = new Set(selectedIds);
+        targetedIncubes = allIncubes.filter(i => idSet.has(String(i.id)));
+      } else if (Array.isArray(selectedAtelier.invitedNames) && selectedAtelier.invitedNames.length > 0) {
+        const nameSet = new Set(selectedAtelier.invitedNames.map(n => n.toLowerCase().trim()));
+        targetedIncubes = allIncubes.filter(i => nameSet.has(String(i.nom_incube || '').toLowerCase().trim()));
+      }
+    }
+
+    // Identifier les participants ayant signé via QR code qui ne sont pas dans targetedIncubes
+    const targetedIdsSet = new Set(targetedIncubes.map(i => String(i.id)));
+    const extraAttendees = presencesList.filter(p => !targetedIdsSet.has(String(p.incubeId))).map(p => ({
       id: p.incubeId,
       nom_incube: p.nom && p.prenom ? `${p.nom} ${p.prenom}` : (p.nom || 'Participant QR'),
       pp_numero: p.pp_numero || p.ppNumero || '—',
@@ -975,7 +1069,7 @@ export default function Evenements() {
       telephone: ''
     }));
 
-    const combinedIncubes = [...allIncubes, ...extraAttendees];
+    const combinedIncubes = [...targetedIncubes, ...extraAttendees];
 
     // Liste consolidée pour la feuille d'émargement et l'export Excel
     const emargementList = combinedIncubes.map(inc => {
@@ -1214,7 +1308,7 @@ export default function Evenements() {
                   title="Envoyer les invitations et consignes par email aux incubés"
                 >
                   <Mail size={14} className="text-amber-500" />
-                  <span>{sendingEmails ? 'Envoi...' : '📧 Invitations'}</span>
+                  <span>{sendingEmails ? 'Envoi...' : `📧 Invitations (${totalCount})`}</span>
                 </button>
 
                 <button
@@ -1341,25 +1435,37 @@ export default function Evenements() {
                             )}
                           </td>
                           <td className="py-3 px-4 text-center">
-                            <button
-                              type="button"
-                              onClick={() => handleTogglePresence(inc)}
-                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 w-full max-w-[140px] mx-auto shadow-sm ${
-                                isPresent
-                                  ? 'bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/30 dark:hover:bg-red-900/40 dark:text-red-400 border border-red-200 dark:border-red-900/50'
-                                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                              }`}
-                            >
-                              {isPresent ? (
-                                <>
-                                  <X size={13} /> Retirer
-                                </>
-                              ) : (
-                                <>
-                                  <Check size={13} /> Valider présence
-                                </>
+                            <div className="flex items-center justify-center gap-1.5 max-w-[170px] mx-auto">
+                              <button
+                                type="button"
+                                onClick={() => handleTogglePresence(inc)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm flex-1 ${
+                                  isPresent
+                                    ? 'bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/30 dark:hover:bg-red-900/40 dark:text-red-400 border border-red-200 dark:border-red-900/50'
+                                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                }`}
+                              >
+                                {isPresent ? (
+                                  <>
+                                    <X size={13} /> Retirer
+                                  </>
+                                ) : (
+                                  <>
+                                    <Check size={13} /> Valider présence
+                                  </>
+                                )}
+                              </button>
+                              {selectedAtelier.targetMode === 'selection' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveFromAtelier(inc.id)}
+                                  className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors cursor-pointer shrink-0"
+                                  title="Supprimer cet incubé de la liste des invités"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
                               )}
-                            </button>
+                            </div>
                           </td>
                         </tr>
                       );

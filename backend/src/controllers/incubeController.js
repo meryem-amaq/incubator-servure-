@@ -1359,12 +1359,16 @@ exports.envoyerAlerteAssiduite = async (req, res) => {
 
     if (!incube.email) return res.status(400).json({ message: "L'incubé n'a pas d'adresse email enregistrée" });
 
-    const { tauxPresence = 0, moyenneHeures = 0, annee = 2026 } = req.body;
+    const { tauxPresence = 0, moyenneHeures = 0, annee = 2026, customMessage, customSubject, cc } = req.body;
 
     const emailResult = await emailService.sendAlerteAssiduiteEmail(incube, {
       tauxPresence,
       moyenneHeures,
       annee
+    }, {
+      customMessage,
+      customSubject,
+      cc
     });
 
     res.json({

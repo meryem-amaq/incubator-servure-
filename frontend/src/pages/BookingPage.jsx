@@ -21,7 +21,10 @@ import {
   Search,
   Filter,
   RefreshCw,
-  GraduationCap
+  GraduationCap,
+  Mail,
+  Bell,
+  Sparkles
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -56,8 +59,21 @@ export default function BookingPage() {
   const [duree, setDuree] = useState('1h');
   const [sujet, setSujet] = useState('');
   const [commentaireEmail, setCommentaireEmail] = useState('');
-  const [lieu, setLieu] = useState('Bureaux Incubateur IDS / Fablab');
+  const [lieu, setLieu] = useState('IDS Salé — Bureaux d’accompagnement');
   const [searchIncube, setSearchIncube] = useState('');
+
+  // Modal de prévisualisation et personnalisation d'email avant envoi
+  const [mailCustomModal, setMailCustomModal] = useState({
+    isOpen: false,
+    mode: 'create', // 'create' | 'resend'
+    rdvId: null,
+    payload: null,
+    targetIncubes: [],
+    customSubject: '',
+    customMessage: '',
+    cc: '', // Champ CC vide par défaut
+    sending: false
+  });
 
   // État du mois affiché dans le calendrier visuel
   const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
@@ -370,8 +386,19 @@ export default function BookingPage() {
     );
   };
 
-  const handleCreateRdv = async (e) => {
-    e.preventDefault();
+  const formatDateFrench = (dateInput) => {
+    if (!dateInput) return 'prochainement';
+    try {
+      const d = new Date(dateInput);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+      }
+    } catch (e) {}
+    return String(dateInput);
+  };
+
+  const handleOpenRdvMailModal = (e) => {
+    if (e) e.preventDefault();
     if (!sujet.trim()) {
       toast.error("Veuillez saisir le sujet du rendez-vous !");
       return;
@@ -397,35 +424,117 @@ export default function BookingPage() {
       }
     }
 
+    const payload = {
+      accompagnateurNom,
+      accompagnateurId,
+      incubeIds: selectedIncubeIds,
+      incubeNoms: selectedIncubesNoms || 'Incubés',
+      dateRdv: selectedDate,
+      heureRdv,
+      duree,
+      sujet: sujet.trim(),
+      commentaireEmail: commentaireEmail.trim(),
+      lieu: lieu || 'IDS Salé — Bureaux d’accompagnement'
+    };
+
+    const targetIncubes = incubes.filter(i => selectedIncubeIds.includes(i.id) || selectedIncubeIds.includes(String(i.id)));
+    const dateFormatted = formatDateFrench(selectedDate);
+    const defaultSubject = `📅 Rendez-vous d'accompagnement : ${sujet.trim()}`;
+    const defaultMessage = `Bonjour,\n\nNous vous confirmons la programmation de votre rendez-vous individuel d'accompagnement, qui se déroulera le ${dateFormatted}.\n\nCette séance d'échange constitue une étape clé pour faire le point sur vos priorités, vos livrables et la progression concrète de votre projet au sein de IDS Salé.`;
+
+    setMailCustomModal({
+      isOpen: true,
+      mode: 'create',
+      rdvId: null,
+      payload,
+      targetIncubes,
+      customSubject: defaultSubject,
+      customMessage: defaultMessage,
+      cc: '',
+      sending: false
+    });
+  };
+
+  const handleOpenResendMailModal = (rdvItem) => {
+    if (!rdvItem) return;
+    const rdvOrig = rdvItem.originalData || rdvItem;
+    let targetIds = [];
     try {
-      const payload = {
-        accompagnateurNom,
-        accompagnateurId,
-        incubeIds: selectedIncubeIds,
-        incubeNoms: selectedIncubesNoms || 'Incubés',
-        dateRdv: selectedDate,
-        heureRdv,
-        duree,
-        sujet: sujet.trim(),
-        commentaireEmail: commentaireEmail.trim(),
-        lieu
-      };
+      targetIds = typeof rdvOrig.incubeIds === 'string' ? JSON.parse(rdvOrig.incubeIds) : (rdvOrig.incubeIds || []);
+    } catch(e) {
+      targetIds = [];
+    }
 
-      const res = await api.post('/rendezvous/creer', payload);
-      const created = res.data?.data || payload;
+    const targetIncubes = incubes.filter(i => targetIds.includes(i.id) || targetIds.includes(String(i.id)));
+    const dateFormatted = formatDateFrench(rdvOrig.dateRdv);
+    const defaultSubject = `📅 Rappel : Rendez-vous d'accompagnement — ${rdvOrig.sujet}`;
+    const defaultMessage = `Bonjour,\n\nCeci est un rappel concernant votre rendez-vous individuel d'accompagnement prévu le ${dateFormatted}.\n\nMerci de vous munir de l'état d'avancement de vos livrables et d'arriver à l'heure convenue.`;
 
-      toast.success("📅 Rendez-vous planifié et invitation transmise par email !", { icon: '✅' });
-      setSujet('');
-      setCommentaireEmail('');
-      setSelectedIncubeIds([]);
-      setSelectedCoachId('');
-      loadData();
-      setActiveTab('prochains');
+    const payload = {
+      accompagnateurNom: rdvOrig.accompagnateurNom || 'Accompagnateur IDS',
+      accompagnateurId: rdvOrig.accompagnateurId,
+      incubeIds: targetIds,
+      incubeNoms: rdvOrig.incubeNoms || '',
+      dateRdv: rdvOrig.dateRdv,
+      heureRdv: rdvOrig.heureRdv,
+      duree: rdvOrig.duree || '1h00',
+      sujet: rdvOrig.sujet,
+      commentaireEmail: rdvOrig.commentaireEmail || '',
+      lieu: rdvOrig.lieu || 'IDS Salé — Bureaux d’accompagnement'
+    };
 
-      // Le lien Google Calendar reste accessible directement sur la carte du rendez-vous
-      // (l'appel window.open après un await est automatiquement bloqué par la plupart des navigateurs)
+    setMailCustomModal({
+      isOpen: true,
+      mode: 'resend',
+      rdvId: rdvOrig.id,
+      payload,
+      targetIncubes: targetIncubes.length > 0 ? targetIncubes : incubes.slice(0, 1),
+      customSubject: defaultSubject,
+      customMessage: defaultMessage,
+      cc: '',
+      sending: false
+    });
+  };
+
+  const handleConfirmSendRdv = async (sendEmailOption = true) => {
+    const { payload, customSubject, customMessage, cc, mode, rdvId } = mailCustomModal;
+    if (!payload && mode === 'create') return;
+
+    setMailCustomModal(prev => ({ ...prev, sending: true }));
+    try {
+      if (mode === 'create') {
+        const fullPayload = {
+          ...payload,
+          envoyerEmail: sendEmailOption,
+          customSubject,
+          customMessage,
+          cc: (cc || '').trim()
+        };
+        await api.post('/rendezvous/creer', fullPayload);
+        toast.success(
+          sendEmailOption
+            ? "📅 Rendez-vous planifié et invitation transmise par email !"
+            : "📅 Rendez-vous enregistré sans envoi d'email.",
+          { icon: '✅' }
+        );
+        setSujet('');
+        setCommentaireEmail('');
+        setSelectedIncubeIds([]);
+        setSelectedCoachId('');
+        loadData();
+        setActiveTab('prochains');
+      } else if (mode === 'resend' && rdvId) {
+        await api.post(`/rendezvous/${rdvId}/notifier`, {
+          customSubject,
+          customMessage,
+          cc: (cc || '').trim()
+        });
+        toast.success("Invitation renvoyée avec succès !", { icon: '📧' });
+      }
+      setMailCustomModal(prev => ({ ...prev, isOpen: false, sending: false }));
     } catch (err) {
-      toast.error(err.response?.data?.message || "Erreur création rendez-vous");
+      toast.error(err.response?.data?.message || err.message || "Erreur lors de la planification");
+      setMailCustomModal(prev => ({ ...prev, sending: false }));
     }
   };
 
@@ -957,7 +1066,7 @@ export default function BookingPage() {
                 </p>
               </div>
 
-              <form onSubmit={handleCreateRdv} className="space-y-4">
+              <form onSubmit={handleOpenRdvMailModal} className="space-y-4">
                 
                 {/* Date, Heure, Durée */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1109,12 +1218,263 @@ export default function BookingPage() {
                   type="submit"
                   className="w-full py-3.5 bg-amber-600 hover:bg-amber-700 text-white font-black text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-amber-600/20 transition-all cursor-pointer"
                 >
-                  <Send size={16} /> Confirmer & Lier à Google Calendar
+                  <Mail size={16} /> Vérifier le contenu & Envoyer l'invitation ({selectedIncubeIds.length})
                 </button>
               </form>
             </div>
           </div>
         )}
+
+        {/* =========================================================================
+            MODAL DE PERSONNALISATION ET APERÇU DE L'EMAIL DE RENDEZ-VOUS (STYLE IDS VALIDÉ)
+            ========================================================================= */}
+        {mailCustomModal.isOpen && mailCustomModal.payload && (() => {
+          const payload = mailCustomModal.payload;
+          const targets = mailCustomModal.targetIncubes || [];
+          const withEmail = targets.filter(i => i.email && i.email.trim());
+          const withoutEmail = targets.filter(i => !i.email || !i.email.trim());
+
+          const previewBadge = 'RENDEZ-VOUS D\'ACCOMPAGNEMENT';
+          const previewObjet = payload.sujet;
+          const previewAccomp = payload.accompagnateurNom || 'Accompagnateur IDS';
+          const previewDate = formatDateFrench(payload.dateRdv);
+          const previewHoraires = `${payload.heureRdv} (${payload.duree || '1h00'})`;
+          const rawLieu = payload.lieu;
+          const previewLieu = rawLieu
+            ? (rawLieu.toLowerCase().includes('ids') || rawLieu.toLowerCase().includes('visio') ? rawLieu : `IDS Salé — ${rawLieu}`)
+            : 'IDS Salé — Bureaux d’accompagnement';
+
+          const renderPreviewParagraphs = (text) => {
+            if (!text) return null;
+            return text.split(/\n\s*\n/).map((para, idx) => (
+              <p key={idx} className="mb-3 text-slate-800 dark:text-slate-200 text-xs sm:text-sm leading-relaxed whitespace-pre-line">
+                {para}
+              </p>
+            ));
+          };
+
+          return (
+            <div
+              className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+              onClick={() => !mailCustomModal.sending && setMailCustomModal(prev => ({ ...prev, isOpen: false }))}
+            >
+              <div
+                className="bg-white dark:bg-dark-900 rounded-3xl border border-slate-200 dark:border-dark-700 shadow-2xl w-full max-w-5xl overflow-hidden max-h-[92vh] flex flex-col text-slate-900 dark:text-white slide-up"
+                onClick={e => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="p-4 sm:px-6 border-b border-slate-100 dark:border-dark-800 flex items-center justify-between bg-slate-50/70 dark:bg-dark-800/40 shrink-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center font-black shrink-0 bg-primary-500/15 text-primary-600 dark:text-primary-400">
+                      <Mail size={20} />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
+                        {mailCustomModal.mode === 'resend' ? "Renvoyer la convocation au rendez-vous" : "Prévisualiser et personnaliser l'invitation au rendez-vous"}
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-dark-400 truncate max-w-md mt-0.5">
+                        {previewObjet}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={mailCustomModal.sending}
+                    onClick={() => setMailCustomModal(prev => ({ ...prev, isOpen: false }))}
+                    className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 dark:hover:bg-dark-700 transition cursor-pointer"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {/* Body: 2 colonnes */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-slate-100 dark:divide-dark-800 flex-1 overflow-y-auto">
+                  {/* Colonne Gauche : Paramètres & Personnalisation */}
+                  <div className="lg:col-span-6 p-4 sm:p-6 space-y-4 overflow-y-auto">
+                    <div className="p-3 bg-primary-50/70 dark:bg-primary-950/20 border border-primary-200/80 dark:border-primary-800/40 rounded-2xl flex items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-2 text-primary-900 dark:text-primary-200 font-bold">
+                        <Users size={15} className="text-primary-600" />
+                        <span>Destinataires : {withEmail.length} incubé(s)</span>
+                      </div>
+                      {withoutEmail.length > 0 && (
+                        <span className="text-[11px] text-amber-700 dark:text-amber-400 font-semibold">
+                          ({withoutEmail.length} sans email exclus)
+                        </span>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-dark-200 mb-1 flex items-center justify-between">
+                        <span>Copie (CC) — Optionnel :</span>
+                        <span className="text-[10px] text-slate-400 font-normal">Vide par défaut</span>
+                      </label>
+                      <div className="relative">
+                        <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={mailCustomModal.cc}
+                          onChange={e => setMailCustomModal(p => ({ ...p, cc: e.target.value }))}
+                          placeholder="ex: direction@ids.ma, accompagnement@ids.ma"
+                          className="input pl-9 !py-2 !text-xs w-full"
+                          disabled={mailCustomModal.sending}
+                        />
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        Séparez plusieurs adresses email par des virgules si nécessaire.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-dark-200 mb-1">
+                        Objet de l'email :
+                      </label>
+                      <input
+                        type="text"
+                        value={mailCustomModal.customSubject}
+                        onChange={e => setMailCustomModal(p => ({ ...p, customSubject: e.target.value }))}
+                        className="input !py-2 !text-xs w-full font-semibold"
+                        disabled={mailCustomModal.sending}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-dark-200 mb-1 flex items-center justify-between">
+                        <span>Texte d'introduction (personnalisable) :</span>
+                        <span className="text-[10px] text-primary-600 font-semibold">Texte modifiable</span>
+                      </label>
+                      <textarea
+                        rows={6}
+                        value={mailCustomModal.customMessage}
+                        onChange={e => setMailCustomModal(p => ({ ...p, customMessage: e.target.value }))}
+                        placeholder="Saisissez ici le texte personnalisé pour ce rendez-vous..."
+                        className="input !py-2.5 !text-xs w-full leading-relaxed"
+                        disabled={mailCustomModal.sending}
+                      />
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        Vous pouvez ajuster librement le message d'introduction. Les paramètres officiels (date, heure, coach, lieu) restent verrouillés en dessous.
+                      </p>
+                    </div>
+
+                    {payload.commentaireEmail && (
+                      <div className="p-3 bg-slate-50 dark:bg-dark-800 rounded-xl border border-slate-200 dark:border-dark-700 text-xs">
+                        <strong className="text-slate-700 dark:text-dark-200 block mb-1">Consigne préalable saisie :</strong>
+                        <p className="italic text-slate-500">« {payload.commentaireEmail} »</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Colonne Droite : Prévisualisation en direct (Live Preview) */}
+                  <div className="lg:col-span-6 p-4 sm:p-6 bg-slate-50/60 dark:bg-dark-950/40 space-y-3 overflow-y-auto">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-dark-400 flex items-center gap-1.5">
+                        <Sparkles size={14} className="text-amber-500" />
+                        Aperçu en direct de l'email
+                      </span>
+                      <span className="text-[11px] font-mono text-slate-400">Modèle officiel IDS</span>
+                    </div>
+
+                    {/* Email Container Card */}
+                    <div className="bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 rounded-2xl p-5 sm:p-6 shadow-sm text-slate-900 dark:text-white text-xs sm:text-sm space-y-4 max-w-lg mx-auto">
+                      <div className="text-center">
+                        <h2 className="text-base sm:text-lg font-black tracking-tight text-slate-900 dark:text-white">
+                          Incubateur Digital Solidaire
+                        </h2>
+                        <div className="mt-2">
+                          <span className="inline-block bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300 px-3 py-1 rounded-full text-[10px] font-black tracking-wider uppercase">
+                            {previewBadge}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Paragraphes dynamiques */}
+                      <div className="pt-2">
+                        {renderPreviewParagraphs(mailCustomModal.customMessage)}
+                      </div>
+
+                      {/* Tableau récapitulatif officiel verrouillé */}
+                      <div className="bg-slate-50 dark:bg-dark-800/80 border border-slate-200 dark:border-dark-700 rounded-xl p-3.5 sm:p-4 text-xs space-y-1.5">
+                        <div className="grid grid-cols-12 py-0.5">
+                          <span className="col-span-4 text-slate-500 dark:text-dark-400 font-medium">Objet :</span>
+                          <span className="col-span-8 font-semibold text-slate-900 dark:text-white">{previewObjet}</span>
+                        </div>
+                        <div className="grid grid-cols-12 py-0.5">
+                          <span className="col-span-4 text-slate-500 dark:text-dark-400 font-medium">Accompagnateur :</span>
+                          <span className="col-span-8 font-semibold text-slate-900 dark:text-white">{previewAccomp}</span>
+                        </div>
+                        <div className="grid grid-cols-12 py-0.5">
+                          <span className="col-span-4 text-slate-500 dark:text-dark-400 font-medium">Date :</span>
+                          <span className="col-span-8 font-semibold text-slate-900 dark:text-white">{previewDate}</span>
+                        </div>
+                        <div className="grid grid-cols-12 py-0.5">
+                          <span className="col-span-4 text-slate-500 dark:text-dark-400 font-medium">Horaires :</span>
+                          <span className="col-span-8 font-semibold text-slate-900 dark:text-white">{previewHoraires}</span>
+                        </div>
+                        <div className="grid grid-cols-12 py-0.5">
+                          <span className="col-span-4 text-slate-500 dark:text-dark-400 font-medium">Lieu :</span>
+                          <span className="col-span-8 font-semibold text-slate-900 dark:text-white">{previewLieu}</span>
+                        </div>
+                      </div>
+
+                      {payload.commentaireEmail && (
+                        <div className="p-2.5 bg-sky-50 dark:bg-sky-950/30 border-l-2 border-sky-500 text-[11px] text-slate-700 dark:text-slate-300">
+                          <strong>Note de l'accompagnateur :</strong> « {payload.commentaireEmail} »
+                        </div>
+                      )}
+
+                      <p className="text-xs text-slate-600 dark:text-slate-400 pt-1">
+                        Nous comptons sur votre ponctualité et votre implication.
+                      </p>
+
+                      <hr className="border-slate-200 dark:border-dark-700 my-3" />
+
+                      <div className="text-xs">
+                        <p className="text-slate-600 dark:text-slate-400 mb-0.5">Bien cordialement,</p>
+                        <p className="font-bold text-slate-900 dark:text-white">L'équipe IDS Salé</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer Modal avec actions explicites */}
+                <div className="p-4 sm:px-6 border-t border-slate-100 dark:border-dark-800 bg-slate-50/70 dark:bg-dark-800/40 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+                  <button
+                    type="button"
+                    disabled={mailCustomModal.sending}
+                    onClick={() => setMailCustomModal(prev => ({ ...prev, isOpen: false }))}
+                    className="btn btn-secondary text-xs py-2.5 px-4 rounded-xl w-full sm:w-auto"
+                  >
+                    Annuler / Corriger les informations
+                  </button>
+
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    {mailCustomModal.mode === 'create' && (
+                      <button
+                        type="button"
+                        disabled={mailCustomModal.sending}
+                        onClick={() => handleConfirmSendRdv(false)}
+                        className="btn btn-secondary text-xs py-2.5 px-4 rounded-xl border border-slate-300 dark:border-dark-700 hover:bg-slate-200/50 flex-1 sm:flex-none cursor-pointer"
+                        title="Enregistrer le rendez-vous dans le planning sans envoyer d'email"
+                      >
+                        Enregistrer sans email
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      disabled={mailCustomModal.sending}
+                      onClick={() => handleConfirmSendRdv(true)}
+                      className="btn btn-primary text-xs py-2.5 px-5 rounded-xl flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-black shadow-md shadow-amber-600/25 flex-1 sm:flex-none cursor-pointer"
+                    >
+                      <Send size={14} />
+                      <span>{mailCustomModal.sending ? "Envoi en cours..." : (mailCustomModal.mode === 'resend' ? "Confirmer et renvoyer" : "Confirmer et envoyer l'invitation")}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
       </div>
     </div>
@@ -1260,15 +1620,26 @@ export default function BookingPage() {
 
           <div className="flex items-center gap-1">
             {rdv.type === 'rendezvous' && !isHistory && (
-              <button
-                type="button"
-                onClick={() => handleMarquerEffectue(rdv.originalId)}
-                className="px-2 py-1 text-[10px] font-bold rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 flex items-center gap-1"
-                title="Marquer comme effectué"
-              >
-                <CheckCircle2 size={12} />
-                <span>Effectué</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleOpenResendMailModal(rdv)}
+                  className="px-2 py-1 text-[10px] font-bold rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-700 dark:text-sky-300 flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Prévisualiser et renvoyer la convocation par email avec champ CC"
+                >
+                  <Mail size={11} />
+                  <span>Email</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMarquerEffectue(rdv.originalId)}
+                  className="px-2 py-1 text-[10px] font-bold rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 flex items-center gap-1"
+                  title="Marquer comme effectué"
+                >
+                  <CheckCircle2 size={12} />
+                  <span>Effectué</span>
+                </button>
+              </>
             )}
             {rdv.type === 'rendezvous' && (
               <button
