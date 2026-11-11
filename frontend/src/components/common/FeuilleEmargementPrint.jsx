@@ -382,47 +382,49 @@ export default function FeuilleEmargementPrint({
         }
       });
 
-      // 5. Zone de signature du Formateur (présente sur chaque page pour certification officielle)
-      // Cadre horizontal agrandi occupant toute la largeur disponible avec marges régulières
-      const boxWidth = contentWidth; // 182mm (largeur complète de la page A4 avec marges régulières)
-      const boxHeight = 28;
-      const boxX = marginX; // 14mm (aligné avec les marges gauche/droite du tableau)
-      const boxY = pageHeight - 16 - boxHeight; // 253mm
+      // 5. Zone de signature du Formateur (présente UNIQUEMENT sur la dernière page pour certification officielle)
+      if (isLastPage) {
+        // Cadre horizontal agrandi occupant toute la largeur disponible avec marges régulières
+        const boxWidth = contentWidth; // 182mm (largeur complète de la page A4 avec marges régulières)
+        const boxHeight = 28;
+        const boxX = marginX; // 14mm (aligné avec les marges gauche/droite du tableau)
+        const boxY = pageHeight - 16 - boxHeight; // 253mm (fixé au pied de la page)
 
-      // 1. Fond blanc global et bordure extérieure fine bleu marine (#1e40af)
-      doc.setDrawColor(30, 64, 175);
-      doc.setFillColor(255, 255, 255);
-      doc.setLineWidth(0.4);
-      doc.roundedRect(boxX, boxY, boxWidth, boxHeight, 2.5, 2.5, 'FD');
+        // 1. Fond blanc global et bordure extérieure fine bleu marine (#1e40af)
+        doc.setDrawColor(30, 64, 175);
+        doc.setFillColor(255, 255, 255);
+        doc.setLineWidth(0.4);
+        doc.roundedRect(boxX, boxY, boxWidth, boxHeight, 2.5, 2.5, 'FD');
 
-      // 2. Bandeau supérieur bleu clair (#e8f1fd) sur toute la largeur
-      doc.setFillColor(232, 241, 253);
-      doc.setDrawColor(30, 64, 175);
-      doc.roundedRect(boxX, boxY, boxWidth, 7, 2.5, 2.5, 'FD');
-      doc.setFillColor(232, 241, 253);
-      doc.rect(boxX + 0.2, boxY + 3.5, boxWidth - 0.4, 3.5, 'F');
+        // 2. Bandeau supérieur bleu clair (#e8f1fd) sur toute la largeur
+        doc.setFillColor(232, 241, 253);
+        doc.setDrawColor(30, 64, 175);
+        doc.roundedRect(boxX, boxY, boxWidth, 7, 2.5, 2.5, 'FD');
+        doc.setFillColor(232, 241, 253);
+        doc.rect(boxX + 0.2, boxY + 3.5, boxWidth - 0.4, 3.5, 'F');
 
-      // Ligne de délimitation sous le bandeau
-      doc.setDrawColor(191, 219, 254);
-      doc.setLineWidth(0.2);
-      doc.line(boxX, boxY + 7, boxX + boxWidth, boxY + 7);
+        // Ligne de délimitation sous le bandeau
+        doc.setDrawColor(191, 219, 254);
+        doc.setLineWidth(0.2);
+        doc.line(boxX, boxY + 7, boxX + boxWidth, boxY + 7);
 
-      // 3. Titre dans le bandeau : « Signature du formateur : »
-      doc.setFontSize(8.5);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(30, 58, 138); // #1e3a8a
-      doc.text('Signature du formateur :', boxX + 6, boxY + 4.8);
+        // 3. Titre dans le bandeau : « Signature du formateur : »
+        doc.setFontSize(8.5);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(30, 58, 138); // #1e3a8a
+        doc.text('Signature du formateur :', boxX + 6, boxY + 4.8);
 
-      // 4. Longue ligne horizontale bleue presque sur toute la largeur intérieure du cadre
-      const lineY = boxY + boxHeight - 4.5;
-      doc.setDrawColor(30, 64, 175); // bleue
-      doc.setLineWidth(0.3);
-      doc.line(boxX + 8, lineY, boxX + boxWidth - 8, lineY);
+        // 4. Longue ligne horizontale bleue presque sur toute la largeur intérieure du cadre
+        const lineY = boxY + boxHeight - 4.5;
+        doc.setDrawColor(30, 64, 175); // bleue
+        doc.setLineWidth(0.3);
+        doc.line(boxX + 8, lineY, boxX + boxWidth - 8, lineY);
 
-      // Redessiner la bordure extérieure pour une netteté parfaite
-      doc.setDrawColor(30, 64, 175);
-      doc.setLineWidth(0.4);
-      doc.roundedRect(boxX, boxY, boxWidth, boxHeight, 2.5, 2.5, 'D');
+        // Redessiner la bordure extérieure pour une netteté parfaite
+        doc.setDrawColor(30, 64, 175);
+        doc.setLineWidth(0.4);
+        doc.roundedRect(boxX, boxY, boxWidth, boxHeight, 2.5, 2.5, 'D');
+      }
 
       // 6. Pied de page officiel sur TOUTES les pages
       doc.setDrawColor(226, 232, 240);
@@ -790,25 +792,27 @@ export default function FeuilleEmargementPrint({
                   </div>
                 </div>
 
-                {/* PARTIE INFÉRIEURE DE LA PAGE : Signature (sur chaque page) et Pied de page */}
+                {/* PARTIE INFÉRIEURE DE LA PAGE : Signature (uniquement sur la dernière page) et Pied de page */}
                 <div className="pt-4">
-                  {/* 4. Zone de signature du Formateur (sur chaque page officielle) */}
-                  <div className="signatures-print-block pb-3 w-full text-xs">
-                    <div className="w-full border-[1.5px] border-[#1e40af] rounded-xl overflow-hidden bg-white shadow-sm flex flex-col justify-between">
-                      {/* Bandeau d'en-tête bleu clair avec titre bien visible et en gras */}
-                      <div className="bg-[#e8f1fd] px-5 py-2 border-b border-[#bfdbfe]/60">
-                        <p className="font-bold text-[#1e3a8a] text-xs">Signature du formateur :</p>
-                      </div>
+                  {/* 4. Zone de signature du Formateur (présente UNIQUEMENT sur la dernière page, fixée au pied de page) */}
+                  {isLastPage && (
+                    <div className="signatures-print-block pb-3 w-full text-xs">
+                      <div className="w-full border-[1.5px] border-[#1e40af] rounded-xl overflow-hidden bg-white shadow-sm flex flex-col justify-between">
+                        {/* Bandeau d'en-tête bleu clair avec titre bien visible et en gras */}
+                        <div className="bg-[#e8f1fd] px-5 py-2 border-b border-[#bfdbfe]/60">
+                          <p className="font-bold text-[#1e3a8a] text-xs">Signature du formateur :</p>
+                        </div>
 
-                      {/* Grande zone blanche pour une signature manuscrite confortable */}
-                      <div className="h-20 w-full bg-white"></div>
+                        {/* Grande zone blanche pour une signature manuscrite confortable */}
+                        <div className="h-20 w-full bg-white"></div>
 
-                      {/* Longue ligne horizontale bleue presque sur toute la largeur */}
-                      <div className="px-6 pb-4 pt-0">
-                        <div className="border-b-[1.5px] border-[#1e40af] w-full"></div>
+                        {/* Longue ligne horizontale bleue presque sur toute la largeur */}
+                        <div className="px-6 pb-4 pt-0">
+                          <div className="border-b-[1.5px] border-[#1e40af] w-full"></div>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* 5. Pied de page officiel sur TOUTES les pages */}
                   <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-500 font-mono">

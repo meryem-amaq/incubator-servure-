@@ -199,14 +199,16 @@ const generatePDFDocument = (incubeName, title, columns, data, signatureImage) =
     }
   });
 
-  const finalY = doc.lastAutoTable.finalY || 35;
+  const finalY = doc.lastAutoTable?.finalY || 35;
   const pageHeight = doc.internal.pageSize.height;
 
-  let sigY = finalY + 25;
-  if (sigY + 50 > pageHeight) {
+  // Si le contenu du tableau ne laisse pas assez d'espace au pied de page, ajouter une nouvelle page
+  if (finalY > pageHeight - 55) {
     doc.addPage();
-    sigY = 30;
   }
+
+  // Signature fixée au pied de la dernière page (même si la page est presque vide)
+  const sigY = pageHeight - 48;
 
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
@@ -666,14 +668,15 @@ export const generateGlobalPVDocument = (incube, rows = [], signatureImage = nul
   currentY = cardY + cardHeight + 8;
 
   // ==========================================
-  // SECTION 5 : VALIDATION ET ÉMARGEMENT
+  // SECTION 5 : VALIDATION ET ÉMARGEMENT (AU PIED DE PAGE)
   // ==========================================
-  if (currentY + 45 > pageHeight) {
+  if (currentY > pageHeight - 65) {
     doc.addPage();
-    currentY = 16;
   }
 
-  drawSectionHeader("5. VALIDATION ET ÉMARGEMENT", currentY);
+  // Fixation de la signature au pied de la dernière page (même si la page est presque vide)
+  const sigY = pageHeight - 50;
+  drawSectionHeader("5. VALIDATION ET ÉMARGEMENT", sigY - 12);
 
   doc.setFontSize(8);
   doc.setFont("helvetica", "italic");
@@ -681,10 +684,10 @@ export const generateGlobalPVDocument = (incube, rows = [], signatureImage = nul
   doc.text(
     "Les parties soussignées attestent de la conformité du présent procès-verbal et de l'exactitude des éléments mentionnés.",
     marginX + 6,
-    currentY + 5
+    sigY - 6
   );
 
-  drawPVSignatures(doc, signatureImage, currentY + 10, incubeName, accompagnateurName, pageWidth);
+  drawPVSignatures(doc, signatureImage, sigY, incubeName, accompagnateurName, pageWidth);
 
   // Numérotation des pages en pied de page
   const totalPages = doc.internal.getNumberOfPages();
@@ -845,21 +848,20 @@ export const generateSeancePVDocument = (incube, row = {}, signatureImage = null
   doc.setTextColor(51, 65, 85);
   doc.text(obsLines, 21, 119);
 
-  // 5. Section 3 : Attestation
-  let nextY = 111 + obsHeight + 10;
+  // 5. Section 3 : Attestation & Signatures (fixées au pied de la dernière page)
+  const contentEndY = 111 + obsHeight;
+  if (contentEndY > pageHeight - 65) {
+    doc.addPage();
+  }
+
+  // Fixation de la signature au pied de page (même si la page est presque vide)
+  const sigY = pageHeight - 50;
   doc.setFontSize(8);
   doc.setFont("helvetica", "italic");
   doc.setTextColor(100, 116, 139);
   const attestation = "Attestation : Les parties soussignées certifient l'exactitude des informations mentionnées ci-dessus et conviennent de poursuivre le plan d'action convenu.";
   const attLines = doc.splitTextToSize(attestation, pageWidth - 32);
-  doc.text(attLines, 16, nextY);
-
-  // 7. Signatures
-  let sigY = nextY + 10;
-  if (sigY + 45 > pageHeight) {
-    doc.addPage();
-    sigY = 25;
-  }
+  doc.text(attLines, 16, sigY - 8);
 
   drawPVSignatures(doc, signatureImage, sigY, incubeName, accompagnateurName, pageWidth);
 
@@ -1366,14 +1368,15 @@ export const generateQuarterlyPVDocument = (incube, options = {}, signatureImage
   currentY = cardY + cardHeight + 7;
 
   // ==========================================
-  // 7. VALIDATION ET ÉMARGEMENT (SIGNATURES)
+  // 7. VALIDATION ET ÉMARGEMENT (AU PIED DE PAGE)
   // ==========================================
-  if (currentY + 45 > pageHeight) {
+  if (currentY > pageHeight - 65) {
     doc.addPage();
-    currentY = 16;
   }
 
-  drawSectionHeader("7. ÉMARGEMENT & DOUBLE SIGNATURE OFFICIELLE", currentY);
+  // Fixation de la signature au pied de la dernière page (même si la page est presque vide)
+  const sigY = pageHeight - 50;
+  drawSectionHeader("7. ÉMARGEMENT & DOUBLE SIGNATURE OFFICIELLE", sigY - 12);
 
   doc.setFontSize(7.5);
   doc.setFont("helvetica", "italic");
@@ -1381,10 +1384,10 @@ export const generateQuarterlyPVDocument = (incube, options = {}, signatureImage
   doc.text(
     `Le présent procès-verbal trimestriel arrête l'état d'avancement du projet à l'issue du trimestre T${quarterNum} (${selectedYear}). Les soussignés en certifient la conformité.`,
     marginX + 6,
-    currentY + 4.5
+    sigY - 6
   );
 
-  drawPVSignatures(doc, signatureImage, currentY + 9, incubeName, accompagnateurName, pageWidth);
+  drawPVSignatures(doc, signatureImage, sigY, incubeName, accompagnateurName, pageWidth);
 
   // Numérotation finale de toutes les pages
   const totalPages = doc.internal.getNumberOfPages();
