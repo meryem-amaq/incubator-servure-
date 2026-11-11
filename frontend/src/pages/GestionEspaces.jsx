@@ -31,9 +31,12 @@ import {
   Image as ImageIcon,
   Bell,
   RefreshCw,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Download
 } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
+import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
+import jsPDF from 'jspdf';
+import { loadImageAsDataUrl } from '../utils/pdfExport';
 import toast from 'react-hot-toast';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -742,7 +745,7 @@ export default function GestionEspaces() {
 
 
       {/* SÉLECTEUR D'ESPACES (FABLAB / STUDIO / SALLE DE RÉUNION) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:hidden">
         {ESPACES.map(esp => {
           const statusInfo = getEspaceStatusInfo(esp.id);
           return (
@@ -817,7 +820,7 @@ export default function GestionEspaces() {
       </div>
 
       {/* 1. BARRE DE NAVIGATION PAR ONGLETS (DÉDIÉE ET AÉRÉE) */}
-      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-dark-700 pb-2.5 overflow-x-auto scrollbar-none flex-nowrap">
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-dark-700 pb-2.5 overflow-x-auto scrollbar-none flex-nowrap print:hidden">
         <button
           onClick={() => setActiveTab('demandes')}
           className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 whitespace-nowrap ${
@@ -865,7 +868,7 @@ export default function GestionEspaces() {
 
       {/* ALERTE VISUELLE EN CAS DE DEMANDES EN ATTENTE DANS D'AUTRES ESPACES */}
       {reservations.filter(r => r.statut === 'en_attente' && r.espace !== selectedEspace).length > 0 && (
-        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-amber-800 dark:text-amber-200 shadow-xs animate-fadeIn">
+        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-amber-800 dark:text-amber-200 shadow-xs animate-fadeIn print:hidden">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 animate-ping"></span>
             <span>
@@ -1667,41 +1670,278 @@ export default function GestionEspaces() {
       })()}
 
       {/* =========================================================================
-         ONGLET 4 : QR CODE UNIQUE DE RÉSERVATION D'ESPACE
+         ONGLET 4 : QR CODE UNIQUE DE RÉSERVATION D'ESPACE (AFFICHE OFFICIELLE A4)
          ========================================================================= */}
       {activeTab === 'qr' && (() => {
         const baseUrl = import.meta.env.VITE_CLOUD_URL || 'https://ids-production-app-6aba82b6af10.herokuapp.com';
-        const qrUrl = `${baseUrl}/booking/${selectedEspace}`;
-        const afficheTitle = `QR Code Officiel — ${currentEsp?.nom || 'Espace'}`;
+        const qrUrl = qrSousSalle && qrSousSalle !== 'all'
+          ? `${baseUrl}/booking/${selectedEspace}?salle=${encodeURIComponent(qrSousSalle)}`
+          : `${baseUrl}/booking/${selectedEspace}`;
+        const afficheTitle = qrSousSalle && qrSousSalle !== 'all'
+          ? `${currentEsp?.nom || 'Espace'} — ${qrSousSalle}`
+          : (currentEsp?.nom || 'Espace');
+
+        const handleDownloadPdf = async () => {
+          try {
+            toast.loading("Génération de l'affiche A4...", { id: 'pdf-affiche' });
+            const doc = new jsPDF({
+              orientation: 'portrait',
+              unit: 'mm',
+              format: 'a4'
+            });
+
+            const pageWidth = 210;
+            const pageHeight = 297;
+
+            // Cadre décoratif extérieur
+            doc.setDrawColor(203, 213, 225); // slate-300
+            doc.setLineWidth(0.6);
+            doc.rect(10, 10, pageWidth - 20, pageHeight - 20);
+
+            // Cadre principal intérieur couleur IDS
+            doc.setDrawColor(2, 132, 199); // sky-600 IDS
+            doc.setLineWidth(1.2);
+            doc.rect(12, 12, pageWidth - 24, pageHeight - 24);
+
+            // Chargement des deux logos officiels (IDS et CTPES)
+            let logoIds = null;
+            let logoCtpes = null;
+            try {
+              logoIds = await loadImageAsDataUrl('/logo-ids.png');
+              logoCtpes = await loadImageAsDataUrl('/logo-ctpes.png');
+            } catch (err) {
+              console.warn('Erreur chargement logos affiche:', err);
+            }
+
+            // En-tête institutionnel officiel — SANS "ROYAUME DU MAROC"
+            if (logoIds) {
+              doc.addImage(logoIds, 'PNG', 18, 16, 26, 26);
+            }
+            if (logoCtpes) {
+              doc.addImage(logoCtpes, 'PNG', pageWidth - 18 - 26, 16, 26, 26);
+            }
+
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(14);
+            doc.setTextColor(15, 23, 42); // slate-900
+            doc.text('INCUBATEUR DIGITAL SOLIDAIRE (IDS)', pageWidth / 2, 24, { align: 'center' });
+
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(71, 85, 105); // slate-600
+            doc.text("ESPACES D'INNOVATION & D'EXPÉRIMENTATION", pageWidth / 2, 30, { align: 'center' });
+
+            doc.setDrawColor(226, 232, 240);
+            doc.setLineWidth(0.4);
+            doc.line(18, 47, pageWidth - 18, 47);
+
+            // Badge officiel
+            doc.setFillColor(240, 249, 255);
+            doc.setDrawColor(186, 230, 253);
+            doc.roundedRect(pageWidth / 2 - 45, 54, 90, 8, 4, 4, 'FD');
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(8);
+            doc.setTextColor(2, 132, 199);
+            doc.text('RÉSERVATION OFFICIELLE EN LIGNE', pageWidth / 2, 59.5, { align: 'center' });
+
+            // Grand Titre de l'espace
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(22);
+            doc.setTextColor(15, 23, 42);
+            doc.text(afficheTitle.toUpperCase(), pageWidth / 2, 74, { align: 'center' });
+
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
+            doc.setTextColor(100, 116, 139);
+            doc.text(currentEsp?.desc || 'Plateforme de réservation des espaces et équipements', pageWidth / 2, 82, { align: 'center' });
+
+            // Récupération de l'image QR Code haute définition avec logo au centre
+            const canvasEl = document.getElementById('qr-canvas-espace');
+            if (canvasEl) {
+              const qrDataUrl = canvasEl.toDataURL('image/png');
+              const qrSize = 100;
+              const qrX = (pageWidth - qrSize) / 2;
+              const qrY = 94;
+
+              doc.setFillColor(255, 255, 255);
+              doc.setDrawColor(226, 232, 240);
+              doc.roundedRect(qrX - 6, qrY - 6, qrSize + 12, qrSize + 12, 6, 6, 'FD');
+
+              doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+            }
+
+            // Accroche sobre sous le QR code (sans liste verbeuse d'instructions)
+            const textY = 216;
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(14);
+            doc.setTextColor(2, 132, 199);
+            doc.text('Scannez pour réserver cet espace', pageWidth / 2, textY, { align: 'center' });
+
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9.5);
+            doc.setTextColor(100, 116, 139);
+            doc.text("Accédez instantanément au planning et soumettez votre demande en ligne", pageWidth / 2, textY + 7, { align: 'center' });
+
+            // Séparateur bas
+            doc.setDrawColor(226, 232, 240);
+            doc.line(30, 255, pageWidth - 30, 255);
+
+            // Pied de page institutionnel officiel
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.setTextColor(148, 163, 184);
+            doc.text("Incubateur Digital Solidaire (IDS) • Salé • CTPES • Document Officiel d'Affichage", pageWidth / 2, 265, { align: 'center' });
+
+            const fileName = `Affiche_Reservation_${(currentEsp?.nom || 'Espace').replace(/\s+/g, '_')}${qrSousSalle && qrSousSalle !== 'all' ? `_${qrSousSalle.replace(/\s+/g, '_')}` : ''}.pdf`;
+            doc.save(fileName);
+            toast.success("Affiche A4 téléchargée avec succès !", { id: 'pdf-affiche' });
+          } catch (err) {
+            console.error("Erreur génération affiche A4:", err);
+            toast.error("Erreur lors de la génération de l'affiche", { id: 'pdf-affiche' });
+          }
+        };
 
         return (
-          <div className="card p-8 border-2 border-emerald-500/30 text-center space-y-6 max-w-md mx-auto bg-white dark:bg-dark-900 shadow-xl">
-            <div className="space-y-1">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                Affiche Officielle de Réservation
-              </span>
-              <h3 className="font-black text-2xl text-slate-900 dark:text-white pt-2">
-                {afficheTitle}
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-dark-400">
-                Scannez ce QR code pour réserver directement cet espace
-              </p>
+          <div className="space-y-6 max-w-2xl mx-auto">
+            {/* SÉLECTEUR DE SOUS-SALLE / ATELIER POUR L'AFFICHE (SI APPLICABLE) */}
+            {currentEsp?.salles && currentEsp.salles.length > 1 && (
+              <div className="card p-3 bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 flex items-center justify-between gap-3 flex-wrap print:hidden">
+                <span className="text-xs font-bold text-slate-700 dark:text-dark-200">
+                  Afficher le QR Code pour :
+                </span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setQrSousSalle('all')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      qrSousSalle === 'all'
+                        ? 'bg-primary-500 text-[#001633] shadow-sm'
+                        : 'bg-slate-100 dark:bg-dark-800 text-slate-600 dark:text-dark-300 hover:bg-slate-200'
+                    }`}
+                  >
+                    Tout l'espace
+                  </button>
+                  {currentEsp.salles.map(s => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setQrSousSalle(s)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        qrSousSalle === s
+                          ? 'bg-primary-500 text-[#001633] shadow-sm'
+                          : 'bg-slate-100 dark:bg-dark-800 text-slate-600 dark:text-dark-300 hover:bg-slate-200'
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* BOUTONS D'ACTIONS (PDF VECTORIEL A4 & IMPRESSION DIRECTE) */}
+            <div className="flex items-center justify-center gap-3 print:hidden">
+              <button
+                type="button"
+                onClick={handleDownloadPdf}
+                className="btn btn-primary px-5 py-2.5 text-xs font-bold shadow-lg cursor-pointer flex items-center gap-2"
+                title="Télécharger l'affiche officielle au format PDF A4 haute définition prête pour impression"
+              >
+                <Download size={15} />
+                <span>Télécharger l'Affiche PDF (A4)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="btn btn-secondary px-5 py-2.5 text-xs font-bold shadow-md cursor-pointer flex items-center gap-2 border-slate-300 dark:border-dark-700"
+                title="Lancer l'impression directe de l'affiche A4"
+              >
+                <Printer size={15} />
+                <span>Imprimer l'Affiche</span>
+              </button>
             </div>
 
-            <div className="p-6 bg-slate-50 dark:bg-dark-800 rounded-3xl border-2 border-dashed border-emerald-500/40 inline-block shadow-inner mx-auto my-1">
-              <QRCodeSVG
+            {/* AFFICHE OFFICIELLE FORMAT A4 — PRÉVISUALISATION ET SUPPORT D'IMPRESSION */}
+            <div className="bg-white text-slate-900 border-2 border-slate-300 rounded-3xl p-8 sm:p-12 shadow-2xl relative text-center space-y-6 print:shadow-none print:border-none print:p-0 print:m-0">
+              {/* Double encadrement officiel pour impression */}
+              <div className="absolute inset-3 border-2 border-sky-600/40 rounded-2xl pointer-events-none print:inset-0"></div>
+
+              {/* En-tête avec les 2 logos officiels (IDS à gauche, CTPES à droite) — SANS "Royaume du Maroc" */}
+              <div className="flex items-center justify-between gap-4 pb-4 border-b border-slate-200 relative z-10">
+                <img src="/logo-ids.png" alt="Logo IDS" className="h-14 w-auto object-contain" />
+                <div className="text-center flex-1 px-2">
+                  <h2 className="text-sm sm:text-base font-black tracking-wide text-slate-900 uppercase">
+                    INCUBATEUR DIGITAL SOLIDAIRE (IDS)
+                  </h2>
+                  <p className="text-[10px] sm:text-xs font-semibold text-slate-500 tracking-wider uppercase mt-0.5">
+                    ESPACES D'INNOVATION & D'EXPÉRIMENTATION
+                  </p>
+                </div>
+                <img src="/logo-ctpes.png" alt="Logo CTPES" className="h-14 w-auto object-contain" />
+              </div>
+
+              {/* Badge et Titre de l'espace */}
+              <div className="space-y-2 relative z-10 pt-2">
+                <span className="inline-block text-[11px] font-extrabold uppercase tracking-widest px-4 py-1 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
+                  RÉSERVATION OFFICIELLE EN LIGNE
+                </span>
+                <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight pt-1">
+                  {afficheTitle.toUpperCase()}
+                </h1>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  {currentEsp?.desc || "Plateforme de réservation des espaces et équipements"}
+                </p>
+              </div>
+
+              {/* QR Code central haute résolution avec logo IDS au centre */}
+              <div className="relative z-10 p-6 sm:p-8 bg-slate-50 rounded-3xl border border-slate-200 inline-block shadow-inner mx-auto my-2">
+                <QRCodeSVG
+                  value={qrUrl}
+                  size={240}
+                  level="H"
+                  includeMargin={true}
+                  imageSettings={{
+                    src: '/logo-ids.png',
+                    height: 48,
+                    width: 48,
+                    excavate: true
+                  }}
+                />
+              </div>
+
+              {/* Accroche sobre sous le QR code (sans liste verbeuse d'instructions) */}
+              <div className="space-y-1 relative z-10">
+                <h3 className="text-base sm:text-lg font-bold text-sky-700">
+                  Scannez pour réserver cet espace
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Accédez instantanément au planning et soumettez votre demande en ligne
+                </p>
+              </div>
+
+              {/* Pied de page officiel */}
+              <div className="pt-6 border-t border-slate-200 text-[10px] text-slate-400 relative z-10 flex flex-col sm:flex-row items-center justify-between gap-1">
+                <span>Incubateur Digital Solidaire (IDS) • Salé</span>
+                <span>CTPES — Centre des Très Petites Entreprises Solidaires</span>
+              </div>
+            </div>
+
+            {/* QR Code Canvas invisible servant à l'export haute résolution vers jsPDF */}
+            <div className="hidden">
+              <QRCodeCanvas
+                id="qr-canvas-espace"
                 value={qrUrl}
-                size={240}
+                size={600}
                 level="H"
+                includeMargin={true}
+                imageSettings={{
+                  src: '/logo-ids.png',
+                  height: 110,
+                  width: 110,
+                  excavate: true
+                }}
               />
             </div>
-
-            <button
-              onClick={() => window.print()}
-              className="btn btn-primary w-full py-2.5 text-xs font-bold shadow-lg cursor-pointer flex items-center justify-center gap-2"
-            >
-              <Printer size={15} /> Imprimer l'Affiche QR Code ({currentEsp?.nom || 'Espace'})
-            </button>
           </div>
         );
       })()}
