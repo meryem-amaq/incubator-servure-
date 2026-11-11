@@ -741,7 +741,7 @@ export default function GestionEspaces() {
   }, [filteredReservations, resStatusFilter, resMoisFilter, resSearch]);
 
   return (
-    <div className="slide-up space-y-6 w-full pb-12">
+    <div className="slide-up space-y-6 w-full pb-12 print:p-0 print:m-0 print:pb-0 print:space-y-0">
 
 
       {/* SÉLECTEUR D'ESPACES (FABLAB / STUDIO / SALLE DE RÉUNION) */}
@@ -1790,7 +1790,7 @@ export default function GestionEspaces() {
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(8);
             doc.setTextColor(148, 163, 184);
-            doc.text("Incubateur Digital Solidaire (IDS) • Salé • CTPES • Document Officiel d'Affichage", pageWidth / 2, 265, { align: 'center' });
+            doc.text("Incubateur Digital Solidaire (IDS) • Salé • Document Officiel d'Affichage", pageWidth / 2, 265, { align: 'center' });
 
             const fileName = `Affiche_Reservation_${(currentEsp?.nom || 'Espace').replace(/\s+/g, '_')}${qrSousSalle && qrSousSalle !== 'all' ? `_${qrSousSalle.replace(/\s+/g, '_')}` : ''}.pdf`;
             doc.save(fileName);
@@ -1802,7 +1802,7 @@ export default function GestionEspaces() {
         };
 
         return (
-          <div className="space-y-6 max-w-2xl mx-auto">
+          <div className="affiche-espace-container space-y-6 max-w-xl mx-auto print:max-w-none print:w-full print:m-0 print:p-0 print:space-y-0">
             {/* SÉLECTEUR DE SOUS-SALLE / ATELIER POUR L'AFFICHE (SI APPLICABLE) */}
             {currentEsp?.salles && currentEsp.salles.length > 1 && (
               <div className="card p-3 bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 flex items-center justify-between gap-3 flex-wrap print:hidden">
@@ -1861,49 +1861,49 @@ export default function GestionEspaces() {
               </button>
             </div>
 
-            {/* AFFICHE OFFICIELLE FORMAT A4 — PRÉVISUALISATION ET SUPPORT D'IMPRESSION */}
-            <div className="bg-white text-slate-900 border-2 border-slate-300 rounded-3xl p-8 sm:p-12 shadow-2xl relative text-center space-y-6 print:shadow-none print:border-none print:p-0 print:m-0">
+            {/* AFFICHE OFFICIELLE FORMAT A4 — PRÉVISUALISATION ÉLÉGANTE ET SUPPORT D'IMPRESSION */}
+            <div className="affiche-espace-sheet relative text-center bg-white text-slate-900 border-2 border-slate-300 dark:border-dark-700 rounded-3xl p-6 sm:p-10 shadow-xl flex flex-col justify-between max-w-xl mx-auto min-h-[640px] sm:min-h-[720px]">
               {/* Double encadrement officiel pour impression */}
-              <div className="absolute inset-3 border-2 border-sky-600/40 rounded-2xl pointer-events-none print:inset-0"></div>
+              <div className="inner-frame absolute inset-2.5 sm:inset-3 border-2 border-sky-600/50 rounded-2xl pointer-events-none"></div>
 
               {/* En-tête avec les 2 logos officiels (IDS à gauche, CTPES à droite) — SANS "Royaume du Maroc" */}
-              <div className="flex items-center justify-between gap-4 pb-4 border-b border-slate-200 relative z-10">
-                <img src="/logo-ids.png" alt="Logo IDS" className="h-14 w-auto object-contain" />
-                <div className="text-center flex-1 px-2">
-                  <h2 className="text-sm sm:text-base font-black tracking-wide text-slate-900 uppercase">
+              <div className="flex items-center justify-between gap-3 pb-3 sm:pb-4 border-b border-slate-200 relative z-10">
+                <img src="/logo-ids.png" alt="Logo IDS" className="h-12 sm:h-14 md:h-16 w-auto object-contain shrink-0" />
+                <div className="text-center flex-1 px-1">
+                  <h2 className="text-xs sm:text-sm md:text-base font-black tracking-wide text-slate-900 uppercase">
                     INCUBATEUR DIGITAL SOLIDAIRE (IDS)
                   </h2>
-                  <p className="text-[10px] sm:text-xs font-semibold text-slate-500 tracking-wider uppercase mt-0.5">
+                  <p className="text-[9px] sm:text-[10px] md:text-xs font-semibold text-slate-500 tracking-wider uppercase mt-0.5">
                     ESPACES D'INNOVATION & D'EXPÉRIMENTATION
                   </p>
                 </div>
-                <img src="/logo-ctpes.png" alt="Logo CTPES" className="h-14 w-auto object-contain" />
+                <img src="/logo-ctpes.png" alt="Logo CTPES" className="h-12 sm:h-14 md:h-16 w-auto object-contain shrink-0" />
               </div>
 
               {/* Badge et Titre de l'espace */}
-              <div className="space-y-2 relative z-10 pt-2">
-                <span className="inline-block text-[11px] font-extrabold uppercase tracking-widest px-4 py-1 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
+              <div className="space-y-1.5 sm:space-y-2 relative z-10 pt-1">
+                <span className="inline-block text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest px-3 sm:px-4 py-1 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
                   RÉSERVATION OFFICIELLE EN LIGNE
                 </span>
-                <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight pt-1">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
                   {afficheTitle.toUpperCase()}
                 </h1>
-                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                <p className="text-[11px] sm:text-xs text-slate-500 max-w-md mx-auto">
                   {currentEsp?.desc || "Plateforme de réservation des espaces et équipements"}
                 </p>
               </div>
 
               {/* QR Code central haute résolution avec logo IDS au centre */}
-              <div className="relative z-10 p-6 sm:p-8 bg-slate-50 rounded-3xl border border-slate-200 inline-block shadow-inner mx-auto my-2">
+              <div className="relative z-10 p-5 sm:p-7 bg-slate-50 rounded-3xl border border-slate-200 inline-block shadow-inner mx-auto my-1">
                 <QRCodeSVG
                   value={qrUrl}
-                  size={240}
+                  size={220}
                   level="H"
                   includeMargin={true}
                   imageSettings={{
                     src: '/logo-ids.png',
-                    height: 48,
-                    width: 48,
+                    height: 46,
+                    width: 46,
                     excavate: true
                   }}
                 />
@@ -1914,15 +1914,14 @@ export default function GestionEspaces() {
                 <h3 className="text-base sm:text-lg font-bold text-sky-700">
                   Scannez pour réserver cet espace
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-[11px] sm:text-xs text-slate-500">
                   Accédez instantanément au planning et soumettez votre demande en ligne
                 </p>
               </div>
 
-              {/* Pied de page officiel */}
-              <div className="pt-6 border-t border-slate-200 text-[10px] text-slate-400 relative z-10 flex flex-col sm:flex-row items-center justify-between gap-1">
-                <span>Incubateur Digital Solidaire (IDS) • Salé</span>
-                <span>CTPES — Centre des Très Petites Entreprises Solidaires</span>
+              {/* Pied de page officiel — SANS "CTPES — Centre des Très Petites Entreprises Solidaires" */}
+              <div className="pt-3 sm:pt-4 border-t border-slate-200 text-[10px] sm:text-xs text-slate-400 font-medium relative z-10 text-center">
+                <span>Incubateur Digital Solidaire (IDS) • Salé • Document Officiel d'Affichage</span>
               </div>
             </div>
 

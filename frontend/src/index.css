@@ -291,4 +291,41 @@
     box-shadow: none !important;
     page-break-inside: avoid !important;
   }
+
+  /* Affiche Officielle de Réservation d'Espace (Impression A4 pleine page 1 page exacte) */
+  .affiche-espace-container {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .affiche-espace-sheet {
+    width: 100% !important;
+    max-width: none !important;
+    min-height: 250mm !important;
+    max-height: 265mm !important;
+    margin: 0 auto !important;
+    padding: 10mm 12mm !important;
+    border: 1.5px solid #cbd5e1 !important;
+    border-radius: 16px !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    box-sizing: border-box !important;
+    position: relative !important;
+  }
+
+  .affiche-espace-sheet .inner-frame {
+    position: absolute !important;
+    inset: 3mm !important;
+    border: 2px solid #0284c7 !important;
+    border-radius: 12px !important;
+    pointer-events: none !important;
+  }
 }
