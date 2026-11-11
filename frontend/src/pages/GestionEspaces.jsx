@@ -1714,11 +1714,13 @@ export default function GestionEspaces() {
             }
 
             // En-tête institutionnel officiel — SANS "ROYAUME DU MAROC"
+            // Logo IDS : format carré naturel (1:1) -> 22mm x 22mm
             if (logoIds) {
-              doc.addImage(logoIds, 'PNG', 18, 16, 26, 26);
+              doc.addImage(logoIds, 'PNG', 18, 16, 22, 22);
             }
+            // Logo CTPES : format rectangle horizontal naturel (1024x235, ratio 4.36:1) -> 48mm x 11mm
             if (logoCtpes) {
-              doc.addImage(logoCtpes, 'PNG', pageWidth - 18 - 26, 16, 26, 26);
+              doc.addImage(logoCtpes, 'PNG', pageWidth - 18 - 48, 21.5, 48, 11);
             }
 
             doc.setFont('helvetica', 'bold');
@@ -1733,7 +1735,7 @@ export default function GestionEspaces() {
 
             doc.setDrawColor(226, 232, 240);
             doc.setLineWidth(0.4);
-            doc.line(18, 47, pageWidth - 18, 47);
+            doc.line(18, 44, pageWidth - 18, 44);
 
             // Badge officiel
             doc.setFillColor(240, 249, 255);
@@ -1786,11 +1788,11 @@ export default function GestionEspaces() {
             doc.setDrawColor(226, 232, 240);
             doc.line(30, 255, pageWidth - 30, 255);
 
-            // Pied de page institutionnel officiel
+            // Pied de page institutionnel officiel — SANS localhost ni IP ni mention CTPES
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(8);
             doc.setTextColor(148, 163, 184);
-            doc.text("Incubateur Digital Solidaire (IDS) • Salé • Document Officiel d'Affichage", pageWidth / 2, 265, { align: 'center' });
+            doc.text("IDS — Incubateur Digital Solidaire • Salé • Document Officiel d'Affichage", pageWidth / 2, 265, { align: 'center' });
 
             const fileName = `Affiche_Reservation_${(currentEsp?.nom || 'Espace').replace(/\s+/g, '_')}${qrSousSalle && qrSousSalle !== 'all' ? `_${qrSousSalle.replace(/\s+/g, '_')}` : ''}.pdf`;
             doc.save(fileName);
@@ -1852,9 +1854,16 @@ export default function GestionEspaces() {
               </button>
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={() => {
+                  const oldTitle = document.title;
+                  document.title = " ";
+                  window.print();
+                  setTimeout(() => {
+                    document.title = oldTitle;
+                  }, 1000);
+                }}
                 className="btn btn-secondary px-5 py-2.5 text-xs font-bold shadow-md cursor-pointer flex items-center gap-2 border-slate-300 dark:border-dark-700"
-                title="Lancer l'impression directe de l'affiche A4"
+                title="Lancer l'impression directe de l'affiche A4 sans en-tête ni pied de page URL"
               >
                 <Printer size={15} />
                 <span>Imprimer l'Affiche</span>
@@ -1868,7 +1877,7 @@ export default function GestionEspaces() {
 
               {/* En-tête avec les 2 logos officiels (IDS à gauche, CTPES à droite) — SANS "Royaume du Maroc" */}
               <div className="flex items-center justify-between gap-3 pb-3 sm:pb-4 border-b border-slate-200 relative z-10">
-                <img src="/logo-ids.png" alt="Logo IDS" className="h-12 sm:h-14 md:h-16 w-auto object-contain shrink-0" />
+                <img src="/logo-ids.png" alt="Logo IDS" className="h-12 w-12 sm:h-14 sm:w-14 object-contain shrink-0" />
                 <div className="text-center flex-1 px-1">
                   <h2 className="text-xs sm:text-sm md:text-base font-black tracking-wide text-slate-900 uppercase">
                     INCUBATEUR DIGITAL SOLIDAIRE (IDS)
@@ -1877,7 +1886,7 @@ export default function GestionEspaces() {
                     ESPACES D'INNOVATION & D'EXPÉRIMENTATION
                   </p>
                 </div>
-                <img src="/logo-ctpes.png" alt="Logo CTPES" className="h-12 sm:h-14 md:h-16 w-auto object-contain shrink-0" />
+                <img src="/logo-ctpes.png" alt="Logo CTPES" className="h-8 sm:h-9 md:h-10 w-auto max-w-[130px] sm:max-w-[150px] object-contain shrink-0" />
               </div>
 
               {/* Badge et Titre de l'espace */}
@@ -1919,9 +1928,10 @@ export default function GestionEspaces() {
                 </p>
               </div>
 
-              {/* Pied de page officiel — SANS "CTPES — Centre des Très Petites Entreprises Solidaires" */}
-              <div className="pt-3 sm:pt-4 border-t border-slate-200 text-[10px] sm:text-xs text-slate-400 font-medium relative z-10 text-center">
-                <span>Incubateur Digital Solidaire (IDS) • Salé • Document Officiel d'Affichage</span>
+              {/* Pied de page officiel — SANS localhost, SANS IP, SANS mention CTPES */}
+              <div className="pt-3 sm:pt-4 border-t border-slate-200 text-[10px] sm:text-xs text-slate-500 font-medium relative z-10 flex items-center justify-between px-2">
+                <span>IDS — Incubateur Digital Solidaire • Salé</span>
+                <span>Document Officiel d'Affichage</span>
               </div>
             </div>
 

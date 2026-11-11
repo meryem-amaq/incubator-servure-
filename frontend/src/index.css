@@ -196,7 +196,7 @@
 @media print {
   @page {
     size: A4 portrait;
-    margin: 10mm 12mm 10mm 12mm;
+    margin: 0 !important; /* Supprime complètement les en-têtes (Date, Titre) et pieds de page (URL, localhost, IP) natifs du navigateur */
   }
 
   /* Masquer toute la navigation, les barres d'outils et l'interface Web normale */
@@ -292,21 +292,29 @@
     page-break-inside: avoid !important;
   }
 
-  /* Affiche Officielle de Réservation d'Espace (Impression A4 pleine page 1 page exacte) */
+  /* Affiche Officielle de Réservation d'Espace (Impression A4 pleine page 1 page exacte sans en-tête ni pied de page navigateur) */
   .affiche-espace-container {
-    width: 100% !important;
-    max-width: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
+    width: 210mm !important;
+    max-width: 210mm !important;
+    min-height: 297mm !important;
+    height: 297mm !important;
+    margin: 0 auto !important;
+    padding: 10mm 12mm !important;
+    box-sizing: border-box !important;
+    background: #ffffff !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
   }
 
   .affiche-espace-sheet {
     width: 100% !important;
     max-width: none !important;
-    min-height: 250mm !important;
-    max-height: 265mm !important;
+    min-height: 275mm !important;
+    max-height: 277mm !important;
+    height: 100% !important;
     margin: 0 auto !important;
-    padding: 10mm 12mm !important;
+    padding: 8mm 10mm !important;
     border: 1.5px solid #cbd5e1 !important;
     border-radius: 16px !important;
     background: #ffffff !important;
