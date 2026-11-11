@@ -1708,24 +1708,25 @@ export default function GestionEspaces() {
             }
 
             // En-tête institutionnel officiel — SANS "ROYAUME DU MAROC"
-            // Logo IDS : format carré naturel (1:1) -> 22mm x 22mm
+            // Logo IDS : format carré naturel (1:1) -> 20mm x 20mm
             if (logoIds) {
-              doc.addImage(logoIds, 'PNG', 18, 16, 22, 22);
+              doc.addImage(logoIds, 'PNG', 18, 17, 20, 20);
             }
-            // Logo CTPES : format rectangle horizontal naturel (1024x235, ratio 4.36:1) -> 48mm x 11mm
+            // Logo CTPES : format rectangle horizontal naturel (1024x235, ratio 4.36:1) -> 42mm x 9.6mm
             if (logoCtpes) {
-              doc.addImage(logoCtpes, 'PNG', pageWidth - 18 - 48, 21.5, 48, 11);
+              doc.addImage(logoCtpes, 'PNG', pageWidth - 18 - 42, 22.2, 42, 9.6);
             }
 
+            // Titre institutionnel centré avec espacement aéré garanti (> 2 cm d'écart avec chaque logo)
             doc.setFont('helvetica', 'bold');
-            doc.setFontSize(14);
+            doc.setFontSize(10.5);
             doc.setTextColor(15, 23, 42); // slate-900
-            doc.text('INCUBATEUR DIGITAL SOLIDAIRE (IDS)', pageWidth / 2, 24, { align: 'center' });
+            doc.text('INCUBATEUR DIGITAL SOLIDAIRE (IDS)', 94, 25, { align: 'center' });
 
             doc.setFont('helvetica', 'normal');
-            doc.setFontSize(9);
+            doc.setFontSize(7.5);
             doc.setTextColor(71, 85, 105); // slate-600
-            doc.text("ESPACES D'INNOVATION & D'EXPÉRIMENTATION", pageWidth / 2, 30, { align: 'center' });
+            doc.text("ESPACES D'INNOVATION & D'EXPÉRIMENTATION", 94, 30.5, { align: 'center' });
 
             doc.setDrawColor(226, 232, 240);
             doc.setLineWidth(0.4);
@@ -1834,17 +1835,17 @@ export default function GestionEspaces() {
               <div className="inner-frame absolute inset-2.5 sm:inset-3 border-2 border-sky-600/50 rounded-2xl pointer-events-none"></div>
 
               {/* En-tête avec les 2 logos officiels (IDS à gauche, CTPES à droite) — SANS "Royaume du Maroc" */}
-              <div className="flex items-center justify-between gap-3 pb-3 sm:pb-4 border-b border-slate-200 relative z-10">
-                <img src="/logo-ids.png" alt="Logo IDS" className="h-12 w-12 sm:h-14 sm:w-14 object-contain shrink-0" />
-                <div className="text-center flex-1 px-1">
-                  <h2 className="text-xs sm:text-sm md:text-base font-black tracking-wide text-slate-900 uppercase">
+              <div className="flex items-center justify-between gap-3 sm:gap-6 pb-3 sm:pb-4 border-b border-slate-200 relative z-10">
+                <img src="/logo-ids.png" alt="Logo IDS" className="h-10 w-10 sm:h-12 sm:w-12 object-contain shrink-0" />
+                <div className="text-center flex-1 px-2 sm:px-4 min-w-0">
+                  <h2 className="text-[11px] sm:text-[13px] md:text-sm font-black tracking-wide text-slate-900 uppercase whitespace-nowrap overflow-hidden text-ellipsis">
                     INCUBATEUR DIGITAL SOLIDAIRE (IDS)
                   </h2>
-                  <p className="text-[9px] sm:text-[10px] md:text-xs font-semibold text-slate-500 tracking-wider uppercase mt-0.5">
+                  <p className="text-[8px] sm:text-[9px] md:text-[10px] font-semibold text-slate-500 tracking-wider uppercase mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis">
                     ESPACES D'INNOVATION & D'EXPÉRIMENTATION
                   </p>
                 </div>
-                <img src="/logo-ctpes.png" alt="Logo CTPES" className="h-8 sm:h-9 md:h-10 w-auto max-w-[130px] sm:max-w-[150px] object-contain shrink-0" />
+                <img src="/logo-ctpes.png" alt="Logo CTPES" className="h-6 sm:h-7 md:h-8 w-auto max-w-[100px] sm:max-w-[125px] object-contain shrink-0" />
               </div>
 
               {/* Badge et Titre de l'espace */}
