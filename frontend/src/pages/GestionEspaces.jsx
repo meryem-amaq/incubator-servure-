@@ -91,7 +91,6 @@ export default function GestionEspaces() {
   });
   const currentEsp = useMemo(() => ESPACES.find(e => e.id === selectedEspace) || ESPACES[0], [selectedEspace]);
   const [selectedSousSalleFilter, setSelectedSousSalleFilter] = useState('all');
-  const [qrSousSalle, setQrSousSalle] = useState('all');
   const [activeTab, setActiveTab] = useState(() => {
     if (paramTab === 'etat' || paramTab === 'etat_materiel') return 'etat_materiel';
     if (paramTab && ['demandes', 'materiel', 'qr'].includes(paramTab)) return paramTab;
@@ -754,7 +753,6 @@ export default function GestionEspaces() {
               onClick={() => {
                 setSelectedEspace(esp.id);
                 setSelectedSousSalleFilter('all');
-                setQrSousSalle('all');
               }}
               className={`card p-5 text-left border-2 transition-all duration-200 cursor-pointer flex flex-col justify-between ${
                 selectedEspace === esp.id
@@ -1674,12 +1672,8 @@ export default function GestionEspaces() {
          ========================================================================= */}
       {activeTab === 'qr' && (() => {
         const baseUrl = import.meta.env.VITE_CLOUD_URL || 'https://ids-production-app-6aba82b6af10.herokuapp.com';
-        const qrUrl = qrSousSalle && qrSousSalle !== 'all'
-          ? `${baseUrl}/booking/${selectedEspace}?salle=${encodeURIComponent(qrSousSalle)}`
-          : `${baseUrl}/booking/${selectedEspace}`;
-        const afficheTitle = qrSousSalle && qrSousSalle !== 'all'
-          ? `${currentEsp?.nom || 'Espace'} — ${qrSousSalle}`
-          : (currentEsp?.nom || 'Espace');
+        const qrUrl = `${baseUrl}/booking/${selectedEspace}`;
+        const afficheTitle = currentEsp?.nom || 'Espace';
 
         const handleDownloadPdf = async () => {
           try {
@@ -1794,7 +1788,7 @@ export default function GestionEspaces() {
             doc.setTextColor(148, 163, 184);
             doc.text("IDS — Incubateur Digital Solidaire • Salé • Document Officiel d'Affichage", pageWidth / 2, 265, { align: 'center' });
 
-            const fileName = `Affiche_Reservation_${(currentEsp?.nom || 'Espace').replace(/\s+/g, '_')}${qrSousSalle && qrSousSalle !== 'all' ? `_${qrSousSalle.replace(/\s+/g, '_')}` : ''}.pdf`;
+            const fileName = `Affiche_Reservation_${(currentEsp?.nom || 'Espace').replace(/\s+/g, '_')}.pdf`;
             doc.save(fileName);
             toast.success("Affiche A4 téléchargée avec succès !", { id: 'pdf-affiche' });
           } catch (err) {
@@ -1805,42 +1799,6 @@ export default function GestionEspaces() {
 
         return (
           <div className="affiche-espace-container space-y-6 max-w-xl mx-auto print:max-w-none print:w-full print:m-0 print:p-0 print:space-y-0">
-            {/* SÉLECTEUR DE SOUS-SALLE / ATELIER POUR L'AFFICHE (SI APPLICABLE) */}
-            {currentEsp?.salles && currentEsp.salles.length > 1 && (
-              <div className="card p-3 bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 flex items-center justify-between gap-3 flex-wrap print:hidden">
-                <span className="text-xs font-bold text-slate-700 dark:text-dark-200">
-                  Afficher le QR Code pour :
-                </span>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={() => setQrSousSalle('all')}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      qrSousSalle === 'all'
-                        ? 'bg-primary-500 text-[#001633] shadow-sm'
-                        : 'bg-slate-100 dark:bg-dark-800 text-slate-600 dark:text-dark-300 hover:bg-slate-200'
-                    }`}
-                  >
-                    Tout l'espace
-                  </button>
-                  {currentEsp.salles.map(s => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setQrSousSalle(s)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                        qrSousSalle === s
-                          ? 'bg-primary-500 text-[#001633] shadow-sm'
-                          : 'bg-slate-100 dark:bg-dark-800 text-slate-600 dark:text-dark-300 hover:bg-slate-200'
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* BOUTONS D'ACTIONS (PDF VECTORIEL A4 & IMPRESSION DIRECTE) */}
             <div className="flex items-center justify-center gap-3 print:hidden">
               <button
