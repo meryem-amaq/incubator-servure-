@@ -130,7 +130,7 @@ export default function Evenements() {
     heureFin: '12:30',
     duree: '3h00',
     description: '',
-    envoyerEmail: true,
+    envoyerEmail: false,
     targetMode: 'all', // 'all' ou 'selection'
     selectedIncubes: []
   });
@@ -285,38 +285,17 @@ export default function Evenements() {
       localStorage.setItem('ids_ateliers_list', JSON.stringify([item, ...formations]));
     }
 
-    // Envoi direct des invitations par email si l'option est cochée
+    // Si l'option d'envoi d'email est cochée, ouvrir la modale de personnalisation au lieu d'envoyer directement en aveugle
+    toast.success(`Atelier "${item.titre}" planifié avec succès !`);
+
     if (newFormation.envoyerEmail && targetIncubeIds.length > 0) {
-      try {
-        const res = await fetch(`/api/evenements/${newId}/notifier`, {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({
-            evenement: {
-              titre: item.titre,
-              formateur: item.formateur,
-              intervenant: item.intervenant,
-              date: item.date,
-              heureDebut: item.heureDebut || '09:30',
-              heureFin: item.heureFin || '12:30',
-              duree: item.duree || '3h00',
-              description: item.description
-            },
-            incubeIds: newFormation.targetMode === 'all' ? undefined : targetIncubeIds
-          })
-        });
-        const resData = await res.json();
-        if (resData.success) {
-          toast.success(`🎉 Atelier créé & invitations transmises par email (${resData.sentCount || targetIncubeIds.length} incubé(s)) !`, { duration: 5000 });
-        } else {
-          toast.success(`Atelier "${item.titre}" planifié avec succès !`);
-        }
-      } catch (err) {
-        console.error("Erreur lors de l'envoi des invitations:", err);
-        toast.success(`Atelier "${item.titre}" planifié avec succès !`);
-      }
-    } else {
-      toast.success(`Atelier "${item.titre}" planifié avec succès !`);
+      const targetList = newFormation.targetMode === 'all'
+        ? allIncubes
+        : allIncubes.filter(i => targetIncubeIds.includes(i.id));
+
+      setTimeout(() => {
+        handleOpenMailCustomModal('convocation', { ...item, id: createdId }, targetList);
+      }, 350);
     }
 
     setIsSubmitting(false);
@@ -330,7 +309,7 @@ export default function Evenements() {
       heureFin: '12:30',
       duree: '3h00',
       description: '',
-      envoyerEmail: true,
+      envoyerEmail: false,
       targetMode: 'all',
       selectedIncubes: []
     });
@@ -2055,10 +2034,10 @@ export default function Evenements() {
                     <div>
                       <span className="block text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5">
                         <Mail size={14} className="text-primary-600 dark:text-primary-400" />
-                        Envoyer directement l'invitation par email aux incubés
+                        Préparer et personnaliser l'invitation par email aux incubés
                       </span>
                       <span className="block text-[11px] text-slate-500 dark:text-dark-400 mt-0.5">
-                        Une invitation personnalisée contenant la description, les horaires et le lien d'émargement leur sera transmise immédiatement.
+                        Une fenêtre s'ouvrira après la création pour vous permettre de modifier le texte, d'ajouter un CC et de prévisualiser l'email avant l'envoi.
                       </span>
                     </div>
                   </label>
@@ -2194,11 +2173,11 @@ export default function Evenements() {
                   {isSubmitting ? (
                     <span className="flex items-center gap-2">
                       <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full" />
-                      Création & Envoi des invitations...
+                      Création de l'atelier...
                     </span>
                   ) : (
                     <span className="flex items-center gap-1.5">
-                      <Plus size={15} /> Créer {newFormation.envoyerEmail ? '& Inviter' : "l'atelier"}
+                      <Plus size={15} /> Créer {newFormation.envoyerEmail ? '& Personnaliser l\'email' : "l'atelier"}
                     </span>
                   )}
                 </button>

@@ -1017,15 +1017,10 @@ export default function Formations() {
       toast.success('Session de formation modifiée avec succès !');
 
       if (editFormationForm.notifyByEmail && editFormationForm.selectedIncubes.length > 0) {
-        try {
-          await api.post(`/evenements/${editFormationForm.id}/notifier`, {
-            evenement: { id: editFormationForm.id, ...payload },
-            incubeIds: editFormationForm.selectedIncubes
-          });
-          toast.success(`Mise à jour envoyée par email à ${editFormationForm.selectedIncubes.length} incubé(s) !`);
-        } catch (mailErr) {
-          console.warn('Erreur envoi notification email:', mailErr);
-        }
+        const targetList = allIncubes.filter(i => editFormationForm.selectedIncubes.includes(i.id));
+        setTimeout(() => {
+          handleOpenMailCustomModal('convocation', { id: editFormationForm.id, ...payload }, targetList);
+        }, 350);
       }
 
       setEditingFormationItem(null);
@@ -2038,7 +2033,7 @@ export default function Formations() {
                     className="rounded border-slate-300 text-blue-500 focus:ring-blue-500"
                   />
                   <Mail size={13} className="text-blue-500" />
-                  <span>Envoyer une notification par email de la modification</span>
+                  <span>Préparer et personnaliser la notification par email de la modification</span>
                 </label>
               </div>
 
