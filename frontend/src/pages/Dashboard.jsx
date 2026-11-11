@@ -32,6 +32,7 @@ import toast from 'react-hot-toast';
 import { KpiEconomique, KpiDemographie, KpiAssiduite, KpiMaterielChart } from '../components/common/KpiCharts';
 import KpiMaterielInvestissement from '../components/common/KpiMaterielInvestissement';
 import DashboardPdfStage from '../components/common/DashboardPdfStage';
+import { loadImageAsDataUrl } from '../utils/pdfExport';
 
 const PHASE_COLORS = {
   Idéation: { badge: 'badge-navy', bar: 'bg-navy-500' },
@@ -115,6 +116,11 @@ export default function Dashboard() {
         scrollY: 0,
       });
 
+      const [logoIds, logoCtpes] = await Promise.all([
+        loadImageAsDataUrl('/logo-ids.png'),
+        loadImageAsDataUrl('/logo-ctpes.png')
+      ]);
+
       // Format Paysage A4 (297mm x 210mm)
       const pdf = new jsPDF('landscape', 'mm', 'a4');
       const pageWidth = 297;
@@ -140,10 +146,19 @@ export default function Dashboard() {
         pdf.setLineWidth(0.35);
         pdf.line(marginX, 16.5, pageWidth - marginX, 16.5);
 
+        // Logos officiels IDS et CTPES
+        if (logoIds) {
+          try { pdf.addImage(logoIds, 'PNG', marginX, 2, 12.5, 12.5); } catch (e) {}
+        }
+        if (logoCtpes) {
+          try { pdf.addImage(logoCtpes, 'PNG', pageWidth - marginX - 36, 3.5, 36, 9); } catch (e) {}
+        }
+
+        const titleX = logoIds ? marginX + 15 : marginX;
         pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(11);
+        pdf.setFontSize(10.5);
         pdf.setTextColor(15, 23, 42);
-        pdf.text("Tableau de Bord Exécutif & Indicateurs d'Impact — IDS", marginX, 8.5);
+        pdf.text("Tableau de Bord Exécutif & Indicateurs d'Impact — IDS", titleX, 8);
 
         pdf.setFont('helvetica', 'normal');
         pdf.setFontSize(7.5);
@@ -155,9 +170,7 @@ export default function Dashboard() {
           : (pageNum === 1
             ? `Page 1 sur 2 : Assiduité & Participation aux Ateliers  •  Promotion : ${promoLabel}`
             : `Page 2 sur 2 : Occupation des Espaces & Santé du Matériel  •  Promotion : ${promoLabel}`);
-        pdf.text(pageSubtitle, marginX, 13.5);
-
-        pdf.text(dateStr, pageWidth - marginX - pdf.getTextWidth(dateStr), 13.5);
+        pdf.text(pageSubtitle, titleX, 13);
 
         // Footer
         pdf.setDrawColor(226, 232, 240);
@@ -167,7 +180,7 @@ export default function Dashboard() {
         pdf.setFont('helvetica', 'normal');
         pdf.setFontSize(7.5);
         pdf.setTextColor(100, 116, 139);
-        pdf.text('Incubateur CGS — Programme Digital Solidaire (IDS) • Document Officiel Confidentiel', marginX, pageHeight - 4);
+        pdf.text(`Incubateur Digital Solidaire (IDS) • Document Officiel Confidentiel • ${dateStr}`, marginX, pageHeight - 4);
 
         const pageLabel = `Page ${pageNum} sur 2`;
         pdf.text(pageLabel, pageWidth - marginX - pdf.getTextWidth(pageLabel), pageHeight - 4);

@@ -1,6 +1,155 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+// ==========================================
+// 🎨 LOGOS ET EN-TÊTE OFFICIEL
+// ==========================================
+
+let cachedLogoIds = null;
+let cachedLogoCtpes = null;
+
+export const loadImageAsDataUrl = (url) => {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined') return resolve(null);
+    try {
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || img.width;
+          canvas.height = img.naturalHeight || img.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL('image/png'));
+        } catch {
+          resolve(null);
+        }
+      };
+      img.onerror = () => resolve(null);
+      img.src = url;
+    } catch {
+      resolve(null);
+    }
+  });
+};
+
+export const preloadLogos = async () => {
+  if (typeof window === 'undefined') return;
+  try {
+    const [ids, ctpes] = await Promise.all([
+      cachedLogoIds ? Promise.resolve(cachedLogoIds) : loadImageAsDataUrl('/logo-ids.png'),
+      cachedLogoCtpes ? Promise.resolve(cachedLogoCtpes) : loadImageAsDataUrl('/logo-ctpes.png')
+    ]);
+    if (ids) cachedLogoIds = ids;
+    if (ctpes) cachedLogoCtpes = ctpes;
+  } catch (e) {
+    console.warn('Erreur préchargement logos PDF:', e);
+  }
+};
+
+if (typeof window !== 'undefined') {
+  preloadLogos();
+}
+
+export const ensureLogosLoaded = async () => {
+  if (cachedLogoIds && cachedLogoCtpes) return { logoIds: cachedLogoIds, logoCtpes: cachedLogoCtpes };
+  await preloadLogos();
+  return { logoIds: cachedLogoIds, logoCtpes: cachedLogoCtpes };
+};
+
+export const drawOfficialHeader = (doc, title, subtitle = '', isLandscape = true) => {
+  const pageWidth = doc.internal.pageSize.width;
+  const marginX = 14;
+
+  if (isLandscape) {
+    // 1. Logo IDS (Gauche)
+    if (cachedLogoIds) {
+      try {
+        doc.addImage(cachedLogoIds, 'PNG', marginX, 7, 16, 16);
+      } catch (e) {}
+    }
+
+    // 2. Logo CTPES (Droite)
+    if (cachedLogoCtpes) {
+      try {
+        doc.addImage(cachedLogoCtpes, 'PNG', pageWidth - marginX - 44, 9, 44, 11);
+      } catch (e) {}
+    }
+
+    // 3. Titre central officiel
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 116, 139);
+    doc.text('ROYAUME DU MAROC', pageWidth / 2, 9, { align: 'center' });
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text('INCUBATEUR DIGITAL SOLIDAIRE (IDS)', pageWidth / 2, 14, { align: 'center' });
+
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(37, 99, 235);
+    doc.text(title, pageWidth / 2, 20, { align: 'center' });
+
+    if (subtitle) {
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 116, 139);
+      doc.text(subtitle, pageWidth / 2, 25, { align: 'center' });
+    }
+
+    // Ligne séparatrice
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.6);
+    doc.line(marginX, 28, pageWidth - marginX, 28);
+  } else {
+    // Portrait
+    // 1. Logo IDS (Gauche)
+    if (cachedLogoIds) {
+      try {
+        doc.addImage(cachedLogoIds, 'PNG', marginX, 7, 15, 15);
+      } catch (e) {}
+    }
+
+    // 2. Logo CTPES (Droite)
+    if (cachedLogoCtpes) {
+      try {
+        doc.addImage(cachedLogoCtpes, 'PNG', pageWidth - marginX - 40, 9, 40, 10);
+      } catch (e) {}
+    }
+
+    // 3. Titre central officiel
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 116, 139);
+    doc.text('ROYAUME DU MAROC', pageWidth / 2, 8.5, { align: 'center' });
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text('INCUBATEUR DIGITAL SOLIDAIRE (IDS)', pageWidth / 2, 13.5, { align: 'center' });
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(37, 99, 235);
+    doc.text(title, pageWidth / 2, 19.5, { align: 'center' });
+
+    if (subtitle) {
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 116, 139);
+      doc.text(subtitle, pageWidth / 2, 24.5, { align: 'center' });
+    }
+
+    // Ligne séparatrice
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.6);
+    doc.line(marginX, 27.5, pageWidth - marginX, 27.5);
+  }
+};
+
 const generatePDFDocument = (incubeName, title, columns, data, signatureImage) => {
   const doc = new jsPDF('landscape');
 
@@ -9,7 +158,7 @@ const generatePDFDocument = (incubeName, title, columns, data, signatureImage) =
   const subtitleText = `${incubeName ? incubeName + ' • ' : ''}Édité le ${today} à ${time}`;
 
   autoTable(doc, {
-    startY: 40,
+    startY: 34,
     head: [columns.map(c => c.header)],
     body: data.map(row => columns.map(c => {
       const val = row[c.dataKey];
@@ -31,24 +180,22 @@ const generatePDFDocument = (incubeName, title, columns, data, signatureImage) =
     alternateRowStyles: {
       fillColor: [248, 250, 252],
     },
-    margin: { top: 40, left: 14, right: 14, bottom: 60 },
+    margin: { top: 34, left: 14, right: 14, bottom: 60 },
     didDrawPage: function (data) {
-      // Titre principal
-      doc.setFontSize(16);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(15, 23, 42);
-      doc.text(title, data.settings.margin.left, 20);
+      drawOfficialHeader(doc, title, subtitleText, true);
 
-      // Sous-titre (Nom incubé + Date)
-      doc.setFontSize(11);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(100, 116, 139);
-      doc.text(subtitleText, data.settings.margin.left, 28);
-
-      // Ligne de séparation
-      doc.setDrawColor(203, 213, 225);
-      doc.setLineWidth(0.5);
-      doc.line(data.settings.margin.left, 32, doc.internal.pageSize.width - data.settings.margin.right, 32);
+      // Pied de page
+      const pageHeight = doc.internal.pageSize.height;
+      const pageWidth = doc.internal.pageSize.width;
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(148, 163, 184);
+      doc.text(
+        `Page ${data.pageNumber} • Document officiel Incubateur Digital Solidaire (IDS)`,
+        pageWidth / 2,
+        pageHeight - 5,
+        { align: 'center' }
+      );
     }
   });
 
@@ -130,12 +277,15 @@ export const getPDFBlobUrl = (incubeName, title, columns, data) => {
 // ==========================================
 
 const getAccompagnateurName = (incube) => {
+  if (incube?.accompagnateur && typeof incube.accompagnateur === 'string' && incube.accompagnateur.trim()) {
+    return incube.accompagnateur.trim();
+  }
   if (incube?.accompagnateurAdmin) {
     const { prenom, nom } = incube.accompagnateurAdmin;
     const full = `${prenom || ''} ${nom || ''}`.trim();
     if (full) return full;
   }
-  return 'Cellule d\'Accompagnement IDS';
+  return 'Accompagnateur référent — IDS Salé';
 };
 
 const formatDateFr = (dateStr) => {
@@ -249,87 +399,68 @@ export const generateGlobalPVDocument = (incube, rows = [], signatureImage = nul
   // ==========================================
   // EN-TÊTE DU DOCUMENT
   // ==========================================
-  doc.setFontSize(8.5);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(37, 99, 235);
-  doc.text("CENTRE DE GESTION SOLIDAIRE (CGS) • IDS INCUBATEUR", marginX, 12);
-
-  doc.setFontSize(15);
-  doc.setTextColor(15, 23, 42);
-  doc.text("FICHE DE SUIVI & PROCÈS-VERBAL", marginX, 20);
-
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(100, 116, 139);
-  doc.text(`Fiche de Suivi d'accompagnement • Réf : FS-PV-${incube?.pp_numero || 'INC'} • Dossier : ${incubeName}`, marginX, 26);
-
-  doc.setFontSize(8.5);
-  doc.text(`Édité le ${today} à ${time}`, pageWidth - marginX, 26, { align: 'right' });
-
-  // Séparateur supérieur
-  doc.setDrawColor(203, 213, 225);
-  doc.setLineWidth(0.6);
-  doc.line(marginX, 29, pageWidth - marginX, 29);
+  const subtitle = `Fiche de Suivi d'accompagnement • Réf : FS-PV-${incube?.pp_numero || 'INC'} • Dossier : ${incubeName} • Édité le ${today} à ${time}`;
+  drawOfficialHeader(doc, "FICHE DE SUIVI & PROCÈS-VERBAL", subtitle, true);
 
   // ==========================================
   // SECTION 1 : IDENTIFICATION DU DOSSIER
   // ==========================================
-  drawSectionHeader("1. IDENTIFICATION DU DOSSIER", 35);
+  drawSectionHeader("1. IDENTIFICATION DU DOSSIER", 34);
 
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(marginX, 38, contentWidth, 18, 2, 2, 'FD');
+  doc.roundedRect(marginX, 37, contentWidth, 18, 2, 2, 'FD');
 
   doc.setFontSize(8.5);
   // Colonne 1
   doc.setFont("helvetica", "bold");
   doc.setTextColor(71, 85, 105);
-  doc.text("• Porteur de projet :", marginX + 4, 45);
+  doc.text("• Porteur de projet :", marginX + 4, 44);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(15, 23, 42);
-  doc.text(incubeName, marginX + 38, 45);
+  doc.text(incubeName, marginX + 38, 44);
 
   doc.setFont("helvetica", "bold");
   doc.setTextColor(71, 85, 105);
-  doc.text("• Raison sociale :", marginX + 4, 51);
+  doc.text("• Raison sociale :", marginX + 4, 50);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(15, 23, 42);
-  doc.text(incube?.raison_sociale || '—', marginX + 38, 51);
+  doc.text(incube?.raison_sociale || '—', marginX + 38, 50);
 
   // Colonne 2
   doc.setFont("helvetica", "bold");
   doc.setTextColor(71, 85, 105);
-  doc.text("• N° Dossier :", marginX + 96, 45);
+  doc.text("• N° Dossier :", marginX + 96, 44);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(15, 23, 42);
-  doc.text(incube?.pp_numero || '—', marginX + 125, 45);
+  doc.text(incube?.pp_numero || '—', marginX + 125, 44);
 
   doc.setFont("helvetica", "bold");
   doc.setTextColor(71, 85, 105);
-  doc.text("• Phase actuelle :", marginX + 96, 51);
+  doc.text("• Phase actuelle :", marginX + 96, 50);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(15, 23, 42);
-  doc.text(incube?.phase_projet || '—', marginX + 125, 51);
+  doc.text(incube?.phase_projet || '—', marginX + 125, 50);
 
   // Colonne 3
   doc.setFont("helvetica", "bold");
   doc.setTextColor(71, 85, 105);
-  doc.text("• Accompagnateur :", marginX + 185, 45);
+  doc.text("• Accompagnateur :", marginX + 185, 44);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(15, 23, 42);
-  doc.text(accompagnateurName, marginX + 220, 45);
+  doc.text(accompagnateurName, marginX + 220, 44);
 
   doc.setFont("helvetica", "bold");
   doc.setTextColor(71, 85, 105);
-  doc.text("• Date du PV :", marginX + 185, 51);
+  doc.text("• Date du PV :", marginX + 185, 50);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(15, 23, 42);
-  doc.text(`${today} (${rows.length} séance(s))`, marginX + 220, 51);
+  doc.text(`${today} (${rows.length} séance(s))`, marginX + 220, 50);
 
   // ==========================================
   // SECTION 2 : HISTORIQUE & DÉROULEMENT DU SUIVI TECHNIQUE
   // ==========================================
-  drawSectionHeader("2. HISTORIQUE & DÉROULEMENT DU SUIVI TECHNIQUE", 63);
+  drawSectionHeader("2. HISTORIQUE & DÉROULEMENT DU SUIVI TECHNIQUE", 62);
 
   const columns = [
     { header: 'Séance', dataKey: 'numero_ordre' },
@@ -382,10 +513,10 @@ export const generateGlobalPVDocument = (incube, rows = [], signatureImage = nul
       5: { cellWidth: 'auto' },
       6: { cellWidth: 18, halign: 'center', fontStyle: 'bold' }
     },
-    margin: { top: 67, left: marginX, right: marginX, bottom: 40 }
+    margin: { top: 66, left: marginX, right: marginX, bottom: 40 }
   });
 
-  let currentY = doc.lastAutoTable.finalY || 67;
+  let currentY = doc.lastAutoTable.finalY || 66;
 
   // ==========================================
   // SECTION 3 : RESSOURCES HUMAINES & ÉQUIPE DU PROJET
@@ -563,7 +694,7 @@ export const generateGlobalPVDocument = (incube, rows = [], signatureImage = nul
     doc.setFont("helvetica", "normal");
     doc.setTextColor(148, 163, 184);
     doc.text(
-      `Page ${i} sur ${totalPages} • Document officiel CGS - IDS Incubateur • Émargement numérique certifié`,
+      `Page ${i} sur ${totalPages} • Document officiel Incubateur Digital Solidaire (IDS) • Émargement numérique certifié`,
       pageWidth / 2,
       pageHeight - 5,
       { align: 'center' }
@@ -600,127 +731,106 @@ export const generateSeancePVDocument = (incube, row = {}, signatureImage = null
   const numOrdre = row.numero_ordre || '1';
 
   // 1. En-tête
-  doc.setFontSize(8.5);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(37, 99, 235);
-  doc.text("ROYAUME DU MAROC • CENTRE DE GESTION SOLIDAIRE • IDS INCUBATEUR", 16, 15);
-
-  doc.setFontSize(15);
-  doc.setTextColor(15, 23, 42);
-  doc.text("FICHE DE SUIVI & PV DE SÉANCE", 16, 23);
-
-  doc.setFontSize(9.5);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(100, 116, 139);
-  doc.text(`Séance • Réf. FS-S${numOrdre}-${incube?.pp_numero || 'INC'}`, 16, 29);
-
-  doc.setFontSize(8.5);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(15, 23, 42);
-  doc.text(`Date de la séance : ${formatDateFr(row.date_suivi)}`, pageWidth - 16, 29, { align: 'right' });
-
-  // Séparateur
-  doc.setDrawColor(203, 213, 225);
-  doc.setLineWidth(0.6);
-  doc.line(16, 33, pageWidth - 16, 33);
+  const subtitle = `Séance N°${numOrdre} • Réf. FS-S${numOrdre}-${incube?.pp_numero || 'INC'} • Date : ${formatDateFr(row.date_suivi)} • Édité le ${today} à ${time}`;
+  drawOfficialHeader(doc, "FICHE DE SUIVI & PV DE SÉANCE", subtitle, false);
 
   // 2. Fiche d'identification du projet
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(16, 37, pageWidth - 32, 26, 2, 2, 'FD');
+  doc.roundedRect(16, 31, pageWidth - 32, 26, 2, 2, 'FD');
 
   doc.setFontSize(8.5);
   // Col 1
   doc.setFont("helvetica", "bold");
   doc.setTextColor(71, 85, 105);
-  doc.text("Porteur de projet :", 20, 44);
+  doc.text("Porteur de projet :", 20, 38);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(15, 23, 42);
-  doc.text(incubeName, 52, 44);
+  doc.text(incubeName, 52, 38);
 
   doc.setFont("helvetica", "bold");
   doc.setTextColor(71, 85, 105);
-  doc.text("Raison Sociale :", 20, 50);
+  doc.text("Raison Sociale :", 20, 44);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(15, 23, 42);
-  doc.text(incube?.raison_sociale || '—', 52, 50);
+  doc.text(incube?.raison_sociale || '—', 52, 44);
 
   doc.setFont("helvetica", "bold");
   doc.setTextColor(71, 85, 105);
-  doc.text("N° de Dossier :", 20, 56);
+  doc.text("N° de Dossier :", 20, 50);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(15, 23, 42);
-  doc.text(incube?.pp_numero || '—', 52, 56);
+  doc.text(incube?.pp_numero || '—', 52, 50);
 
   // Col 2
   doc.setFont("helvetica", "bold");
   doc.setTextColor(71, 85, 105);
-  doc.text("Phase du projet :", 112, 44);
+  doc.text("Phase du projet :", 112, 38);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(15, 23, 42);
-  doc.text(incube?.phase_projet || '—', 142, 44);
+  doc.text(incube?.phase_projet || '—', 142, 38);
 
   doc.setFont("helvetica", "bold");
   doc.setTextColor(71, 85, 105);
-  doc.text("Accompagnateur :", 112, 50);
+  doc.text("Accompagnateur :", 112, 44);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(15, 23, 42);
-  doc.text(accompagnateurName, 142, 50);
+  doc.text(accompagnateurName, 142, 44);
 
   doc.setFont("helvetica", "bold");
   doc.setTextColor(71, 85, 105);
-  doc.text("Secteur d'activité :", 112, 56);
+  doc.text("Secteur d'activité :", 112, 50);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(15, 23, 42);
-  doc.text(incube?.secteur_activite || '—', 142, 56);
+  doc.text(incube?.secteur_activite || '—', 142, 50);
 
   // 3. Section 1 : Objet & Évolutions
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(15, 23, 42);
-  doc.text("1. Objet de la Réunion & Évolutions constatées", 16, 68);
+  doc.text("1. Objet de la Réunion & Évolutions constatées", 16, 63);
 
   // Bannière Objet de la réunion
   doc.setFillColor(241, 245, 249);
   doc.setDrawColor(203, 213, 225);
-  doc.roundedRect(16, 71, pageWidth - 32, 11, 2, 2, 'FD');
+  doc.roundedRect(16, 66, pageWidth - 32, 11, 2, 2, 'FD');
   doc.setFontSize(8.5);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(15, 23, 42);
-  doc.text("Objet de la réunion :", 20, 78);
+  doc.text("Objet de la réunion :", 20, 73);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(37, 99, 235);
-  doc.text(row.objet_reunion || 'Séance de suivi périodique', 56, 78);
+  doc.text(row.objet_reunion || 'Séance de suivi périodique', 56, 73);
 
   // Deux cartes : Changement juridique & Changement d'avancement
   const cardW = (pageWidth - 32 - 8) / 2;
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(16, 85, cardW, 19, 2, 2, 'FD');
-  doc.roundedRect(16 + cardW + 8, 85, cardW, 19, 2, 2, 'FD');
+  doc.roundedRect(16, 80, cardW, 19, 2, 2, 'FD');
+  doc.roundedRect(16 + cardW + 8, 80, cardW, 19, 2, 2, 'FD');
 
   doc.setFontSize(8.5);
   // Carte gauche
   doc.setFont("helvetica", "bold");
   doc.setTextColor(71, 85, 105);
-  doc.text("Changement Juridique :", 20, 92);
+  doc.text("Changement Juridique :", 20, 87);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(37, 99, 235);
-  doc.text(row.statut_juridique || 'Non renseigné', 20, 99);
+  doc.text(row.statut_juridique || 'Non renseigné', 20, 94);
 
   // Carte droite
   doc.setFont("helvetica", "bold");
   doc.setTextColor(71, 85, 105);
-  doc.text("Changement de l'état d'avancement :", 16 + cardW + 12, 92);
+  doc.text("Changement de l'état d'avancement :", 16 + cardW + 12, 87);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(15, 23, 42);
-  doc.text(row.statut_avancement || 'Idéation', 16 + cardW + 12, 99);
+  doc.text(row.statut_avancement || 'Idéation', 16 + cardW + 12, 94);
 
   // 4. Section 2 : Observations de l'accompagnateur et recommandations
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(15, 23, 42);
-  doc.text("2. Observations de l'accompagnateur et recommandations", 16, 112);
+  doc.text("2. Observations de l'accompagnateur et recommandations", 16, 107);
 
   const obsText = row.observations?.trim() || "Séance de suivi conforme aux jalons fixés. Le porteur poursuit l'exécution de sa feuille de route.";
   const obsLines = doc.splitTextToSize(obsText, pageWidth - 42);
@@ -728,15 +838,15 @@ export const generateSeancePVDocument = (incube, row = {}, signatureImage = null
 
   doc.setFillColor(255, 255, 255);
   doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(16, 116, pageWidth - 32, obsHeight, 2, 2, 'FD');
+  doc.roundedRect(16, 111, pageWidth - 32, obsHeight, 2, 2, 'FD');
 
   doc.setFontSize(8.5);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(51, 65, 85);
-  doc.text(obsLines, 21, 124);
+  doc.text(obsLines, 21, 119);
 
   // 5. Section 3 : Attestation
-  let nextY = 116 + obsHeight + 10;
+  let nextY = 111 + obsHeight + 10;
   doc.setFontSize(8);
   doc.setFont("helvetica", "italic");
   doc.setTextColor(100, 116, 139);
@@ -757,7 +867,7 @@ export const generateSeancePVDocument = (incube, row = {}, signatureImage = null
   doc.setFontSize(7.5);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(148, 163, 184);
-  doc.text(`Document officiel édité le ${today} à ${time} • CGS - IDS Incubateur`, pageWidth / 2, pageHeight - 8, { align: 'center' });
+  doc.text(`Document officiel édité le ${today} à ${time} • Incubateur Digital Solidaire (IDS)`, pageWidth / 2, pageHeight - 8, { align: 'center' });
 
   return doc;
 };
@@ -827,27 +937,8 @@ export const generateQuarterlyPVDocument = (incube, options = {}, signatureImage
   // ==========================================
   // EN-TÊTE DU DOCUMENT
   // ==========================================
-  doc.setFontSize(8.5);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(37, 99, 235);
-  doc.text("CENTRE DE GESTION SOLIDAIRE (CGS) • IDS INCUBATEUR", marginX, 12);
-
-  doc.setFontSize(14);
-  doc.setTextColor(15, 23, 42);
-  doc.text("PROCÈS-VERBAL D'ÉVALUATION TRIMESTRIELLE (PV 3 MOIS)", marginX, 19);
-
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(100, 116, 139);
-  doc.text(`Réf : PV-TRI-T${quarterNum}-${selectedYear}-${incube?.pp_numero || 'INC'} • Dossier : ${incubeName} • Période : ${quarterLabel} ${selectedYear}`, marginX, 25);
-
-  doc.setFontSize(8.5);
-  doc.text(`Édité le ${today} à ${time}`, pageWidth - marginX, 25, { align: 'right' });
-
-  // Ligne de séparation
-  doc.setDrawColor(203, 213, 225);
-  doc.setLineWidth(0.6);
-  doc.line(marginX, 28, pageWidth - marginX, 28);
+  const subtitle = `Réf : PV-TRI-T${quarterNum}-${selectedYear}-${incube?.pp_numero || 'INC'} • Dossier : ${incubeName} • Période : ${quarterLabel} ${selectedYear} • Édité le ${today} à ${time}`;
+  drawOfficialHeader(doc, "PROCÈS-VERBAL D'ÉVALUATION TRIMESTRIELLE (PV 3 MOIS)", subtitle, true);
 
   // ==========================================
   // CARTOUCHE D'IDENTIFICATION
@@ -1303,7 +1394,7 @@ export const generateQuarterlyPVDocument = (incube, options = {}, signatureImage
     doc.setFont("helvetica", "normal");
     doc.setTextColor(148, 163, 184);
     doc.text(
-      `Page ${i} sur ${totalPages} • Document officiel CGS - IDS Incubateur • Procès-Verbal Trimestriel T${quarterNum} ${selectedYear}`,
+      `Page ${i} sur ${totalPages} • Document officiel Incubateur Digital Solidaire (IDS) • Procès-Verbal Trimestriel T${quarterNum} ${selectedYear}`,
       pageWidth / 2,
       pageHeight - 5,
       { align: 'center' }

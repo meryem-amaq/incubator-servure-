@@ -450,7 +450,7 @@ router.post('/directe', auth, requireStaff, async (req, res) => {
       }
     } catch (lookupErr) {}
 
-    const targetEmail = req.body.emailIncube || req.user?.email || 'admin@cgs.dz';
+    const targetEmail = req.body.emailIncube || req.user?.email || 'contact@ids.ma';
     const targetTelephone = req.body.telephoneIncube || req.user?.telephone || null;
 
     const reservation = await ReservationEspace.create({

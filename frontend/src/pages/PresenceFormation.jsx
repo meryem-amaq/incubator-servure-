@@ -424,7 +424,7 @@ export default function PresenceFormation() {
         )}
 
         <div className="text-center text-[11px] text-slate-500">
-          Système Sécurisé d'Assiduité Pédagogique • Incubateur CGS / IDS
+          Système Sécurisé d'Assiduité Pédagogique • Incubateur Digital Solidaire (IDS)
         </div>
       </div>
     </div>

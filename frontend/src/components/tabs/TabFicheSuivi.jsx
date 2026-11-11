@@ -27,7 +27,9 @@ import {
   exportSeancePVToPDF,
   getSeancePVBlobUrl,
   exportQuarterlyPVToPDF,
-  getQuarterlyPVBlobUrl
+  getQuarterlyPVBlobUrl,
+  preloadLogos,
+  ensureLogosLoaded
 } from '../../utils/pdfExport';
 
 const BASE_STATUT_OPTS = ['Auto-entrepreneur', 'SARL', 'SARL AU', 'Autre'];
@@ -141,6 +143,10 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
       console.warn("Erreur chargement rendez-vous incubé:", err);
     }
   };
+
+  useEffect(() => {
+    preloadLogos();
+  }, []);
 
   useEffect(() => {
     loadRendezVous();
@@ -290,11 +296,12 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
   };
 
   // Signature Fiche de Suivi Globale
-  const handleOpenGlobalPV = () => {
+  const handleOpenGlobalPV = async () => {
     if (!rows || rows.length === 0) {
       toast.error("Aucune séance de suivi enregistrée pour générer la Fiche de Suivi");
       return;
     }
+    await ensureLogosLoaded();
     setExportType('global');
     setSelectedRow(null);
     setSigModalTitle(`Signature de la Fiche de Suivi • ${incube?.nom_incube || 'Incubé'}`);
@@ -304,7 +311,8 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
   };
 
   // Signature PV de Séance individuelle
-  const handleOpenSeancePV = (row) => {
+  const handleOpenSeancePV = async (row) => {
+    await ensureLogosLoaded();
     setExportType('seance');
     setSelectedRow(row);
     const dateFormatted = formatDateFr(row.date_suivi);
@@ -315,7 +323,8 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
   };
 
   // Générer & Prévisualiser le PV Trimestriel
-  const handleOpenQuarterlyPV = () => {
+  const handleOpenQuarterlyPV = async () => {
+    await ensureLogosLoaded();
     setExportType('quarterly');
     setSelectedRow(null);
     setSigModalTitle(`Signature du PV Trimestriel (T${quarterlyConfig.quarter} ${quarterlyConfig.year}) • ${incube?.nom_incube || 'Incubé'}`);
@@ -329,7 +338,8 @@ export default function TabFicheSuivi({ incubeId, incube, fiches = [], onUpdate 
   };
 
   // Validation signature
-  const handleValidateSignature = (signatureImage) => {
+  const handleValidateSignature = async (signatureImage) => {
+    await ensureLogosLoaded();
     const safeName = (incube?.nom_incube || 'Incube').replace(/[^a-zA-Z0-9_-]/g, '_');
     const dateStamp = new Date().toISOString().split('T')[0];
 
