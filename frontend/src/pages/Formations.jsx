@@ -224,7 +224,9 @@ export default function Formations() {
   const [submittingEditFormation, setSubmittingEditFormation] = useState(false);
   const [sendingConvocations, setSendingConvocations] = useState(false);
   const [sendingReminder, setSendingReminder] = useState(false);
-  const [sendingSingleEmailId, setSendingSingleEmailId] = useState(null);
+  const [removingIncubeId, setRemovingIncubeId] = useState(null);
+  const [showAddParticipantSelect, setShowAddParticipantSelect] = useState(false);
+  const [selectedParticipantToAdd, setSelectedParticipantToAdd] = useState('');
 
   // Charger les présences réelles d'une session de formation
   const loadSessionPresences = async (formationId) => {
@@ -386,35 +388,78 @@ export default function Formations() {
     }
   };
 
-  // Renvoyer la convocation individuellement à un incubé spécifique
-  const handleSendSingleConvocation = async (formation, inc) => {
-    if (!inc?.email) {
-      toast.error(`Aucun email enregistré pour ${inc?.nom_incube || 'cet incubé'}`);
-      return;
-    }
-    setSendingSingleEmailId(inc.id);
+  // Retirer un incubé inscrit par erreur à cette session de formation (CRUD)
+  const handleRemoveIncubeFromFormation = async (formation, meta, inc) => {
+    if (!inc?.id || !formation?.id) return;
+    const nom = inc.nom_incube || 'cet incubé';
+    if (!window.confirm(`Retirer ${nom} de la liste des participants de cette formation ?`)) return;
+
+    setRemovingIncubeId(inc.id);
     try {
-      const res = await api.post(`/evenements/${formation.id}/notifier`, {
-        evenement: {
-          id: formation.id,
-          titre: formation.titre,
-          formateur: formation.formateur,
-          intervenant: formation.intervenant,
-          date: formation.date,
-          dateFin: formation.dateFin,
-          heureDebut: formation.heureDebut,
-          heureFin: formation.heureFin,
-          duree: formation.duree,
-          description: formation.description
-        },
-        incubeIds: [inc.id]
+      const currentInvites = Array.isArray(meta?.invitesIds) && meta.invitesIds.length > 0
+        ? meta.invitesIds.map(Number)
+        : allIncubes.map(i => Number(i.id));
+
+      const updatedInvites = currentInvites.filter(id => id !== Number(inc.id));
+      const updatedMeta = { ...meta, invitesIds: updatedInvites };
+
+      await api.put(`/ateliers/${formation.id}`, {
+        ...formation,
+        description: JSON.stringify(updatedMeta)
       });
-      toast.success(`📧 Convocation envoyée à ${inc.nom_incube} (${inc.email}) !`);
+
+      setParticipantsModalItem(prev => prev ? ({
+        ...prev,
+        formation: { ...prev.formation, description: JSON.stringify(updatedMeta) },
+        meta: updatedMeta
+      }) : null);
+
+      setRawAteliers(prev => prev.map(f => f.id === formation.id ? ({ ...f, description: JSON.stringify(updatedMeta) }) : f));
+      toast.success(`${nom} a été retiré de cette session.`);
     } catch (err) {
-      console.error('Erreur envoi individuel:', err);
-      toast.error(err.response?.data?.message || "Erreur lors de l'envoi de la convocation");
+      console.error('Erreur retrait incubé:', err);
+      toast.error(err.response?.data?.message || "Erreur lors du retrait de l'incubé");
     } finally {
-      setSendingSingleEmailId(null);
+      setRemovingIncubeId(null);
+    }
+  };
+
+  // Inscrire un incubé manquant à cette session de formation (CRUD)
+  const handleAddIncubeToFormation = async (formation, meta, incubeId) => {
+    if (!incubeId || !formation?.id) return;
+    const numId = Number(incubeId);
+    const targetInc = allIncubes.find(i => Number(i.id) === numId);
+    const nom = targetInc?.nom_incube || "L'incubé";
+
+    try {
+      const currentInvites = Array.isArray(meta?.invitesIds) && meta.invitesIds.length > 0
+        ? meta.invitesIds.map(Number)
+        : allIncubes.map(i => Number(i.id));
+
+      if (currentInvites.includes(numId)) {
+        toast.error(`${nom} est déjà inscrit à cette session`);
+        return;
+      }
+
+      const updatedInvites = [...currentInvites, numId];
+      const updatedMeta = { ...meta, invitesIds: updatedInvites };
+
+      await api.put(`/ateliers/${formation.id}`, {
+        ...formation,
+        description: JSON.stringify(updatedMeta)
+      });
+
+      setParticipantsModalItem(prev => prev ? ({
+        ...prev,
+        formation: { ...prev.formation, description: JSON.stringify(updatedMeta) },
+        meta: updatedMeta
+      }) : null);
+
+      setRawAteliers(prev => prev.map(f => f.id === formation.id ? ({ ...f, description: JSON.stringify(updatedMeta) }) : f));
+      toast.success(`${nom} a été inscrit avec succès à la session !`);
+    } catch (err) {
+      console.error('Erreur ajout incubé:', err);
+      toast.error(err.response?.data?.message || "Erreur lors de l'inscription de l'incubé");
     }
   };
 
@@ -2183,40 +2228,18 @@ export default function Formations() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 flex-wrap justify-end">
-                  <button
-                    type="button"
-                    onClick={() => handleSendFormationConvocations(formation, baseList)}
-                    disabled={sendingConvocations}
-                    className="btn btn-sm bg-blue-600 hover:bg-blue-700 text-white font-extrabold flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs shadow-md shadow-blue-700/20 cursor-pointer disabled:opacity-50"
-                    title={`Envoyer la convocation officielle par email à tous les incubés inscrits (${baseList.length})`}
-                  >
-                    <Mail size={14} />
-                    <span>{sendingConvocations ? 'Envoi...' : `📧 Convoquer (${baseList.length})`}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleSendFormationReminder(formation, baseList)}
-                    disabled={sendingReminder}
-                    className="btn btn-sm bg-sky-50 dark:bg-sky-950/30 hover:bg-sky-100 dark:hover:bg-sky-900/40 text-sky-800 dark:text-sky-300 font-extrabold flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs border border-sky-300 dark:border-sky-800 shadow-xs cursor-pointer disabled:opacity-50"
-                    title="Envoyer un rappel par email à tous les participants"
-                  >
-                    <Bell size={13} />
-                    <span className="hidden sm:inline">{sendingReminder ? 'Envoi...' : '🔔 Rappel'}</span>
-                  </button>
-
+                <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
                     onClick={() => setPrintModalFormation(formation)}
-                    className="btn btn-sm bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs shadow-md shadow-emerald-700/20 cursor-pointer"
+                    className="btn btn-sm bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs shadow-md shadow-emerald-700/20 cursor-pointer"
                     title="Imprimer la feuille d'émargement officielle (A4)"
                   >
                     <Printer size={14} />
                     <span className="hidden sm:inline">Imprimer Feuille (A4)</span>
                   </button>
                   <button 
-                    onClick={() => { setParticipantsModalItem(null); setParticipantFilter(''); setPresenceStatusFilter('all'); }}
+                    onClick={() => { setParticipantsModalItem(null); setParticipantFilter(''); setPresenceStatusFilter('all'); setShowAddParticipantSelect(false); }}
                     className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 dark:hover:bg-dark-700 transition-colors cursor-pointer"
                   >
                     <X size={18} />
@@ -2310,9 +2333,9 @@ export default function Formations() {
                   </button>
                 </div>
 
-                {/* Recherche & Refresh */}
-                <div className="flex items-center gap-2 flex-1 sm:max-w-xs">
-                  <div className="relative flex-1">
+                {/* Recherche, Refresh & Inscription */}
+                <div className="flex items-center gap-2 flex-1 sm:max-w-md justify-end flex-wrap">
+                  <div className="relative flex-1 min-w-[140px]">
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       type="text"
@@ -2330,8 +2353,61 @@ export default function Formations() {
                   >
                     <RefreshCw size={14} className={loadingPresences ? 'animate-spin' : ''} />
                   </button>
+
+                  {nonInvitedIncubes.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAddParticipantSelect(prev => !prev)}
+                      className="btn btn-sm bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
+                      title="Inscrire un autre incubé à cette session"
+                    >
+                      <Plus size={14} />
+                      <span className="hidden sm:inline">+ Inscrire</span>
+                    </button>
+                  )}
                 </div>
               </div>
+
+              {/* Barre d'inscription rapide d'un incubé */}
+              {showAddParticipantSelect && (
+                <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border-b border-amber-200 dark:border-amber-800/40 flex items-center gap-2.5 flex-wrap text-xs shrink-0">
+                  <span className="font-extrabold text-amber-900 dark:text-amber-300 flex items-center gap-1">
+                    <UserCheck size={14} /> Inscrire un incubé :
+                  </span>
+                  <select
+                    value={selectedParticipantToAdd}
+                    onChange={e => setSelectedParticipantToAdd(e.target.value)}
+                    className="select !py-1.5 !px-2.5 !text-xs bg-white dark:bg-dark-800 border-amber-300 dark:border-amber-700 rounded-xl flex-1 min-w-[200px]"
+                  >
+                    <option value="">-- Choisir un incubé à inscrire ({nonInvitedIncubes.length} disponible(s)) --</option>
+                    {nonInvitedIncubes.map(i => (
+                      <option key={i.id} value={i.id}>
+                        {i.nom_incube} {i.promotion ? `(${i.promotion})` : ''} {i.raison_sociale ? `• ${i.raison_sociale}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={!selectedParticipantToAdd}
+                    onClick={async () => {
+                      if (!selectedParticipantToAdd) return;
+                      await handleAddIncubeToFormation(formation, meta, selectedParticipantToAdd);
+                      setSelectedParticipantToAdd('');
+                      setShowAddParticipantSelect(false);
+                    }}
+                    className="btn btn-sm bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-3 py-1.5 rounded-xl text-xs disabled:opacity-40 cursor-pointer"
+                  >
+                    Valider
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowAddParticipantSelect(false); setSelectedParticipantToAdd(''); }}
+                    className="btn btn-sm btn-secondary px-2.5 py-1.5 rounded-xl text-slate-600 text-xs cursor-pointer"
+                  >
+                    Annuler
+                  </button>
+                </div>
+              )}
 
 
 
@@ -2442,19 +2518,15 @@ export default function Formations() {
                             )}
                           </button>
 
-                          {/* Bouton Envoi Email Individuel */}
+                          {/* Bouton Retirer l'incubé de la session (si tapé par erreur) */}
                           <button
                             type="button"
-                            onClick={() => handleSendSingleConvocation(formation, inc)}
-                            disabled={!inc.email || sendingSingleEmailId === inc.id}
-                            className={`p-2 rounded-xl border text-xs transition cursor-pointer flex items-center justify-center shrink-0 ${
-                              !inc.email
-                                ? 'border-slate-200 dark:border-dark-700 text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-40'
-                                : 'border-blue-200 dark:border-blue-800/50 hover:bg-blue-50 dark:hover:bg-blue-950/30 text-blue-600 dark:text-blue-400'
-                            }`}
-                            title={inc.email ? `Envoyer la convocation par email à ${inc.nom_incube} (${inc.email})` : 'Aucune adresse email enregistrée'}
+                            onClick={() => handleRemoveIncubeFromFormation(formation, meta, inc)}
+                            disabled={removingIncubeId === inc.id}
+                            className="p-2 rounded-xl border border-rose-200 dark:border-rose-900/40 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition cursor-pointer shrink-0 disabled:opacity-40"
+                            title={`Retirer ${inc.nom_incube} de cette session de formation (si ajouté par erreur)`}
                           >
-                            <Mail size={13} className={sendingSingleEmailId === inc.id ? "animate-spin text-blue-500" : ""} />
+                            <Trash2 size={13} className={removingIncubeId === inc.id ? "animate-spin text-rose-500" : ""} />
                           </button>
                         </div>
                       </div>
