@@ -59,6 +59,7 @@ export default function BookingPage() {
   const [duree, setDuree] = useState('1h');
   const [sujet, setSujet] = useState('');
   const [commentaireEmail, setCommentaireEmail] = useState('');
+  const [ccRdv, setCcRdv] = useState('');
   const [lieu, setLieu] = useState('IDS Salé — Bureaux d’accompagnement');
   const [searchIncube, setSearchIncube] = useState('');
 
@@ -450,7 +451,7 @@ export default function BookingPage() {
       targetIncubes,
       customSubject: defaultSubject,
       customMessage: defaultMessage,
-      cc: '',
+      cc: (ccRdv || '').trim(),
       sending: false
     });
   };
@@ -1144,11 +1145,28 @@ export default function BookingPage() {
                   <label className="text-xs font-bold block mb-1">Lieu de la réunion</label>
                   <input
                     type="text"
-                    placeholder="Bureaux Incubateur IDS / Fablab ou Lien Visio"
+                    placeholder="IDS Salé — Bureaux d’accompagnement ou Lien Visio"
                     value={lieu}
                     onChange={(e) => setLieu(e.target.value)}
                     className="input !py-2 !text-xs"
                   />
+                </div>
+
+                {/* Copie (CC) — Optionnel */}
+                <div>
+                  <label className="text-xs font-bold block mb-1">
+                    Copie (CC) de l'invitation <span className="text-slate-400 font-normal">(Optionnel — laisser vide par défaut)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="ex: coach@ids.ma, direction@ids.ma (vide par défaut)"
+                    value={ccRdv}
+                    onChange={(e) => setCcRdv(e.target.value)}
+                    className="input !py-2 !text-xs font-medium"
+                  />
+                  <p className="text-[10px] text-slate-500 dark:text-dark-400 mt-1">
+                    Laissez vide si vous ne souhaitez mettre personne en copie. Vous pourrez également le modifier dans la fenêtre de prévisualisation.
+                  </p>
                 </div>
 
                 {/* Sélection des Incubés */}

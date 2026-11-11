@@ -49,6 +49,15 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
     return MOIS[curMonthIdx] || MOIS[0];
   }); // "tourniquets", "formations", "ateliers"
 
+  // Modal de prévisualisation et personnalisation avant envoi de l'alerte d'assiduité
+  const [alerteMailModal, setAlerteMailModal] = useState({
+    isOpen: false,
+    customSubject: '',
+    customMessage: '',
+    cc: '',
+    sending: false
+  });
+
   // Synchroniser automatiquement les pointages réels des tourniquets physiques ZKTeco (Porteur + Associés + Salariés RH)
   const handleSyncTourniquet = async (isSilent = false) => {
     const targetId = incubeId || incube?.id;
@@ -664,28 +673,44 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
     }
   };
 
-  // Envoyer un email d'alerte d'assiduité à l'incubé
-  const [sendingAlerte, setSendingAlerte] = useState(false);
-  const handleSendAlerteAssiduite = async () => {
+  // Envoyer un email d'alerte d'assiduité à l'incubé (avec modale de personnalisation préalable)
+  const handleOpenAlerteMailModal = () => {
     const targetId = incubeId || incube?.id;
     if (!targetId) {
       toast.error("Veuillez sélectionner un incubé.");
       return;
     }
 
+    const nom = incube?.nom_incube || 'Porteur de Projet';
+    const defaultSubject = `⚠️ Alerte Suivi d'Engagement & Assiduité — Année ${annee}`;
+    const defaultMessage = `Bonjour ${nom},\n\nNous vous adressons ce point relatif à votre assiduité et à votre implication dans le cadre de votre parcours d'accompagnement pour l'année ${annee}.\n\nL'assiduité aux ateliers, aux formations et le respect de votre calendrier constituent une condition indispensable pour valider votre accompagnement au sein de IDS Salé.`;
+
+    setAlerteMailModal({
+      isOpen: true,
+      customSubject: defaultSubject,
+      customMessage: defaultMessage,
+      cc: '',
+      sending: false
+    });
+  };
+
+  const handleConfirmSendAlerte = async () => {
+    const targetId = incubeId || incube?.id;
+    if (!targetId) return;
+
     const nom = incube?.nom_incube || 'cet incubé';
     const taux = stats.tauxFormationsReel;
     const heures = stats.moyenneHebdo !== '—' ? stats.moyenneHebdo : 0;
 
-    const confirmMsg = `Envoyer un email officiel de relance d'assiduité à ${nom} ?\n\n• Taux présence formations : ${taux}%\n• Moyenne hebdomadaire : ${heures}h / sem\n\nCet email notifiera l'incubé et lui demandera de régulariser sa situation.`;
-    if (!window.confirm(confirmMsg)) return;
-
-    setSendingAlerte(true);
+    setAlerteMailModal(prev => ({ ...prev, sending: true }));
     try {
       const res = await api.post(`/incubes/${targetId}/alerte-assiduite`, {
         tauxPresence: taux,
         moyenneHeures: parseFloat(heures) || 0,
-        annee
+        annee,
+        customSubject: alerteMailModal.customSubject,
+        customMessage: alerteMailModal.customMessage,
+        cc: (alerteMailModal.cc || '').trim()
       });
 
       if (res.data?.success) {
@@ -693,11 +718,11 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
       } else {
         toast.success("Alerte d'assiduité transmise !");
       }
+      setAlerteMailModal(prev => ({ ...prev, isOpen: false, sending: false }));
     } catch (err) {
       console.error("Erreur alerte assiduité:", err);
       toast.error(err.response?.data?.message || "Erreur lors de l'envoi de l'alerte d'assiduité");
-    } finally {
-      setSendingAlerte(false);
+      setAlerteMailModal(prev => ({ ...prev, sending: false }));
     }
   };
 
@@ -1060,13 +1085,12 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
 
           <button
             type="button"
-            className="btn btn-secondary btn-sm !py-1.5 !px-2.5 text-xs flex items-center gap-1.5 border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 font-bold shadow-sm whitespace-nowrap"
-            onClick={handleSendAlerteAssiduite}
-            disabled={sendingAlerte}
-            title="Envoyer un email officiel de relance d'assiduité à l'incubé"
+            className="btn btn-secondary btn-sm !py-1.5 !px-2.5 text-xs flex items-center gap-1.5 border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 font-bold shadow-sm whitespace-nowrap cursor-pointer"
+            onClick={handleOpenAlerteMailModal}
+            title="Prévisualiser et personnaliser l'email officiel de relance d'assiduité avec champ CC"
           >
             <Mail size={14} className="text-amber-500" />
-            <span>{sendingAlerte ? 'Envoi...' : 'Relancer par email'}</span>
+            <span>Relancer par email</span>
           </button>
 
           <button 
@@ -1873,6 +1897,218 @@ export default function TabEngagement({ incubeId, incube = null, data = [], onUp
             </div>
           </div>
         )}
+
+        {/* =========================================================================
+            MODAL DE PERSONNALISATION ET APERÇU DE L'ALERTE ASSIDUITÉ / ENGAGEMENT (STYLE IDS VALIDÉ)
+            ========================================================================= */}
+        {alerteMailModal.isOpen && (() => {
+          const nom = incube?.nom_incube || 'Porteur de Projet';
+          const emailIncube = incube?.email || '—';
+          const taux = stats.tauxFormationsReel;
+          const heures = stats.moyenneHebdo !== '—' ? stats.moyenneHebdo : 0;
+
+          const renderPreviewParagraphs = (text) => {
+            if (!text) return null;
+            return text.split(/\n\s*\n/).map((para, idx) => (
+              <p key={idx} className="mb-3 text-slate-800 dark:text-slate-200 text-xs sm:text-sm leading-relaxed whitespace-pre-line">
+                {para}
+              </p>
+            ));
+          };
+
+          return (
+            <div
+              className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+              onClick={() => !alerteMailModal.sending && setAlerteMailModal(prev => ({ ...prev, isOpen: false }))}
+            >
+              <div
+                className="bg-white dark:bg-dark-900 rounded-3xl border border-slate-200 dark:border-dark-700 shadow-2xl w-full max-w-5xl overflow-hidden max-h-[92vh] flex flex-col text-slate-900 dark:text-white slide-up"
+                onClick={e => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="p-4 sm:px-6 border-b border-slate-100 dark:border-dark-800 flex items-center justify-between bg-slate-50/70 dark:bg-dark-800/40 shrink-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center font-black shrink-0 bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                      <Mail size={20} />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
+                        Prévisualiser et personnaliser l'alerte d'assiduité
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-dark-400 truncate max-w-md mt-0.5">
+                        Relance pour {nom} ({emailIncube})
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={alerteMailModal.sending}
+                    onClick={() => setAlerteMailModal(prev => ({ ...prev, isOpen: false }))}
+                    className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 dark:hover:bg-dark-700 transition cursor-pointer"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {/* Body: 2 colonnes */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-slate-100 dark:divide-dark-800 flex-1 overflow-y-auto">
+                  {/* Colonne Gauche : Paramètres & Personnalisation */}
+                  <div className="lg:col-span-6 p-4 sm:p-6 space-y-4 overflow-y-auto">
+                    <div className="p-3 bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/40 rounded-2xl flex items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200 font-bold">
+                        <Users size={15} className="text-amber-600" />
+                        <span>Destinataire : {nom}</span>
+                      </div>
+                      <span className="text-[11px] text-slate-500 dark:text-dark-400 font-mono">
+                        {emailIncube}
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-dark-200 mb-1 flex items-center justify-between">
+                        <span>Copie (CC) — Optionnel :</span>
+                        <span className="text-[10px] text-slate-400 font-normal">Vide par défaut</span>
+                      </label>
+                      <div className="relative">
+                        <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={alerteMailModal.cc}
+                          onChange={e => setAlerteMailModal(p => ({ ...p, cc: e.target.value }))}
+                          placeholder="ex: administration@ids.ma, direction@ids.ma"
+                          className="input pl-9 !py-2 !text-xs w-full"
+                          disabled={alerteMailModal.sending}
+                        />
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        Permet de mettre l'administration ou un collègue en copie de cet avertissement.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-dark-200 mb-1">
+                        Objet de l'email :
+                      </label>
+                      <input
+                        type="text"
+                        value={alerteMailModal.customSubject}
+                        onChange={e => setAlerteMailModal(p => ({ ...p, customSubject: e.target.value }))}
+                        className="input !py-2 !text-xs w-full font-semibold"
+                        disabled={alerteMailModal.sending}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-dark-200 mb-1 flex items-center justify-between">
+                        <span>Texte d'introduction (personnalisable) :</span>
+                        <span className="text-[10px] text-primary-600 font-semibold">Texte modifiable</span>
+                      </label>
+                      <textarea
+                        rows={6}
+                        value={alerteMailModal.customMessage}
+                        onChange={e => setAlerteMailModal(p => ({ ...p, customMessage: e.target.value }))}
+                        placeholder="Saisissez ici le texte d'alerte..."
+                        className="input !py-2.5 !text-xs w-full leading-relaxed"
+                        disabled={alerteMailModal.sending}
+                      />
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        Vous pouvez adapter le ton du message. Les indicateurs calculés ci-dessous sont injectés automatiquement.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Colonne Droite : Prévisualisation en direct (Live Preview) */}
+                  <div className="lg:col-span-6 p-4 sm:p-6 bg-slate-50/60 dark:bg-dark-950/40 space-y-3 overflow-y-auto">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-dark-400 flex items-center gap-1.5">
+                        <Sparkles size={14} className="text-amber-500" />
+                        Aperçu en direct de l'email
+                      </span>
+                      <span className="text-[11px] font-mono text-slate-400">Modèle officiel IDS</span>
+                    </div>
+
+                    {/* Email Container Card */}
+                    <div className="bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 rounded-2xl p-5 sm:p-6 shadow-sm text-slate-900 dark:text-white text-xs sm:text-sm space-y-4 max-w-lg mx-auto">
+                      <div className="text-center">
+                        <h2 className="text-base sm:text-lg font-black tracking-tight text-slate-900 dark:text-white">
+                          Incubateur Digital Solidaire
+                        </h2>
+                        <div className="mt-2">
+                          <span className="inline-block bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300 px-3 py-1 rounded-full text-[10px] font-black tracking-wider uppercase">
+                            SUIVI D'ASSIDUITÉ & ENGAGEMENT
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Paragraphes dynamiques */}
+                      <div className="pt-2">
+                        {renderPreviewParagraphs(alerteMailModal.customMessage)}
+                      </div>
+
+                      {/* Tableau récapitulatif officiel verrouillé */}
+                      <div className="bg-slate-50 dark:bg-dark-800/80 border border-slate-200 dark:border-dark-700 rounded-xl p-3.5 sm:p-4 text-xs space-y-1.5">
+                        <div className="grid grid-cols-12 py-0.5">
+                          <span className="col-span-5 text-slate-500 dark:text-dark-400 font-medium">Taux de présence :</span>
+                          <span className="col-span-7 font-semibold text-slate-900 dark:text-white">{taux}% (Objectif minimal : 80%)</span>
+                        </div>
+                        <div className="grid grid-cols-12 py-0.5">
+                          <span className="col-span-5 text-slate-500 dark:text-dark-400 font-medium">Présence hebdo :</span>
+                          <span className="col-span-7 font-semibold text-slate-900 dark:text-white">{heures}h / sem (Attendu : 15h / sem)</span>
+                        </div>
+                        <div className="grid grid-cols-12 py-0.5">
+                          <span className="col-span-5 text-slate-500 dark:text-dark-400 font-medium">Période évaluée :</span>
+                          <span className="col-span-7 font-semibold text-slate-900 dark:text-white">Année {annee}</span>
+                        </div>
+                        <div className="grid grid-cols-12 py-0.5">
+                          <span className="col-span-5 text-slate-500 dark:text-dark-400 font-medium">Statut du suivi :</span>
+                          <span className="col-span-7 font-semibold text-amber-600 dark:text-amber-400">Régularisation requise</span>
+                        </div>
+                        <div className="grid grid-cols-12 py-0.5">
+                          <span className="col-span-5 text-slate-500 dark:text-dark-400 font-medium">Référent :</span>
+                          <span className="col-span-7 font-semibold text-slate-900 dark:text-white">Accompagnateur IDS Salé</span>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-slate-600 dark:text-slate-400 pt-1">
+                        Nous vous invitons à contacter rapidement votre accompagnateur référent pour faire le point sur votre calendrier ou régulariser vos présences.
+                      </p>
+
+                      <hr className="border-slate-200 dark:border-dark-700 my-3" />
+
+                      <div className="text-xs">
+                        <p className="text-slate-600 dark:text-slate-400 mb-0.5">Bien cordialement,</p>
+                        <p className="font-bold text-slate-900 dark:text-white">L'équipe Pédagogique — IDS Salé</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer Modal avec actions explicites */}
+                <div className="p-4 sm:px-6 border-t border-slate-100 dark:border-dark-800 bg-slate-50/70 dark:bg-dark-800/40 flex items-center justify-between gap-3 shrink-0">
+                  <button
+                    type="button"
+                    disabled={alerteMailModal.sending}
+                    onClick={() => setAlerteMailModal(prev => ({ ...prev, isOpen: false }))}
+                    className="btn btn-secondary text-xs py-2.5 px-4 rounded-xl"
+                  >
+                    Annuler
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={alerteMailModal.sending}
+                    onClick={handleConfirmSendAlerte}
+                    className="btn btn-primary text-xs py-2.5 px-5 rounded-xl flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-black shadow-md shadow-amber-600/25 cursor-pointer"
+                  >
+                    <Mail size={14} />
+                    <span>{alerteMailModal.sending ? "Envoi en cours..." : "Confirmer et envoyer l'alerte"}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
