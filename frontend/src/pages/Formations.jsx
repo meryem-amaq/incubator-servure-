@@ -33,7 +33,8 @@ import {
   Pencil,
   Layers,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Bell
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import api from '../api/axios';
@@ -221,6 +222,9 @@ export default function Formations() {
     notifyByEmail: false
   });
   const [submittingEditFormation, setSubmittingEditFormation] = useState(false);
+  const [sendingConvocations, setSendingConvocations] = useState(false);
+  const [sendingReminder, setSendingReminder] = useState(false);
+  const [sendingSingleEmailId, setSendingSingleEmailId] = useState(null);
 
   // Charger les présences réelles d'une session de formation
   const loadSessionPresences = async (formationId) => {
@@ -299,6 +303,118 @@ export default function Formations() {
       loadSessionPresences(fId);
     } catch (err) {
       toast.error('Erreur lors de la mise à jour de la présence');
+    }
+  };
+
+  // Envoyer la convocation officielle par email à tous les incubés inscrits
+  const handleSendFormationConvocations = async (formation, targetIncubesList) => {
+    if (!formation || !targetIncubesList || targetIncubesList.length === 0) {
+      toast.error("Aucun incubé inscrit pour l'envoi");
+      return;
+    }
+    const withEmail = targetIncubesList.filter(i => i.email && i.email.trim());
+    if (withEmail.length === 0) {
+      toast.error("Aucun des incubés inscrits n'a d'adresse email valide");
+      return;
+    }
+
+    setSendingConvocations(true);
+    try {
+      const res = await api.post(`/evenements/${formation.id}/notifier`, {
+        evenement: {
+          id: formation.id,
+          titre: formation.titre,
+          formateur: formation.formateur,
+          intervenant: formation.intervenant,
+          date: formation.date,
+          dateFin: formation.dateFin,
+          heureDebut: formation.heureDebut,
+          heureFin: formation.heureFin,
+          duree: formation.duree,
+          description: formation.description
+        },
+        incubeIds: withEmail.map(i => i.id)
+      });
+      if (res.data?.success) {
+        toast.success(res.data.message || `📧 Convocations transmises avec succès à ${res.data.sentCount || withEmail.length} incubé(s) !`, { duration: 4500 });
+      } else {
+        toast.success("Convocations transmises par email !");
+      }
+    } catch (err) {
+      console.error('Erreur envoi convocations formation:', err);
+      toast.error(err.response?.data?.message || err.message || "Erreur lors de l'envoi des convocations");
+    } finally {
+      setSendingConvocations(false);
+    }
+  };
+
+  // Envoyer un rappel par email à tous les participants
+  const handleSendFormationReminder = async (formation, targetIncubesList) => {
+    if (!formation || !targetIncubesList || targetIncubesList.length === 0) {
+      toast.error("Aucun incubé sélectionné");
+      return;
+    }
+    const withEmail = targetIncubesList.filter(i => i.email && i.email.trim());
+    if (withEmail.length === 0) {
+      toast.error("Aucun incubé avec adresse email valide");
+      return;
+    }
+
+    setSendingReminder(true);
+    try {
+      const res = await api.post(`/evenements/${formation.id}/rappel`, {
+        evenement: {
+          id: formation.id,
+          titre: formation.titre,
+          formateur: formation.formateur,
+          intervenant: formation.intervenant,
+          date: formation.date,
+          dateFin: formation.dateFin,
+          heureDebut: formation.heureDebut,
+          heureFin: formation.heureFin,
+          duree: formation.duree,
+          description: formation.description
+        },
+        incubeIds: withEmail.map(i => i.id)
+      });
+      toast.success(res.data?.message || `🔔 Rappels envoyés par email à ${res.data?.sentCount || withEmail.length} incubé(s) !`, { icon: '🔔' });
+    } catch (err) {
+      console.error('Erreur envoi rappel formation:', err);
+      toast.error(err.response?.data?.message || err.message || "Erreur lors de l'envoi des rappels");
+    } finally {
+      setSendingReminder(false);
+    }
+  };
+
+  // Renvoyer la convocation individuellement à un incubé spécifique
+  const handleSendSingleConvocation = async (formation, inc) => {
+    if (!inc?.email) {
+      toast.error(`Aucun email enregistré pour ${inc?.nom_incube || 'cet incubé'}`);
+      return;
+    }
+    setSendingSingleEmailId(inc.id);
+    try {
+      const res = await api.post(`/evenements/${formation.id}/notifier`, {
+        evenement: {
+          id: formation.id,
+          titre: formation.titre,
+          formateur: formation.formateur,
+          intervenant: formation.intervenant,
+          date: formation.date,
+          dateFin: formation.dateFin,
+          heureDebut: formation.heureDebut,
+          heureFin: formation.heureFin,
+          duree: formation.duree,
+          description: formation.description
+        },
+        incubeIds: [inc.id]
+      });
+      toast.success(`📧 Convocation envoyée à ${inc.nom_incube} (${inc.email}) !`);
+    } catch (err) {
+      console.error('Erreur envoi individuel:', err);
+      toast.error(err.response?.data?.message || "Erreur lors de l'envoi de la convocation");
+    } finally {
+      setSendingSingleEmailId(null);
     }
   };
 
@@ -2067,7 +2183,29 @@ export default function Formations() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 flex-wrap justify-end">
+                  <button
+                    type="button"
+                    onClick={() => handleSendFormationConvocations(formation, baseList)}
+                    disabled={sendingConvocations}
+                    className="btn btn-sm bg-blue-600 hover:bg-blue-700 text-white font-extrabold flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs shadow-md shadow-blue-700/20 cursor-pointer disabled:opacity-50"
+                    title={`Envoyer la convocation officielle par email à tous les incubés inscrits (${baseList.length})`}
+                  >
+                    <Mail size={14} />
+                    <span>{sendingConvocations ? 'Envoi...' : `📧 Convoquer (${baseList.length})`}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSendFormationReminder(formation, baseList)}
+                    disabled={sendingReminder}
+                    className="btn btn-sm bg-sky-50 dark:bg-sky-950/30 hover:bg-sky-100 dark:hover:bg-sky-900/40 text-sky-800 dark:text-sky-300 font-extrabold flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs border border-sky-300 dark:border-sky-800 shadow-xs cursor-pointer disabled:opacity-50"
+                    title="Envoyer un rappel par email à tous les participants"
+                  >
+                    <Bell size={13} />
+                    <span className="hidden sm:inline">{sendingReminder ? 'Envoi...' : '🔔 Rappel'}</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => setPrintModalFormation(formation)}
@@ -2303,6 +2441,21 @@ export default function Formations() {
                               </>
                             )}
                           </button>
+
+                          {/* Bouton Envoi Email Individuel */}
+                          <button
+                            type="button"
+                            onClick={() => handleSendSingleConvocation(formation, inc)}
+                            disabled={!inc.email || sendingSingleEmailId === inc.id}
+                            className={`p-2 rounded-xl border text-xs transition cursor-pointer flex items-center justify-center shrink-0 ${
+                              !inc.email
+                                ? 'border-slate-200 dark:border-dark-700 text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-40'
+                                : 'border-blue-200 dark:border-blue-800/50 hover:bg-blue-50 dark:hover:bg-blue-950/30 text-blue-600 dark:text-blue-400'
+                            }`}
+                            title={inc.email ? `Envoyer la convocation par email à ${inc.nom_incube} (${inc.email})` : 'Aucune adresse email enregistrée'}
+                          >
+                            <Mail size={13} className={sendingSingleEmailId === inc.id ? "animate-spin text-blue-500" : ""} />
+                          </button>
                         </div>
                       </div>
                     );
@@ -2310,7 +2463,7 @@ export default function Formations() {
                 )}
               </div>
 
-              {/* Footer Modal avec Bouton d'Impression Officielle A4 */}
+              {/* Footer Modal avec Bouton d'Impression Officielle A4 & Envoi Convocations */}
               <div className="p-3.5 sm:p-4 border-t border-slate-100 dark:border-dark-800 bg-slate-50/80 dark:bg-dark-800/40 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
                 <div className="text-xs text-slate-600 dark:text-dark-300 font-bold text-center sm:text-left">
                   <span>Total : {totalInscrits} participant(s)</span>
@@ -2325,6 +2478,26 @@ export default function Formations() {
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => handleSendFormationConvocations(formation, baseList)}
+                    disabled={sendingConvocations}
+                    className="btn btn-sm bg-blue-600 hover:bg-blue-700 text-white font-extrabold flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs shadow-md shadow-blue-700/20 cursor-pointer disabled:opacity-50"
+                    title={`Envoyer la convocation officielle par email à tous les incubés inscrits (${baseList.length})`}
+                  >
+                    <Mail size={15} />
+                    <span>{sendingConvocations ? 'Envoi en cours...' : `📧 Envoyer convocations (${baseList.length})`}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSendFormationReminder(formation, baseList)}
+                    disabled={sendingReminder}
+                    className="btn btn-sm bg-sky-50 dark:bg-sky-950/30 hover:bg-sky-100 dark:hover:bg-sky-900/40 text-sky-800 dark:text-sky-300 font-extrabold flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs border border-sky-300 dark:border-sky-800 shadow-xs cursor-pointer disabled:opacity-50"
+                    title="Envoyer un rappel par email à tous les participants"
+                  >
+                    <Bell size={14} />
+                    <span>{sendingReminder ? 'Envoi...' : '🔔 Rappel'}</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => setPrintModalFormation(formation)}
