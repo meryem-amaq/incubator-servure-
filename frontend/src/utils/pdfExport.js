@@ -1662,6 +1662,10 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
   const sec2Y = doc.lastAutoTable.finalY + 6;
   drawSectionTitle("2. RENSEIGNEMENTS ENTREPRISE & PROJET D'INCUBATION", sec2Y);
 
+  const rhPersonnel = Array.isArray(incube?.personnel) ? incube.personnel : [];
+  const rhCount = rhPersonnel.filter(p => p && p.nom_complet && String(p.nom_complet).trim() !== '').length;
+  const equipeText = rhCount > 0 ? `${rhCount} membre(s) (RH)` : ((Array.isArray(incube?.associes) && incube.associes.length > 0) ? `${incube.associes.length + 1} membre(s)` : '1 membre');
+
   autoTable(doc, {
     startY: sec2Y + 4,
     margin: { left: 14, right: 14 },
@@ -1676,7 +1680,8 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
     body: [
       ['Raison sociale', incube?.raison_sociale || '—', 'Statut juridique', incube?.statut_juridique || '—'],
       ['Registre Commerce (RC)', incube?.rc || '—', 'Secteur d\'activité', incube?.secteur_activite || '—'],
-      ['Phase du projet', incube?.phase_projet || '—', 'Date de démarrage', incube?.date_demarrage ? new Date(incube.date_demarrage).toLocaleDateString('fr-FR') : '—'],
+      ['Phase du projet', incube?.phase_projet || '—', 'Cible / Marché', incube?.cible || '—'],
+      ['Membres d\'équipe', equipeText, 'Date de démarrage', incube?.date_demarrage ? new Date(incube.date_demarrage).toLocaleDateString('fr-FR') : '—'],
       ['Promotion d\'incubation', incube?.promotion || '—', 'Accompagnateur IDS', incube?.accompagnateur || '—'],
       ['Site Web / Portfolio', incube?.site_web || '—', 'Réf. Porteur (PP)', incube?.pp_numero || '—']
     ]

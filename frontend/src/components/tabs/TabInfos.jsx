@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, UserCheck, Radio, ShieldCheck, ShieldAlert, ArrowRightLeft, Camera, Upload, X, FileSpreadsheet, GraduationCap, Plus, Eye, FileText, Linkedin, Globe } from 'lucide-react';
+import { Save, UserCheck, Radio, ShieldCheck, ShieldAlert, ArrowRightLeft, Camera, Upload, X, FileSpreadsheet, GraduationCap, Plus, Eye, FileText, Linkedin, Globe, Users, Target } from 'lucide-react';
 import api, { getPhotoUrl } from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import ExcelImportModal from '../common/ExcelImportModal';
@@ -78,6 +78,11 @@ export default function TabInfos({ incube, onUpdate }) {
   const [isCustomSecteur, setIsCustomSecteur] = useState(false);
   const [isCustomEtude, setIsCustomEtude] = useState(false);
 
+  // Calcul du nombre de membres d'équipe depuis l'onglet RH (RhDetail / personnel)
+  const rhPersonnelList = Array.isArray(incube?.personnel) ? incube.personnel : [];
+  const validPersonnel = rhPersonnelList.filter(p => p && p.nom_complet && String(p.nom_complet).trim() !== '');
+  const rhTeamCount = validPersonnel.length;
+
   const loadPromotions = async () => {
     try {
       const res = await api.get('/promotions');
@@ -134,6 +139,7 @@ export default function TabInfos({ incube, onUpdate }) {
       raison_sociale: row.raison_sociale || prev.raison_sociale,
       rc: row.rc || row.registre_commerce || prev.rc,
       phase_projet: row.phase_projet || prev.phase_projet,
+      cible: row.cible || row.marche_cible || row.target || prev.cible,
       statut_juridique: row.statut_juridique || prev.statut_juridique,
       pp_numero: row.pp_numero || prev.pp_numero,
       situation_familiale: row.situation_familiale || prev.situation_familiale,
@@ -634,6 +640,44 @@ export default function TabInfos({ incube, onUpdate }) {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Cible & Marché */}
+            <div>
+              <label className="label flex items-center gap-1.5">
+                <Target size={15} className="text-primary-500" />
+                Cible & Marché
+              </label>
+              <input
+                className="input"
+                placeholder="Ex: B2B / B2G / B2B2C"
+                value={form.cible || ''}
+                onChange={f('cible')}
+              />
+            </div>
+
+            {/* Membres d'équipe (Calculé depuis RH) */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="label !mb-0 flex items-center gap-1.5">
+                  <Users size={15} className="text-primary-500" />
+                  Membres d'équipe
+                </label>
+                <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                  Calculé depuis RH
+                </span>
+              </div>
+              <input
+                type="text"
+                className="input bg-slate-100 dark:bg-dark-800 cursor-not-allowed font-semibold text-slate-800 dark:text-white"
+                value={rhTeamCount > 0 ? `${rhTeamCount} membre${rhTeamCount > 1 ? 's' : ''}` : '0 membre'}
+                readOnly
+              />
+              <p className="text-[10px] text-slate-400 dark:text-dark-400 mt-1">
+                {rhTeamCount > 0 
+                  ? `${rhTeamCount} collaborateur${rhTeamCount > 1 ? 's' : ''} déclaré${rhTeamCount > 1 ? 's' : ''} dans l'onglet Ressources Humaines (RH)`
+                  : "Aucun collaborateur dans l'onglet RH (ajoutez du personnel dans l'onglet RH pour actualiser l'équipe)"}
+              </p>
             </div>
 
             {/* Promotion */}

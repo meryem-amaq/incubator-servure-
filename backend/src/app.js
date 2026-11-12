@@ -503,6 +503,7 @@ sequelize.authenticate()
       await checkAndAddColumn('incubes', 'linkedin', 'VARCHAR(255) NULL');
       await checkAndAddColumn('incubes', 'site_web', 'VARCHAR(255) NULL');
       await checkAndAddColumn('incubes', 'description_projet', 'TEXT NULL');
+      await checkAndAddColumn('incubes', 'cible', 'VARCHAR(255) NULL');
       await checkAndAddColumn('suivi_engagement', 'heures_ateliers', 'FLOAT DEFAULT 0');
       await checkAndAddColumn('suivi_engagement', 'nb_ateliers', 'INT DEFAULT 0');
       await checkAndAddColumn('suivi_engagement', 'heures_ateliers_animes', 'FLOAT DEFAULT 0');

@@ -22,6 +22,7 @@ const Incube = sequelize.define('Incube', {
   raison_sociale: { type: DataTypes.STRING(200) },
   rc: { type: DataTypes.STRING(100) },
   phase_projet: { type: DataTypes.STRING(100) },
+  cible: { type: DataTypes.STRING(255), allowNull: true },
   province: { type: DataTypes.STRING(100) },
   ville: { type: DataTypes.STRING(100) },
   genre: { type: DataTypes.STRING(50) },
