@@ -1485,16 +1485,15 @@ export const formatAgeAnnees = (ageStr, dob) => {
 };
 
 export const generateFicheSignaletiqueDocument = async (incube) => {
+  // Format Horizontal (Landscape A4 : 297mm x 210mm)
   const doc = new jsPDF({
-    orientation: 'portrait',
+    orientation: 'landscape',
     unit: 'mm',
     format: 'a4'
   });
 
-  const pageWidth = doc.internal.pageSize.width; // 210
-  const pageHeight = doc.internal.pageSize.height; // 297
-  const marginX = 14;
-  const contentWidth = pageWidth - (marginX * 2); // 182
+  const pageWidth = doc.internal.pageSize.width; // 297
+  const pageHeight = doc.internal.pageSize.height; // 210
 
   const today = new Date().toLocaleDateString('fr-FR');
   const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -1502,9 +1501,7 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
   const displayName = formatNomPrenomIncube(incubeName);
   const ageAnnees = formatAgeAnnees(incube?.age, incube?.date_naissance);
 
-  // 1. Suppression du cadre extérieur global pour éviter tout chevauchement et aérer le document
-
-  // 2. Chargement des logos officiels et de la photo de l'incubé
+  // 1. Chargement des logos et de la photo
   const { logoIds, logoCtpes } = await ensureLogosLoaded();
   let photoDataUrl = null;
   if (incube?.photo_path) {
@@ -1518,267 +1515,448 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
     }
   }
 
-  // 3. En-tête institutionnel officiel — SANS "ROYAUME DU MAROC"
-  // Logo IDS : format carré naturel (1:1) -> 18mm x 18mm (de Y=12 à Y=30)
+  // 2. FOND GÉNÉRAL & BANDEAU SUPÉRIEUR ÉPURÉ
+  doc.setFillColor(248, 250, 252);
+  doc.rect(0, 0, pageWidth, pageHeight, 'F');
+
+  // Bandeau supérieur blanc pour l'en-tête
+  doc.setFillColor(255, 255, 255);
+  doc.rect(0, 0, pageWidth, 30, 'F');
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.4);
+  doc.line(0, 30, pageWidth, 30);
+
+  // ==========================================
+  // 3. LES DEUX LOGOS STRICTEMENT ÉGAUX (38mm x 14mm)
+  // ==========================================
+  const badgeW = 38, badgeH = 14, badgeY = 8, badgeRadius = 2.5;
+
+  // Logo IDS (Gauche)
+  const idsBadgeX = 14;
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.4);
+  doc.roundedRect(idsBadgeX, badgeY, badgeW, badgeH, badgeRadius, badgeRadius, 'FD');
   if (logoIds) {
     try {
-      doc.addImage(logoIds, 'PNG', 14, 12, 18, 18);
-    } catch (e) {}
-  }
-  // Logo CTPES : format rectangle horizontal naturel (1024x235, ratio 4.36:1) -> 38mm x 8.7mm (de Y=16.5 à Y=25.2)
-  if (logoCtpes) {
-    try {
-      doc.addImage(logoCtpes, 'PNG', pageWidth - 14 - 38, 16.5, 38, 8.7);
+      doc.addImage(logoIds, 'PNG', idsBadgeX + (badgeW - 12) / 2, badgeY + (badgeH - 12) / 2, 12, 12);
     } catch (e) {}
   }
 
-  // Titre institutionnel centré avec espacement aéré garanti (> 2 cm d'écart avec chaque logo)
+  // Logo CTPES (Droite) - Format 100% ÉGAL
+  const ctpesBadgeX = pageWidth - 14 - badgeW;
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.4);
+  doc.roundedRect(ctpesBadgeX, badgeY, badgeW, badgeH, badgeRadius, badgeRadius, 'FD');
+  if (logoCtpes) {
+    try {
+      doc.addImage(logoCtpes, 'PNG', ctpesBadgeX + (badgeW - 31) / 2, badgeY + (badgeH - 7.1) / 2, 31, 7.1);
+    } catch (e) {}
+  }
+
+  // Titre En-Tête Centré
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
+  doc.setFontSize(12);
   doc.setTextColor(15, 23, 42); // slate-900
-  doc.text('INCUBATEUR DIGITAL SOLIDAIRE (IDS)', 95, 19, { align: 'center' });
+  doc.text('INCUBATEUR DIGITAL SOLIDAIRE (IDS)', pageWidth / 2, 14, { align: 'center' });
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(2, 132, 199); // primary sky-600
-  doc.text('FICHE SIGNALÉTIQUE & INFORMATIONS GÉNÉRALES', 95, 25, { align: 'center' });
+  doc.text('FICHE SIGNALÉTIQUE & INFORMATIONS GÉNÉRALES', pageWidth / 2, 21, { align: 'center' });
 
-  // Ligne séparatrice officielle (placée à Y=34, soit 4mm SOUS le logo IDS pour garantir aucun chevauchement)
+  // ==========================================
+  // 4. CORPS PRINCIPAL : 2 GRANDES CARTES AÉRÉES
+  // ==========================================
+  const marginX = 14;
+  const colGap = 8;
+  const colW = (pageWidth - marginX * 2 - colGap) / 2; // ~130.5 mm
+  const col1X = marginX;
+  const col2X = marginX + colW + colGap;
+  const topY = 36;
+  const card1H = 92;
+
+  // --- CARTE GAUCHE : PROFIL DE L'INCUBÉ ---
+  doc.setFillColor(255, 255, 255);
   doc.setDrawColor(226, 232, 240);
   doc.setLineWidth(0.4);
-  doc.line(14, 34, pageWidth - 14, 34);
+  doc.roundedRect(col1X, topY, colW, card1H, 3, 3, 'FD');
 
-  // 4. Cartouche Porteur & Photo de l'incubé (Y = 37 à 71)
+  // En-tête de carte gauche
   doc.setFillColor(248, 250, 252);
+  doc.roundedRect(col1X, topY, colW, 10, 3, 3, 'F');
+  doc.rect(col1X, topY + 7, colW, 3, 'F');
   doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(14, 37, contentWidth, 34, 2.5, 2.5, 'FD');
+  doc.line(col1X, topY + 10, col1X + colW, topY + 10);
 
-  // Photo
-  const photoX = 18;
-  const photoY = 40;
-  const photoSize = 28;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text('1. PROFIL & IDENTITÉ DU PORTEUR', col1X + 7, topY + 6.8);
+
+  // Photo de l'incubé (Cadre soigné à gauche)
+  const photoW = 34, photoH = 44;
+  const photoX = col1X + 8;
+  const photoY = topY + 16;
+
+  doc.setFillColor(241, 245, 249);
+  doc.setDrawColor(203, 213, 225);
+  doc.roundedRect(photoX, photoY, photoW, photoH, 2, 2, 'FD');
+
   if (photoDataUrl) {
     try {
-      doc.addImage(photoDataUrl, 'JPEG', photoX, photoY, photoSize, photoSize);
+      doc.addImage(photoDataUrl, 'JPEG', photoX, photoY, photoW, photoH);
       doc.setDrawColor(2, 132, 199);
-      doc.setLineWidth(0.6);
-      doc.rect(photoX, photoY, photoSize, photoSize);
+      doc.setLineWidth(0.5);
+      doc.roundedRect(photoX, photoY, photoW, photoH, 2, 2, 'S');
     } catch (e) {
       photoDataUrl = null;
     }
   }
   if (!photoDataUrl) {
-    doc.setFillColor(241, 245, 249);
-    doc.setDrawColor(203, 213, 225);
-    doc.rect(photoX, photoY, photoSize, photoSize, 'FD');
     const initials = incubeName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'IN';
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
+    doc.setFontSize(16);
     doc.setTextColor(148, 163, 184);
-    doc.text(initials, photoX + photoSize / 2, photoY + 16, { align: 'center' });
+    doc.text(initials, photoX + photoW / 2, photoY + photoH / 2, { align: 'center' });
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.5);
-    doc.text("Photo non fournie", photoX + photoSize / 2, photoY + 23, { align: 'center' });
+    doc.text("Photo incubé", photoX + photoW / 2, photoY + photoH / 2 + 6, { align: 'center' });
   }
 
-  // Informations principales du cartouche
-  const textLeftX = 52;
+  // Informations textuelles du porteur (à droite de la photo)
+  const infoX = photoX + photoW + 7;
+  let textY = topY + 20;
+
+  // Nom complet en grand
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12.5);
+  doc.setFontSize(14);
   doc.setTextColor(15, 23, 42);
-  doc.text(displayName, textLeftX, 45);
+  doc.text(displayName.toUpperCase(), infoX, textY);
+
+  textY += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text("CIN : ", infoX, textY);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text(incube?.cin || '—', infoX + 10, textY);
+
+  textY += 5.5;
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text("Né le : ", infoX, textY);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  const birthText = incube?.date_naissance ? new Date(incube.date_naissance).toLocaleDateString('fr-FR') : '—';
+  doc.text(`${birthText} (${ageAnnees})`, infoX + 11, textY);
+
+  textY += 5.5;
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text("Genre : ", infoX, textY);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text(`${incube?.genre || '—'}, ${incube?.situation_familiale || '—'}`, infoX + 13, textY);
+
+  textY += 5.5;
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text("Niveau : ", infoX, textY);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text(incube?.niveau_etude || 'Bac+5', infoX + 13, textY);
+
+  textY += 5.5;
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text("Spécialité : ", infoX, textY);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(2, 132, 199);
+  doc.text(incube?.secteur_activite || 'Général', infoX + 18, textY);
+
+  textY += 5.5;
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text("Ville : ", infoX, textY);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  const vText = `${incube?.ville || '—'}${incube?.province && incube.province !== incube.ville ? ` (${incube.province})` : ''}`;
+  doc.text(vText, infoX + 10, textY);
+
+  // Bandeau Contact sous la photo
+  const contactY = topY + 68;
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(col1X + 8, contactY, colW - 16, 18, 2, 2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(100, 116, 139);
+  doc.text("Téléphone :", col1X + 12, contactY + 6);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text(incube?.telephone || '—', col1X + 32, contactY + 6);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(100, 116, 139);
+  doc.text("Email :", col1X + 12, contactY + 12.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(15, 23, 42);
+  doc.text(incube?.email || '—', col1X + 25, contactY + 12.5);
+
+  // --- CARTE DROITE : ENTREPRISE & PROJET ---
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.4);
+  doc.roundedRect(col2X, topY, colW, card1H, 3, 3, 'FD');
+
+  // En-tête de carte droite
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(col2X, topY, colW, 10, 3, 3, 'F');
+  doc.rect(col2X, topY + 7, colW, 3, 'F');
+  doc.setDrawColor(226, 232, 240);
+  doc.line(col2X, topY + 10, col2X + colW, topY + 10);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text("2. ENTREPRISE, MARCHÉ & ENCADREMENT", col2X + 7, topY + 6.8);
+
+  // Raison sociale en grand
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
   doc.setTextColor(2, 132, 199);
-  doc.text(incube?.raison_sociale || 'Projet d\'incubation', textLeftX, 51);
+  doc.text(incube?.raison_sociale || 'Projet d\'incubation', col2X + 8, topY + 20);
 
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(71, 85, 105);
-  doc.text("N° Dossier :", textLeftX, 58);
+  // Grille 2 colonnes d'indicateurs
+  const gridLeftX = col2X + 8;
+  const gridRightX = col2X + colW / 2 + 2;
+  let gY = topY + 28;
+  const gSpacing = 6.2;
+
+  // Ligne 1
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(15, 23, 42);
-  doc.text(incube?.pp_numero || '—', textLeftX + 22, 58);
-
+  doc.setFontSize(8.2);
+  doc.setTextColor(100, 116, 139);
+  doc.text("Statut juridique :", gridLeftX, gY);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(71, 85, 105);
-  doc.text("Phase actuelle :", textLeftX + 65, 58);
+  doc.setTextColor(15, 23, 42);
+  doc.text(incube?.statut_juridique || '—', gridLeftX + 27, gY);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text("RC :", gridRightX, gY);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text(incube?.rc || '—', gridRightX + 8, gY);
+
+  // Ligne 2
+  gY += gSpacing;
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text("Secteur :", gridLeftX, gY);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text(incube?.secteur_activite || '—', gridLeftX + 15, gY);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text("Phase :", gridRightX, gY);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(2, 132, 199);
-  doc.text(incube?.phase_projet || '—', textLeftX + 90, 58);
+  doc.text(incube?.phase_projet || 'Lancement', gridRightX + 13, gY);
 
+  // Ligne 3 (Cible et Date de démarrage)
+  gY += gSpacing;
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text("Cible & Marché :", gridLeftX, gY);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(71, 85, 105);
-  doc.text("Promotion :", textLeftX, 65);
+  doc.setTextColor(15, 23, 42);
+  doc.text(incube?.cible || 'B2B / B2C', gridLeftX + 26, gY);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text("Démarrage :", gridRightX, gY);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(15, 23, 42);
-  doc.text(incube?.promotion || '—', textLeftX + 22, 65);
+  const demText = incube?.date_demarrage ? new Date(incube.date_demarrage).toLocaleDateString('fr-FR') : '—';
+  doc.text(demText, gridRightX + 20, gY);
 
+  // Ligne 4 (Promotion & Accompagnateur)
+  gY += gSpacing;
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text("Promotion :", gridLeftX, gY);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(71, 85, 105);
-  doc.text("Accompagnateur :", textLeftX + 65, 65);
+  doc.setTextColor(15, 23, 42);
+  doc.text(incube?.promotion || 'Promotion 2026', gridLeftX + 19, gY);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text("Conseiller :", gridRightX, gY);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(15, 23, 42);
-  doc.text(incube?.accompagnateur || '—', textLeftX + 90, 65);
+  doc.text(incube?.accompagnateur || 'Conseiller IDS', gridRightX + 18, gY);
 
-  // Helper pour dessiner le titre officiel épuré sans cadre bleu
-  const drawSectionTitle = (title, yPos) => {
-    doc.setFontSize(9.2);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(15, 23, 42);
-    doc.text(title, 14, yPos);
-  };
+  // Bloc Équipe RH & Associés en bas de carte droite
+  const teamBoxY = topY + 58;
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(col2X + 8, teamBoxY, colW - 16, 28, 2, 2, 'FD');
 
-  // 5. Section 1 : Renseignements Personnels du Porteur
-  drawSectionTitle("1. RENSEIGNEMENTS PERSONNELS DU PORTEUR", 77);
+  const teamMidX = col2X + colW / 2;
+  doc.line(teamMidX, teamBoxY + 3, teamMidX, teamBoxY + 25);
 
-  autoTable(doc, {
-    startY: 81,
-    margin: { left: 14, right: 14 },
-    theme: 'grid',
-    styles: { fontSize: 8, cellPadding: 2.2, font: 'helvetica', lineColor: [226, 232, 240], lineWidth: 0.3 },
-    columnStyles: {
-      0: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105], cellWidth: 38 },
-      1: { textColor: [15, 23, 42], cellWidth: 53 },
-      2: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105], cellWidth: 38 },
-      3: { textColor: [15, 23, 42], cellWidth: 53 }
-    },
-    body: [
-      ['Carte d\'Identité (CIN)', incube?.cin || '—', 'Genre', incube?.genre || '—'],
-      [
-        'Date de naissance',
-        incube?.date_naissance ? new Date(incube.date_naissance).toLocaleDateString('fr-FR') : '—',
-        'Âge',
-        ageAnnees
-      ],
-      ['Situation familiale', incube?.situation_familiale || '—', 'Niveau d\'étude', incube?.niveau_etude || '—'],
-      ['Ville & Province', `${incube?.ville || '—'} / ${incube?.province || '—'}`, 'Téléphone', incube?.telephone || '—'],
-      ['Adresse E-mail', incube?.email || '—', 'Profil LinkedIn', incube?.linkedin || '—']
-    ]
-  });
-
-  // 6. Section 2 : Renseignements Entreprise & Projet d'Incubation
-  const sec2Y = doc.lastAutoTable.finalY + 6;
-  drawSectionTitle("2. RENSEIGNEMENTS ENTREPRISE & PROJET D'INCUBATION", sec2Y);
-
+  // Calcul effectif RH
   const rhPersonnel = Array.isArray(incube?.personnel) ? incube.personnel : [];
   const rhCount = rhPersonnel.filter(p => p && p.nom_complet && String(p.nom_complet).trim() !== '').length;
-  const equipeText = rhCount > 0 ? `${rhCount} membre(s) (RH)` : ((Array.isArray(incube?.associes) && incube.associes.length > 0) ? `${incube.associes.length + 1} membre(s)` : '1 membre');
+  const finalTeamCount = rhCount > 0 ? rhCount : 1;
 
-  autoTable(doc, {
-    startY: sec2Y + 4,
-    margin: { left: 14, right: 14 },
-    theme: 'grid',
-    styles: { fontSize: 8, cellPadding: 2.2, font: 'helvetica', lineColor: [226, 232, 240], lineWidth: 0.3 },
-    columnStyles: {
-      0: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105], cellWidth: 38 },
-      1: { textColor: [15, 23, 42], cellWidth: 53 },
-      2: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105], cellWidth: 38 },
-      3: { textColor: [15, 23, 42], cellWidth: 53 }
-    },
-    body: [
-      ['Raison sociale', incube?.raison_sociale || '—', 'Statut juridique', incube?.statut_juridique || '—'],
-      ['Registre Commerce (RC)', incube?.rc || '—', 'Secteur d\'activité', incube?.secteur_activite || '—'],
-      ['Phase du projet', incube?.phase_projet || '—', 'Cible / Marché', incube?.cible || '—'],
-      ['Membres d\'équipe', equipeText, 'Date de démarrage', incube?.date_demarrage ? new Date(incube.date_demarrage).toLocaleDateString('fr-FR') : '—'],
-      ['Promotion d\'incubation', incube?.promotion || '—', 'Accompagnateur IDS', incube?.accompagnateur || '—'],
-      ['Site Web / Portfolio', incube?.site_web || '—', 'Réf. Porteur (PP)', incube?.pp_numero || '—']
-    ]
-  });
-
-  // 7. Section 3 : Description & Synthèse du projet
-  const sec3Y = doc.lastAutoTable.finalY + 6;
-  drawSectionTitle("3. DESCRIPTION DU PROJET", sec3Y);
-
-  const descText = (incube?.description_projet && String(incube.description_projet).trim())
-    ? String(incube.description_projet).trim()
-    : "Aucune description renseignée pour ce projet.";
-
-  autoTable(doc, {
-    startY: sec3Y + 4,
-    margin: { left: 14, right: 14 },
-    theme: 'plain',
-    styles: { 
-      fontSize: 8, 
-      cellPadding: 3.5, 
-      font: 'helvetica', 
-      lineColor: [226, 232, 240], 
-      lineWidth: 0.3,
-      fillColor: [248, 250, 252],
-      textColor: incube?.description_projet ? [15, 23, 42] : [148, 163, 184],
-      fontStyle: incube?.description_projet ? 'normal' : 'italic'
-    },
-    body: [
-      [{ content: descText }]
-    ]
-  });
-
-  // 8. Section 4 : Associés & Membres de l'Équipe
-  let associesList = [];
+  // Calcul associés
+  let associesCount = 1;
   if (Array.isArray(incube?.associes)) {
-    associesList = incube.associes;
+    associesCount += incube.associes.length;
   } else if (typeof incube?.associes === 'string') {
     try {
       const parsed = JSON.parse(incube.associes);
-      if (Array.isArray(parsed)) associesList = parsed;
+      if (Array.isArray(parsed)) associesCount += parsed.length;
     } catch (e) {}
   }
 
-  const sec4Y = doc.lastAutoTable.finalY + 6;
-  drawSectionTitle(`4. ASSOCIÉS & ÉQUIPE DU PROJET (${associesList.length})`, sec4Y);
+  // Colonne Gauche : Équipe (RH)
+  const leftCenterX = col2X + 8 + (colW - 16) / 4;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.setTextColor(2, 132, 199);
+  doc.text(String(finalTeamCount).padStart(2, '0'), leftCenterX, teamBoxY + 11, { align: 'center' });
 
-  if (associesList.length > 0) {
-    autoTable(doc, {
-      startY: sec4Y + 4,
-      margin: { left: 14, right: 14 },
-      theme: 'striped',
-      headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.8, cellPadding: 2 },
-      styles: { fontSize: 7.5, cellPadding: 1.8, font: 'helvetica', lineColor: [226, 232, 240], lineWidth: 0.2 },
-      head: [['Nom & Prénom', 'CIN', 'Fonction', 'Téléphone', 'Accès Tourniquet / Badge']],
-      body: associesList.map(a => [
-        a.nom || '—',
-        a.cin || '—',
-        a.fonction || '—',
-        a.tel || '—',
-        (a.badge_id || a.matricule) ? `Badge #${a.badge_id || a.matricule}` : 'Sans badge'
-      ])
-    });
-  } else {
-    doc.setFillColor(248, 250, 252);
-    doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(14, sec4Y + 4, contentWidth, 9, 1.5, 1.5, 'FD');
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(7.8);
-    doc.setTextColor(148, 163, 184);
-    doc.text("Aucun associé enregistré pour cette startup.", 18, sec4Y + 9.5);
-    // Dummy table to set lastAutoTable.finalY
-    doc.lastAutoTable = { finalY: sec4Y + 14 };
-  }
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text("Membres d'équipe", leftCenterX, teamBoxY + 17, { align: 'center' });
 
-  // 8. Pied de page officiel sur toutes les pages
-  const totalPages = doc.internal.getNumberOfPages();
-  for (let i = 1; i <= totalPages; i++) {
-    doc.setPage(i);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.setTextColor(16, 185, 129); // green
+  doc.text("(Calculé depuis RH)", leftCenterX, teamBoxY + 22, { align: 'center' });
+
+  // Colonne Droite : Associés
+  const rightCenterX = teamMidX + (colW - 16) / 4;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.setTextColor(245, 158, 11); // amber
+  doc.text(String(associesCount).padStart(2, '0'), rightCenterX, teamBoxY + 11, { align: 'center' });
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text("Nombre d'associés", rightCenterX, teamBoxY + 17, { align: 'center' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text("(Porteur inclus)", rightCenterX, teamBoxY + 22, { align: 'center' });
+
+  // ==========================================
+  // 5. ZONE BAS : DESCRIPTION DU PROJET & LES 2 QR CODES
+  // ==========================================
+  const botY = topY + card1H + 6;
+  const botH = 68;
+
+  // --- BLOC DESCRIPTION (Gauche) ---
+  const descCardW = colW + (colW - 68); // ~ 193 mm
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.4);
+  doc.roundedRect(col1X, botY, descCardW, botH, 3, 3, 'FD');
+
+  // En-tête Description
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(col1X, botY, descCardW, 9, 3, 3, 'F');
+  doc.rect(col1X, botY + 6, descCardW, 3, 'F');
+  doc.setDrawColor(226, 232, 240);
+  doc.line(col1X, botY + 9, col1X + descCardW, botY + 9);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(15, 23, 42);
+  doc.text("3. DESCRIPTION DU PROJET & PROPOSITION DE VALEUR", col1X + 7, botY + 6.2);
+
+  // Texte descriptif
+  const descContent = (incube?.description_projet && String(incube.description_projet).trim())
+    ? String(incube.description_projet).trim()
+    : "Aucune description détaillée renseignée pour ce projet d'accompagnement.";
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(51, 65, 85);
+  const splitText = doc.splitTextToSize(descContent, descCardW - 16);
+  doc.text(splitText, col1X + 8, botY + 16, { lineHeightFactor: 1.4 });
+
+  // --- BLOC LES 2 QR CODES (Droite) ---
+  const drawQrBox = (x, y, size, label, link = '', color = [15, 23, 42]) => {
+    doc.setFillColor(255, 255, 255);
     doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.4);
-    doc.line(14, pageHeight - 12, pageWidth - 14, pageHeight - 12);
+    doc.roundedRect(x, y, size, size + 10, 2.5, 2.5, 'FD');
 
-    doc.setFontSize(7.2);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(148, 163, 184);
-    doc.text(
-      "IDS — Incubateur Digital Solidaire • Salé • Document Officiel Confidentiel",
-      14,
-      pageHeight - 7
-    );
-    doc.text(
-      `Édité le ${today} à ${time} • Page ${i} sur ${totalPages}`,
-      pageWidth - 14,
-      pageHeight - 7,
-      { align: 'right' }
-    );
-  }
+    const pad = 2.5;
+    const innerSize = size - pad * 2;
+    const finderSize = 4.2;
+    doc.setFillColor(...color);
+
+    doc.rect(x + pad, y + pad, finderSize, finderSize, 'F');
+    doc.rect(x + pad + innerSize - finderSize, y + pad, finderSize, finderSize, 'F');
+    doc.rect(x + pad, y + pad + innerSize - finderSize, finderSize, finderSize, 'F');
+
+    const matrixStart = pad + finderSize + 1.2;
+    const dotStep = 1.3;
+    for (let dy = 0; dy < 6; dy++) {
+      for (let dx = 0; dx < 6; dx++) {
+        if ((dx + dy) % 2 === 0 || (dx * 2 + dy) % 3 === 0) {
+          doc.rect(x + matrixStart + dx * dotStep, y + matrixStart + dy * dotStep, 0.85, 0.85, 'F');
+        }
+      }
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...color);
+    doc.text(label, x + size / 2, y + size + 4, { align: 'center' });
+
+    if (link) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6);
+      doc.setTextColor(100, 116, 139);
+      const shortLink = link.replace(/^https?:\/\/(www\.)?/, '').slice(0, 18);
+      doc.text(shortLink, x + size / 2, y + size + 7.5, { align: 'center' });
+    }
+  };
+
+  const qrAreaX = col1X + descCardW + 6;
+  const qrBoxSize = 31;
+  const qr1X = qrAreaX + 1.5;
+  const qr2X = qrAreaX + qrBoxSize + 4.5;
+
+  // QR 1 : LinkedIn
+  drawQrBox(doc, qr1X, botY + 2, qrBoxSize, 'LinkedIn', incube?.linkedin || '', [10, 102, 194]);
+
+  // QR 2 : Site Web
+  drawQrBox(doc, qr2X, botY + 2, qrBoxSize, 'Site Web', incube?.site_web || '', [2, 132, 199]);
+
+  // ==========================================
+  // 6. PIED DE PAGE DISCRET
+  // ==========================================
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.8);
+  doc.setTextColor(148, 163, 184);
+  doc.text('INCUBATEUR DIGITAL SOLIDAIRE (IDS)  •  DOCUMENT CONFIDENTIEL OFFICIEL', 14, pageHeight - 4);
+
+  doc.text(`Édité le ${today} à ${time}  •  CENTRE DES TRÈS PETITES ENTREPRISES SOLIDAIRES (CTPES)`, pageWidth - 14, pageHeight - 4, { align: 'right' });
 
   return doc;
 };
