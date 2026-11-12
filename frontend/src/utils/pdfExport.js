@@ -1683,7 +1683,11 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
       ['Registre Commerce (RC)', incube?.rc || '—', 'Secteur d\'activité', incube?.secteur_activite || '—'],
       ['Phase du projet', incube?.phase_projet || '—', 'Date de démarrage', incube?.date_demarrage ? new Date(incube.date_demarrage).toLocaleDateString('fr-FR') : '—'],
       ['Promotion d\'incubation', incube?.promotion || '—', 'Accompagnateur IDS', incube?.accompagnateur || '—'],
-      ['Site Web / Portfolio', incube?.site_web || '—', 'Réf. Porteur (PP)', incube?.pp_numero || '—']
+      ['Site Web / Portfolio', incube?.site_web || '—', 'Réf. Porteur (PP)', incube?.pp_numero || '—'],
+      [
+        { content: 'Description du projet', styles: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105] } },
+        { content: incube?.description_projet || 'Aucune description renseignée pour ce projet.', colSpan: 3, styles: { textColor: [15, 23, 42], fontStyle: incube?.description_projet ? 'normal' : 'italic' } }
+      ]
     ]
   });
 

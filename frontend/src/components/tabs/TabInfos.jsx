@@ -148,6 +148,7 @@ export default function TabInfos({ incube, onUpdate }) {
       date_naissance: row.date_naissance || prev.date_naissance,
       niveau_etude: row.niveau_etude || prev.niveau_etude,
       badge_id: row.badge_id || prev.badge_id,
+      description_projet: row.description_projet || row.description || row.presentation || prev.description_projet,
       associes: (Array.isArray(row.associes) && row.associes.length > 0) ? row.associes : prev.associes,
     }));
     toast.success('Champs mis à jour depuis le fichier Excel ! Cliquez sur Enregistrer.');
@@ -839,6 +840,24 @@ export default function TabInfos({ incube, onUpdate }) {
                   autoFocus
                 />
               )}
+            </div>
+
+            {/* Description du projet */}
+            <div className="md:col-span-2">
+              <label className="label flex items-center justify-between">
+                <span className="font-bold flex items-center gap-1.5 text-slate-800 dark:text-white">
+                  <FileText size={15} className="text-primary-500" />
+                  Description du projet
+                </span>
+                <span className="text-[11px] font-normal text-slate-400">Objectif, activité principale, offre ou proposition de valeur</span>
+              </label>
+              <textarea
+                rows={3}
+                className="input resize-y py-2.5 text-sm leading-relaxed"
+                placeholder="Décrivez brièvement le projet, son activité principale, ses produits ou services et ses objectifs..."
+                value={form.description_projet || ''}
+                onChange={f('description_projet')}
+              />
             </div>
           </div>
         </div>

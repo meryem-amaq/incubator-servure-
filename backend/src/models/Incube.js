@@ -14,6 +14,7 @@ const Incube = sequelize.define('Incube', {
   telephone: { type: DataTypes.STRING(50), allowNull: true },
   linkedin: { type: DataTypes.STRING(255), allowNull: true },
   site_web: { type: DataTypes.STRING(255), allowNull: true },
+  description_projet: { type: DataTypes.TEXT, allowNull: true },
   situation_familiale: { type: DataTypes.STRING(100) },
   accompagnateur: { type: DataTypes.STRING(200) },
   date_demarrage: { type: DataTypes.DATEONLY },
