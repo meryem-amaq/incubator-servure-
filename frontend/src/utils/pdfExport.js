@@ -1502,10 +1502,7 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
   const displayName = formatNomPrenomIncube(incubeName);
   const ageAnnees = formatAgeAnnees(incube?.age, incube?.date_naissance);
 
-  // 1. Cadre décoratif extérieur
-  doc.setDrawColor(226, 232, 240);
-  doc.setLineWidth(0.5);
-  doc.rect(10, 10, pageWidth - 20, pageHeight - 20);
+  // 1. Suppression du cadre extérieur global pour éviter tout chevauchement et aérer le document
 
   // 2. Chargement des logos officiels et de la photo de l'incubé
   const { logoIds, logoCtpes } = await ensureLogosLoaded();
@@ -1522,16 +1519,16 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
   }
 
   // 3. En-tête institutionnel officiel — SANS "ROYAUME DU MAROC"
-  // Logo IDS : format carré naturel (1:1) -> 20mm x 20mm
+  // Logo IDS : format carré naturel (1:1) -> 18mm x 18mm (de Y=12 à Y=30)
   if (logoIds) {
     try {
-      doc.addImage(logoIds, 'PNG', 14, 15, 20, 20);
+      doc.addImage(logoIds, 'PNG', 14, 12, 18, 18);
     } catch (e) {}
   }
-  // Logo CTPES : format rectangle horizontal naturel (1024x235, ratio 4.36:1) -> 42mm x 9.6mm
+  // Logo CTPES : format rectangle horizontal naturel (1024x235, ratio 4.36:1) -> 38mm x 8.7mm (de Y=16.5 à Y=25.2)
   if (logoCtpes) {
     try {
-      doc.addImage(logoCtpes, 'PNG', pageWidth - 14 - 42, 20.2, 42, 9.6);
+      doc.addImage(logoCtpes, 'PNG', pageWidth - 14 - 38, 16.5, 38, 8.7);
     } catch (e) {}
   }
 
@@ -1539,16 +1536,16 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10.5);
   doc.setTextColor(15, 23, 42); // slate-900
-  doc.text('INCUBATEUR DIGITAL SOLIDAIRE (IDS)', 94, 22.5, { align: 'center' });
+  doc.text('INCUBATEUR DIGITAL SOLIDAIRE (IDS)', 95, 19, { align: 'center' });
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(2, 132, 199); // primary sky-600
-  doc.text('FICHE SIGNALÉTIQUE & INFORMATIONS GÉNÉRALES', 94, 28, { align: 'center' });
+  doc.text('FICHE SIGNALÉTIQUE & INFORMATIONS GÉNÉRALES', 95, 25, { align: 'center' });
 
-  // Ligne séparatrice officielle
+  // Ligne séparatrice officielle (placée à Y=34, soit 4mm SOUS le logo IDS pour garantir aucun chevauchement)
   doc.setDrawColor(226, 232, 240);
-  doc.setLineWidth(0.5);
+  doc.setLineWidth(0.4);
   doc.line(14, 34, pageWidth - 14, 34);
 
   // 4. Cartouche Porteur & Photo de l'incubé (Y = 37 à 71)
@@ -1625,18 +1622,16 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
   doc.setTextColor(15, 23, 42);
   doc.text(incube?.accompagnateur || '—', textLeftX + 90, 65);
 
-  // Helper pour dessiner le titre officiel d'une section numérotée
-  const drawSectionBadge = (title, yPos) => {
-    doc.setFillColor(2, 132, 199);
-    doc.roundedRect(14, yPos - 3.8, 3, 5, 0.8, 0.8, 'F');
-    doc.setFontSize(9.5);
+  // Helper pour dessiner le titre officiel épuré sans cadre bleu
+  const drawSectionTitle = (title, yPos) => {
+    doc.setFontSize(9.2);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(15, 23, 42);
-    doc.text(title, 20, yPos);
+    doc.text(title, 14, yPos);
   };
 
   // 5. Section 1 : Renseignements Personnels du Porteur
-  drawSectionBadge("1. RENSEIGNEMENTS PERSONNELS DU PORTEUR", 77);
+  drawSectionTitle("1. RENSEIGNEMENTS PERSONNELS DU PORTEUR", 77);
 
   autoTable(doc, {
     startY: 81,
@@ -1665,7 +1660,7 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
 
   // 6. Section 2 : Renseignements Entreprise & Projet d'Incubation
   const sec2Y = doc.lastAutoTable.finalY + 6;
-  drawSectionBadge("2. RENSEIGNEMENTS ENTREPRISE & PROJET D'INCUBATION", sec2Y);
+  drawSectionTitle("2. RENSEIGNEMENTS ENTREPRISE & PROJET D'INCUBATION", sec2Y);
 
   autoTable(doc, {
     startY: sec2Y + 4,
@@ -1689,7 +1684,7 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
 
   // 7. Section 3 : Description & Synthèse du projet
   const sec3Y = doc.lastAutoTable.finalY + 6;
-  drawSectionBadge("3. DESCRIPTION DU PROJET", sec3Y);
+  drawSectionTitle("3. DESCRIPTION DU PROJET", sec3Y);
 
   const descText = (incube?.description_projet && String(incube.description_projet).trim())
     ? String(incube.description_projet).trim()
@@ -1726,7 +1721,7 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
   }
 
   const sec4Y = doc.lastAutoTable.finalY + 6;
-  drawSectionBadge(`4. ASSOCIÉS & ÉQUIPE DU PROJET (${associesList.length})`, sec4Y);
+  drawSectionTitle(`4. ASSOCIÉS & ÉQUIPE DU PROJET (${associesList.length})`, sec4Y);
 
   if (associesList.length > 0) {
     autoTable(doc, {
