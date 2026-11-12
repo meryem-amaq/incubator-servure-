@@ -26,8 +26,8 @@ api.interceptors.response.use(
 export const getPhotoUrl = (path) => {
   if (!path) return null;
 
-  // Si c'est déjà une URL complète (http/https/data)
-  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) {
+  // Si c'est déjà une URL complète (http/https/data/blob)
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:') || path.startsWith('blob:')) {
     // Convertir les liens Google Drive en liens image directs
     // Format: https://drive.google.com/file/d/FILE_ID/view?...
     const driveMatch = path.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);

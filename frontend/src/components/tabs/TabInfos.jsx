@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Save, UserCheck, Radio, ShieldCheck, ShieldAlert, ArrowRightLeft, Camera, Upload, X, FileSpreadsheet, GraduationCap, Plus, Eye } from 'lucide-react';
+import { Save, UserCheck, Radio, ShieldCheck, ShieldAlert, ArrowRightLeft, Camera, Upload, X, FileSpreadsheet, GraduationCap, Plus, Eye, FileText } from 'lucide-react';
 import api, { getPhotoUrl } from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import ExcelImportModal from '../common/ExcelImportModal';
 import { SECTEURS_ACTIVITE, NIVEAUX_ETUDE_OPTIONS, NIVEAUX_ETUDE, normalizeNiveauEtude } from '../../data/constants';
+import { exportFicheSignaletiqueToPDF } from '../../utils/pdfExport';
 import toast from 'react-hot-toast';
 
 const PHASE_OPTS = ['Idéation', 'Lancement', 'Croissance', 'Maturité'];
@@ -70,6 +71,7 @@ export default function TabInfos({ incube, onUpdate }) {
   const [photoPreview, setPhotoPreview] = useState(null);
   const [enlargedPhoto, setEnlargedPhoto] = useState(null);
   const [showExcelModal, setShowExcelModal] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   // Gestion des promotions
   const [promotions, setPromotions] = useState([]);
@@ -268,6 +270,25 @@ export default function TabInfos({ incube, onUpdate }) {
     }
   };
 
+  const handleExportPdf = async () => {
+    try {
+      setExportingPdf(true);
+      toast.loading("Génération de la fiche signalétique en PDF...", { id: 'export-pdf-infos' });
+      const exportData = {
+        ...incube,
+        ...form,
+        photo_path: photoPreview || form.photo_path || incube.photo_path
+      };
+      await exportFicheSignaletiqueToPDF(exportData);
+      toast.success("Fiche signalétique téléchargée !", { id: 'export-pdf-infos' });
+    } catch (err) {
+      console.error("Erreur export PDF infos:", err);
+      toast.error("Erreur lors de la génération du PDF", { id: 'export-pdf-infos' });
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Box de réassignation conditionnelle (Super Admin uniquement) */}
@@ -328,14 +349,26 @@ export default function TabInfos({ incube, onUpdate }) {
         <div className="card">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
             <h2 className="text-lg font-bold text-slate-900 dark:text-white">Informations Générales</h2>
-            <button
-              type="button"
-              onClick={() => setShowExcelModal(true)}
-              className="btn btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 font-semibold self-start sm:self-auto"
-            >
-              <FileSpreadsheet size={15} className="text-emerald-500" />
-              Remplir les champs depuis Excel
-            </button>
+            <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={handleExportPdf}
+                disabled={exportingPdf}
+                className="btn btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5 border-primary-500/40 text-primary-700 dark:text-primary-400 hover:bg-primary-500/10 font-semibold disabled:opacity-50"
+                title="Exporter la fiche signalétique officielle en PDF (avec photo et logos)"
+              >
+                <FileText size={15} className="text-primary-500" />
+                {exportingPdf ? 'Génération...' : 'Exporter la Fiche (PDF)'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowExcelModal(true)}
+                className="btn btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 font-semibold"
+              >
+                <FileSpreadsheet size={15} className="text-emerald-500" />
+                Remplir les champs depuis Excel
+              </button>
+            </div>
           </div>
 
           {/* Photo de l'incubé */}

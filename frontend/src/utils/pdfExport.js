@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { getPhotoUrl } from '../api/axios';
 
 // ==========================================
 // 🎨 LOGOS ET EN-TÊTE OFFICIEL
@@ -1416,6 +1417,338 @@ export const exportQuarterlyPVToPDF = (incube, options, signatureImage, filename
 
 export const getQuarterlyPVBlobUrl = (incube, options) => {
   const doc = generateQuarterlyPVDocument(incube, options, null);
+  const blob = doc.output('blob');
+  return URL.createObjectURL(blob);
+};
+
+// ==========================================
+// 📄 FICHE SIGNALÉTIQUE & INFORMATIONS GÉNÉRALES
+// ==========================================
+
+export const generateFicheSignaletiqueDocument = async (incube) => {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const pageWidth = doc.internal.pageSize.width; // 210
+  const pageHeight = doc.internal.pageSize.height; // 297
+  const marginX = 14;
+  const contentWidth = pageWidth - (marginX * 2); // 182
+
+  const today = new Date().toLocaleDateString('fr-FR');
+  const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  const incubeName = incube?.nom_incube || 'Incubé';
+
+  // 1. Cadre décoratif extérieur
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.5);
+  doc.rect(10, 10, pageWidth - 20, pageHeight - 20);
+
+  // 2. Chargement des logos officiels et de la photo de l'incubé
+  const { logoIds, logoCtpes } = await ensureLogosLoaded();
+  let photoDataUrl = null;
+  if (incube?.photo_path) {
+    const fullPhotoUrl = getPhotoUrl(incube.photo_path);
+    if (fullPhotoUrl) {
+      try {
+        photoDataUrl = await loadImageAsDataUrl(fullPhotoUrl);
+      } catch (err) {
+        console.warn('Erreur chargement photo incubé:', err);
+      }
+    }
+  }
+
+  // 3. En-tête institutionnel officiel — SANS "ROYAUME DU MAROC"
+  // Logo IDS : format carré naturel (1:1) -> 20mm x 20mm
+  if (logoIds) {
+    try {
+      doc.addImage(logoIds, 'PNG', 14, 15, 20, 20);
+    } catch (e) {}
+  }
+  // Logo CTPES : format rectangle horizontal naturel (1024x235, ratio 4.36:1) -> 42mm x 9.6mm
+  if (logoCtpes) {
+    try {
+      doc.addImage(logoCtpes, 'PNG', pageWidth - 14 - 42, 20.2, 42, 9.6);
+    } catch (e) {}
+  }
+
+  // Titre institutionnel centré avec espacement aéré garanti (> 2 cm d'écart avec chaque logo)
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10.5);
+  doc.setTextColor(15, 23, 42); // slate-900
+  doc.text('INCUBATEUR DIGITAL SOLIDAIRE (IDS)', 94, 22, { align: 'center' });
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(2, 132, 199); // primary sky-600
+  doc.text('FICHE SIGNALÉTIQUE & INFORMATIONS GÉNÉRALES', 94, 27, { align: 'center' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139); // slate-500
+  doc.text(`Dossier d'accompagnement • Réf : FS-${incube?.pp_numero || 'INC'} • ${today}`, 94, 31.5, { align: 'center' });
+
+  // Ligne séparatrice officielle
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.5);
+  doc.line(14, 36, pageWidth - 14, 36);
+
+  // 4. Cartouche Porteur & Photo de l'incubé (Y = 39 à 73)
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(14, 39, contentWidth, 34, 2.5, 2.5, 'FD');
+
+  // Photo
+  const photoX = 18;
+  const photoY = 42;
+  const photoSize = 28;
+  if (photoDataUrl) {
+    try {
+      doc.addImage(photoDataUrl, 'JPEG', photoX, photoY, photoSize, photoSize);
+      doc.setDrawColor(2, 132, 199);
+      doc.setLineWidth(0.6);
+      doc.rect(photoX, photoY, photoSize, photoSize);
+    } catch (e) {
+      photoDataUrl = null;
+    }
+  }
+  if (!photoDataUrl) {
+    doc.setFillColor(241, 245, 249);
+    doc.setDrawColor(203, 213, 225);
+    doc.rect(photoX, photoY, photoSize, photoSize, 'FD');
+    const initials = incubeName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'IN';
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(148, 163, 184);
+    doc.text(initials, photoX + photoSize / 2, photoY + 16, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.text("Photo non fournie", photoX + photoSize / 2, photoY + 23, { align: 'center' });
+  }
+
+  // Informations principales du cartouche
+  const textLeftX = 52;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text(incubeName.toUpperCase(), textLeftX, 47);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(2, 132, 199);
+  doc.text(incube?.raison_sociale || 'Projet d\'incubation', textLeftX, 53);
+
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(71, 85, 105);
+  doc.text("N° Dossier :", textLeftX, 60);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(15, 23, 42);
+  doc.text(incube?.pp_numero || '—', textLeftX + 22, 60);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(71, 85, 105);
+  doc.text("Phase actuelle :", textLeftX + 65, 60);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(2, 132, 199);
+  doc.text(incube?.phase_projet || '—', textLeftX + 90, 60);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(71, 85, 105);
+  doc.text("Promotion :", textLeftX, 67);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(15, 23, 42);
+  doc.text(incube?.promotion || '—', textLeftX + 22, 67);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(71, 85, 105);
+  doc.text("Accompagnateur :", textLeftX + 65, 67);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(15, 23, 42);
+  doc.text(incube?.accompagnateur || '—', textLeftX + 90, 67);
+
+  // Helper pour dessiner le titre officiel d'une section numérotée
+  const drawSectionBadge = (title, yPos) => {
+    doc.setFillColor(2, 132, 199);
+    doc.roundedRect(14, yPos - 3.8, 3, 5, 0.8, 0.8, 'F');
+    doc.setFontSize(9.5);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(15, 23, 42);
+    doc.text(title, 20, yPos);
+  };
+
+  // 5. Section 1 : Renseignements Personnels du Porteur
+  drawSectionBadge("1. RENSEIGNEMENTS PERSONNELS DU PORTEUR", 80);
+
+  autoTable(doc, {
+    startY: 84,
+    margin: { left: 14, right: 14 },
+    theme: 'grid',
+    styles: { fontSize: 8, cellPadding: 2.2, font: 'helvetica', lineColor: [226, 232, 240], lineWidth: 0.3 },
+    columnStyles: {
+      0: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105], cellWidth: 38 },
+      1: { textColor: [15, 23, 42], cellWidth: 53 },
+      2: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105], cellWidth: 38 },
+      3: { textColor: [15, 23, 42], cellWidth: 53 }
+    },
+    body: [
+      ['Carte d\'Identité (CIN)', incube?.cin || '—', 'Genre', incube?.genre || '—'],
+      [
+        'Date de naissance',
+        incube?.date_naissance ? new Date(incube.date_naissance).toLocaleDateString('fr-FR') : '—',
+        'Âge',
+        incube?.age || '—'
+      ],
+      ['Situation familiale', incube?.situation_familiale || '—', 'Niveau d\'étude', incube?.niveau_etude || '—'],
+      ['Ville & Province', `${incube?.ville || '—'} / ${incube?.province || '—'}`, 'Téléphone', incube?.telephone || '—'],
+      ['Adresse E-mail', incube?.email || '—', 'Statut Compte', incube?.est_suspendu ? 'Suspendu' : incube?.compteUtilisateur?.actif ? 'Compte Actif' : 'En attente']
+    ]
+  });
+
+  // 6. Section 2 : Renseignements Entreprise & Projet d'Incubation
+  const sec2Y = doc.lastAutoTable.finalY + 6;
+  drawSectionBadge("2. RENSEIGNEMENTS ENTREPRISE & PROJET D'INCUBATION", sec2Y);
+
+  autoTable(doc, {
+    startY: sec2Y + 4,
+    margin: { left: 14, right: 14 },
+    theme: 'grid',
+    styles: { fontSize: 8, cellPadding: 2.2, font: 'helvetica', lineColor: [226, 232, 240], lineWidth: 0.3 },
+    columnStyles: {
+      0: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105], cellWidth: 38 },
+      1: { textColor: [15, 23, 42], cellWidth: 53 },
+      2: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105], cellWidth: 38 },
+      3: { textColor: [15, 23, 42], cellWidth: 53 }
+    },
+    body: [
+      ['Raison sociale', incube?.raison_sociale || '—', 'Statut juridique', incube?.statut_juridique || '—'],
+      ['Registre Commerce (RC)', incube?.rc || '—', 'Secteur d\'activité', incube?.secteur_activite || '—'],
+      ['Phase du projet', incube?.phase_projet || '—', 'Date de démarrage', incube?.date_demarrage ? new Date(incube.date_demarrage).toLocaleDateString('fr-FR') : '—'],
+      ['Promotion d\'incubation', incube?.promotion || '—', 'Accompagnateur IDS', incube?.accompagnateur || '—']
+    ]
+  });
+
+  // 7. Section 3 : Associés & Membres de l'Équipe
+  let associesList = [];
+  if (Array.isArray(incube?.associes)) {
+    associesList = incube.associes;
+  } else if (typeof incube?.associes === 'string') {
+    try {
+      const parsed = JSON.parse(incube.associes);
+      if (Array.isArray(parsed)) associesList = parsed;
+    } catch (e) {}
+  }
+
+  const sec3Y = doc.lastAutoTable.finalY + 6;
+  drawSectionBadge(`3. ASSOCIÉS & ÉQUIPE DU PROJET (${associesList.length})`, sec3Y);
+
+  if (associesList.length > 0) {
+    autoTable(doc, {
+      startY: sec3Y + 4,
+      margin: { left: 14, right: 14 },
+      theme: 'striped',
+      headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.8, cellPadding: 2 },
+      styles: { fontSize: 7.5, cellPadding: 1.8, font: 'helvetica', lineColor: [226, 232, 240], lineWidth: 0.2 },
+      head: [['Nom & Prénom', 'CIN', 'Fonction', 'Téléphone', 'Accès Tourniquet / Badge']],
+      body: associesList.map(a => [
+        a.nom || '—',
+        a.cin || '—',
+        a.fonction || '—',
+        a.tel || '—',
+        (a.badge_id || a.matricule) ? `Badge #${a.badge_id || a.matricule}` : 'Sans badge'
+      ])
+    });
+  } else {
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(14, sec3Y + 4, contentWidth, 9, 1.5, 1.5, 'FD');
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7.8);
+    doc.setTextColor(148, 163, 184);
+    doc.text("Aucun associé enregistré pour cette startup.", 18, sec3Y + 9.5);
+    // Dummy table to set lastAutoTable.finalY
+    doc.lastAutoTable = { finalY: sec3Y + 14 };
+  }
+
+  // 8. Section 4 : Historiques d'évolution (si présents)
+  const hasHistoPhases = Array.isArray(incube?.historique_phases) && incube.historique_phases.length > 0;
+  const hasHistoStatuts = Array.isArray(incube?.historique_statuts) && incube.historique_statuts.length > 0;
+
+  if (hasHistoPhases || hasHistoStatuts) {
+    const sec4Y = doc.lastAutoTable.finalY + 6;
+    if (sec4Y < pageHeight - 40) {
+      drawSectionBadge("4. HISTORIQUE DES ÉVOLUTIONS DU PROJET", sec4Y);
+      const histoRows = [];
+      if (hasHistoPhases) {
+        incube.historique_phases.forEach(h => {
+          histoRows.push([
+            h.date_changement ? new Date(h.date_changement).toLocaleDateString('fr-FR') : '—',
+            'Phase du projet',
+            h.ancienne_phase || '—',
+            h.nouvelle_phase || '—'
+          ]);
+        });
+      }
+      if (hasHistoStatuts) {
+        incube.historique_statuts.forEach(h => {
+          histoRows.push([
+            h.date_changement ? new Date(h.date_changement).toLocaleDateString('fr-FR') : '—',
+            'Statut juridique',
+            h.ancien_statut || '—',
+            h.nouveau_statut || '—'
+          ]);
+        });
+      }
+
+      autoTable(doc, {
+        startY: sec4Y + 4,
+        margin: { left: 14, right: 14 },
+        theme: 'striped',
+        headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5, cellPadding: 1.8 },
+        styles: { fontSize: 7.2, cellPadding: 1.6, font: 'helvetica', lineColor: [226, 232, 240], lineWidth: 0.2 },
+        head: [['Date', 'Type d\'évolution', 'Ancien état', 'Nouvel état']],
+        body: histoRows
+      });
+    }
+  }
+
+  // 9. Pied de page officiel sur toutes les pages
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.4);
+    doc.line(14, pageHeight - 12, pageWidth - 14, pageHeight - 12);
+
+    doc.setFontSize(7.2);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(148, 163, 184);
+    doc.text(
+      "IDS — Incubateur Digital Solidaire • Salé • Document Officiel Confidentiel",
+      14,
+      pageHeight - 7
+    );
+    doc.text(
+      `Édité le ${today} à ${time} • Page ${i} sur ${totalPages}`,
+      pageWidth - 14,
+      pageHeight - 7,
+      { align: 'right' }
+    );
+  }
+
+  return doc;
+};
+
+export const exportFicheSignaletiqueToPDF = async (incube, filename = null) => {
+  const doc = await generateFicheSignaletiqueDocument(incube);
+  const cleanName = (incube?.nom_incube || 'Incube').replace(/\s+/g, '_');
+  doc.save(filename || `Fiche_Signaletique_${cleanName}.pdf`);
+};
+
+export const getFicheSignaletiqueBlobUrl = async (incube) => {
+  const doc = await generateFicheSignaletiqueDocument(incube);
   const blob = doc.output('blob');
   return URL.createObjectURL(blob);
 };
