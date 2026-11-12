@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, UserCheck, Radio, ShieldCheck, ShieldAlert, ArrowRightLeft, Camera, Upload, X, FileSpreadsheet, GraduationCap, Plus, Eye, FileText } from 'lucide-react';
+import { Save, UserCheck, Radio, ShieldCheck, ShieldAlert, ArrowRightLeft, Camera, Upload, X, FileSpreadsheet, GraduationCap, Plus, Eye, FileText, Linkedin, Globe } from 'lucide-react';
 import api, { getPhotoUrl } from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import ExcelImportModal from '../common/ExcelImportModal';
@@ -14,29 +14,28 @@ const SITUATION_OPTS = ['Célibataire', 'Marié(e)', 'Divorcé(e)', 'Veuf(ve)'];
 const calculateAge = (dob) => {
   if (!dob) return '';
   const birthDate = new Date(dob);
+  if (isNaN(birthDate.getTime())) return '';
   const today = new Date();
   
   let years = today.getFullYear() - birthDate.getFullYear();
-  let months = today.getMonth() - birthDate.getMonth();
-  let days = today.getDate() - birthDate.getDate();
-
-  if (days < 0) {
-    months--;
-    const prevMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-    days += prevMonth.getDate();
-  }
-  
-  if (months < 0) {
+  const m = today.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
     years--;
-    months += 12;
   }
-  
-  let result = [];
-  if (years > 0) result.push(`${years} an${years > 1 ? 's' : ''}`);
-  if (months > 0) result.push(`${months} mois`);
-  if (days > 0) result.push(`${days} jour${days > 1 ? 's' : ''}`);
-  
-  return result.join(', ') || '0 jour';
+  if (years < 0) return '';
+  return `${years} an${years > 1 ? 's' : ''}`;
+};
+
+const cleanAgeYearsOnly = (ageStr, dob) => {
+  if (dob) return calculateAge(dob);
+  if (!ageStr) return '';
+  const match = String(ageStr).match(/^(\d+\s*ans?)/i);
+  if (match) return match[1];
+  if (/^\d+$/.test(String(ageStr).trim())) {
+    const num = parseInt(ageStr, 10);
+    return `${num} an${num > 1 ? 's' : ''}`;
+  }
+  return String(ageStr);
 };
 
 const parseAssocies = (raw) => {
@@ -57,9 +56,7 @@ export default function TabInfos({ incube, onUpdate }) {
   const { isSuperAdmin } = useAuth();
   const [form, setForm] = useState(() => {
     const initial = { ...incube };
-    if (initial.date_naissance) {
-      initial.age = calculateAge(initial.date_naissance);
-    }
+    initial.age = cleanAgeYearsOnly(initial.age, initial.date_naissance);
     initial.associes = parseAssocies(initial.associes);
     return initial;
   });
@@ -132,6 +129,8 @@ export default function TabInfos({ incube, onUpdate }) {
       cin: row.cin || row.cni || prev.cin,
       email: row.email || row.mail || prev.email,
       telephone: row.telephone || row.tel || prev.telephone,
+      linkedin: row.linkedin || row.profil_linkedin || prev.linkedin,
+      site_web: row.site_web || row.siteweb || row.website || row.site || prev.site_web,
       raison_sociale: row.raison_sociale || prev.raison_sociale,
       rc: row.rc || row.registre_commerce || prev.rc,
       phase_projet: row.phase_projet || prev.phase_projet,
@@ -145,7 +144,7 @@ export default function TabInfos({ incube, onUpdate }) {
       genre: row.genre || prev.genre,
       secteur_activite: row.secteur_activite || prev.secteur_activite,
       promotion: row.promotion || row.promo || prev.promotion,
-      age: row.date_naissance ? calculateAge(row.date_naissance) : (row.age || prev.age),
+      age: cleanAgeYearsOnly(row.age, row.date_naissance) || prev.age,
       date_naissance: row.date_naissance || prev.date_naissance,
       niveau_etude: row.niveau_etude || prev.niveau_etude,
       badge_id: row.badge_id || prev.badge_id,
@@ -156,9 +155,7 @@ export default function TabInfos({ incube, onUpdate }) {
 
   useEffect(() => {
     const initialForm = { ...incube };
-    if (initialForm.date_naissance) {
-      initialForm.age = calculateAge(initialForm.date_naissance);
-    }
+    initialForm.age = cleanAgeYearsOnly(initialForm.age, initialForm.date_naissance);
     initialForm.associes = parseAssocies(initialForm.associes);
     setForm(initialForm);
     setIsCustomSecteur(Boolean(initialForm.secteur_activite && !SECTEURS_ACTIVITE.includes(initialForm.secteur_activite)));
@@ -503,6 +500,32 @@ export default function TabInfos({ incube, onUpdate }) {
                 placeholder="Ex: 06 12 34 56 78"
                 value={form.telephone || ''}
                 onChange={f('telephone')}
+              />
+            </div>
+            <div>
+              <label className="label flex items-center gap-1.5">
+                <Linkedin size={15} className="text-[#0A66C2]" />
+                Profil LinkedIn
+              </label>
+              <input
+                type="url"
+                className="input"
+                placeholder="Ex: https://www.linkedin.com/in/nom-prenom"
+                value={form.linkedin || ''}
+                onChange={f('linkedin')}
+              />
+            </div>
+            <div>
+              <label className="label flex items-center gap-1.5">
+                <Globe size={15} className="text-primary-500" />
+                Site Web / Portfolio
+              </label>
+              <input
+                type="url"
+                className="input"
+                placeholder="Ex: https://monprojet.ma"
+                value={form.site_web || ''}
+                onChange={f('site_web')}
               />
             </div>
             <div>

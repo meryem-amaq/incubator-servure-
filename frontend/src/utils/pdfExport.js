@@ -1425,6 +1425,65 @@ export const getQuarterlyPVBlobUrl = (incube, options) => {
 // 📄 FICHE SIGNALÉTIQUE & INFORMATIONS GÉNÉRALES
 // ==========================================
 
+export const formatNomPrenomIncube = (fullName) => {
+  if (!fullName || typeof fullName !== 'string') return 'Incubé';
+  const clean = fullName.trim();
+  if (!clean) return 'Incubé';
+
+  const words = clean.split(/\s+/).filter(Boolean);
+  if (words.length === 1) return words[0].toUpperCase();
+
+  const capitalize = (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+  const isAllCaps = (w) => w.length > 1 && w === w.toUpperCase() && /[A-Z]/.test(w);
+  const anyAllCaps = words.some(isAllCaps);
+  const allAllCaps = words.every(isAllCaps);
+
+  if (anyAllCaps && !allAllCaps) {
+    const nomParts = [];
+    const prenomParts = [];
+    words.forEach((w) => {
+      if (isAllCaps(w)) nomParts.push(w.toUpperCase());
+      else prenomParts.push(capitalize(w));
+    });
+    return `${nomParts.join(' ')} ${prenomParts.join(' ')}`.trim();
+  }
+
+  // Si tout est en majuscule ou tout en minuscule/capitalisé (ex: "Ahmed Benmoussa", "ahmed benmoussa", "AHMED BENMOUSSA")
+  const nomPrefixes = ['el', 'al', 'ait', 'ben', 'ibn', 'bel', 'bou', 'ould', 'de', 'da'];
+  let splitIndex = words.length - 1;
+  if (words.length >= 3 && nomPrefixes.includes(words[words.length - 2].toLowerCase())) {
+    splitIndex = words.length - 2;
+  }
+
+  const prenomList = words.slice(0, splitIndex).map(capitalize);
+  const nomList = words.slice(splitIndex).map(w => w.toUpperCase());
+
+  return `${nomList.join(' ')} ${prenomList.join(' ')}`.trim();
+};
+
+export const formatAgeAnnees = (ageStr, dob) => {
+  if (dob) {
+    const birthDate = new Date(dob);
+    if (!isNaN(birthDate.getTime())) {
+      const today = new Date();
+      let years = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        years--;
+      }
+      if (years >= 0) return `${years} an${years > 1 ? 's' : ''}`;
+    }
+  }
+  if (!ageStr) return '—';
+  const match = String(ageStr).match(/^(\d+\s*ans?)/i);
+  if (match) return match[1];
+  if (/^\d+$/.test(String(ageStr).trim())) {
+    const num = parseInt(ageStr, 10);
+    return `${num} an${num > 1 ? 's' : ''}`;
+  }
+  return String(ageStr);
+};
+
 export const generateFicheSignaletiqueDocument = async (incube) => {
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -1440,6 +1499,8 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
   const today = new Date().toLocaleDateString('fr-FR');
   const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   const incubeName = incube?.nom_incube || 'Incubé';
+  const displayName = formatNomPrenomIncube(incubeName);
+  const ageAnnees = formatAgeAnnees(incube?.age, incube?.date_naissance);
 
   // 1. Cadre décoratif extérieur
   doc.setDrawColor(226, 232, 240);
@@ -1478,31 +1539,26 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10.5);
   doc.setTextColor(15, 23, 42); // slate-900
-  doc.text('INCUBATEUR DIGITAL SOLIDAIRE (IDS)', 94, 22, { align: 'center' });
+  doc.text('INCUBATEUR DIGITAL SOLIDAIRE (IDS)', 94, 22.5, { align: 'center' });
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(2, 132, 199); // primary sky-600
-  doc.text('FICHE SIGNALÉTIQUE & INFORMATIONS GÉNÉRALES', 94, 27, { align: 'center' });
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(100, 116, 139); // slate-500
-  doc.text(`Dossier d'accompagnement • Réf : FS-${incube?.pp_numero || 'INC'} • ${today}`, 94, 31.5, { align: 'center' });
+  doc.text('FICHE SIGNALÉTIQUE & INFORMATIONS GÉNÉRALES', 94, 28, { align: 'center' });
 
   // Ligne séparatrice officielle
   doc.setDrawColor(226, 232, 240);
   doc.setLineWidth(0.5);
-  doc.line(14, 36, pageWidth - 14, 36);
+  doc.line(14, 34, pageWidth - 14, 34);
 
-  // 4. Cartouche Porteur & Photo de l'incubé (Y = 39 à 73)
+  // 4. Cartouche Porteur & Photo de l'incubé (Y = 37 à 71)
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(14, 39, contentWidth, 34, 2.5, 2.5, 'FD');
+  doc.roundedRect(14, 37, contentWidth, 34, 2.5, 2.5, 'FD');
 
   // Photo
   const photoX = 18;
-  const photoY = 42;
+  const photoY = 40;
   const photoSize = 28;
   if (photoDataUrl) {
     try {
@@ -1533,41 +1589,41 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12.5);
   doc.setTextColor(15, 23, 42);
-  doc.text(incubeName.toUpperCase(), textLeftX, 47);
+  doc.text(displayName, textLeftX, 45);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(2, 132, 199);
-  doc.text(incube?.raison_sociale || 'Projet d\'incubation', textLeftX, 53);
+  doc.text(incube?.raison_sociale || 'Projet d\'incubation', textLeftX, 51);
 
   doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(71, 85, 105);
-  doc.text("N° Dossier :", textLeftX, 60);
+  doc.text("N° Dossier :", textLeftX, 58);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(15, 23, 42);
-  doc.text(incube?.pp_numero || '—', textLeftX + 22, 60);
+  doc.text(incube?.pp_numero || '—', textLeftX + 22, 58);
 
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(71, 85, 105);
-  doc.text("Phase actuelle :", textLeftX + 65, 60);
+  doc.text("Phase actuelle :", textLeftX + 65, 58);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(2, 132, 199);
-  doc.text(incube?.phase_projet || '—', textLeftX + 90, 60);
+  doc.text(incube?.phase_projet || '—', textLeftX + 90, 58);
 
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(71, 85, 105);
-  doc.text("Promotion :", textLeftX, 67);
+  doc.text("Promotion :", textLeftX, 65);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(15, 23, 42);
-  doc.text(incube?.promotion || '—', textLeftX + 22, 67);
+  doc.text(incube?.promotion || '—', textLeftX + 22, 65);
 
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(71, 85, 105);
-  doc.text("Accompagnateur :", textLeftX + 65, 67);
+  doc.text("Accompagnateur :", textLeftX + 65, 65);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(15, 23, 42);
-  doc.text(incube?.accompagnateur || '—', textLeftX + 90, 67);
+  doc.text(incube?.accompagnateur || '—', textLeftX + 90, 65);
 
   // Helper pour dessiner le titre officiel d'une section numérotée
   const drawSectionBadge = (title, yPos) => {
@@ -1580,10 +1636,10 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
   };
 
   // 5. Section 1 : Renseignements Personnels du Porteur
-  drawSectionBadge("1. RENSEIGNEMENTS PERSONNELS DU PORTEUR", 80);
+  drawSectionBadge("1. RENSEIGNEMENTS PERSONNELS DU PORTEUR", 77);
 
   autoTable(doc, {
-    startY: 84,
+    startY: 81,
     margin: { left: 14, right: 14 },
     theme: 'grid',
     styles: { fontSize: 8, cellPadding: 2.2, font: 'helvetica', lineColor: [226, 232, 240], lineWidth: 0.3 },
@@ -1599,11 +1655,11 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
         'Date de naissance',
         incube?.date_naissance ? new Date(incube.date_naissance).toLocaleDateString('fr-FR') : '—',
         'Âge',
-        incube?.age || '—'
+        ageAnnees
       ],
       ['Situation familiale', incube?.situation_familiale || '—', 'Niveau d\'étude', incube?.niveau_etude || '—'],
       ['Ville & Province', `${incube?.ville || '—'} / ${incube?.province || '—'}`, 'Téléphone', incube?.telephone || '—'],
-      ['Adresse E-mail', incube?.email || '—', 'Statut Compte', incube?.est_suspendu ? 'Suspendu' : incube?.compteUtilisateur?.actif ? 'Compte Actif' : 'En attente']
+      ['Adresse E-mail', incube?.email || '—', 'Profil LinkedIn', incube?.linkedin || '—']
     ]
   });
 
@@ -1626,7 +1682,8 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
       ['Raison sociale', incube?.raison_sociale || '—', 'Statut juridique', incube?.statut_juridique || '—'],
       ['Registre Commerce (RC)', incube?.rc || '—', 'Secteur d\'activité', incube?.secteur_activite || '—'],
       ['Phase du projet', incube?.phase_projet || '—', 'Date de démarrage', incube?.date_demarrage ? new Date(incube.date_demarrage).toLocaleDateString('fr-FR') : '—'],
-      ['Promotion d\'incubation', incube?.promotion || '—', 'Accompagnateur IDS', incube?.accompagnateur || '—']
+      ['Promotion d\'incubation', incube?.promotion || '—', 'Accompagnateur IDS', incube?.accompagnateur || '—'],
+      ['Site Web / Portfolio', incube?.site_web || '—', 'Réf. Porteur (PP)', incube?.pp_numero || '—']
     ]
   });
 
@@ -1672,49 +1729,7 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
     doc.lastAutoTable = { finalY: sec3Y + 14 };
   }
 
-  // 8. Section 4 : Historiques d'évolution (si présents)
-  const hasHistoPhases = Array.isArray(incube?.historique_phases) && incube.historique_phases.length > 0;
-  const hasHistoStatuts = Array.isArray(incube?.historique_statuts) && incube.historique_statuts.length > 0;
-
-  if (hasHistoPhases || hasHistoStatuts) {
-    const sec4Y = doc.lastAutoTable.finalY + 6;
-    if (sec4Y < pageHeight - 40) {
-      drawSectionBadge("4. HISTORIQUE DES ÉVOLUTIONS DU PROJET", sec4Y);
-      const histoRows = [];
-      if (hasHistoPhases) {
-        incube.historique_phases.forEach(h => {
-          histoRows.push([
-            h.date_changement ? new Date(h.date_changement).toLocaleDateString('fr-FR') : '—',
-            'Phase du projet',
-            h.ancienne_phase || '—',
-            h.nouvelle_phase || '—'
-          ]);
-        });
-      }
-      if (hasHistoStatuts) {
-        incube.historique_statuts.forEach(h => {
-          histoRows.push([
-            h.date_changement ? new Date(h.date_changement).toLocaleDateString('fr-FR') : '—',
-            'Statut juridique',
-            h.ancien_statut || '—',
-            h.nouveau_statut || '—'
-          ]);
-        });
-      }
-
-      autoTable(doc, {
-        startY: sec4Y + 4,
-        margin: { left: 14, right: 14 },
-        theme: 'striped',
-        headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5, cellPadding: 1.8 },
-        styles: { fontSize: 7.2, cellPadding: 1.6, font: 'helvetica', lineColor: [226, 232, 240], lineWidth: 0.2 },
-        head: [['Date', 'Type d\'évolution', 'Ancien état', 'Nouvel état']],
-        body: histoRows
-      });
-    }
-  }
-
-  // 9. Pied de page officiel sur toutes les pages
+  // 8. Pied de page officiel sur toutes les pages
   const totalPages = doc.internal.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
