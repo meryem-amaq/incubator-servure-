@@ -1683,15 +1683,38 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
       ['Registre Commerce (RC)', incube?.rc || '—', 'Secteur d\'activité', incube?.secteur_activite || '—'],
       ['Phase du projet', incube?.phase_projet || '—', 'Date de démarrage', incube?.date_demarrage ? new Date(incube.date_demarrage).toLocaleDateString('fr-FR') : '—'],
       ['Promotion d\'incubation', incube?.promotion || '—', 'Accompagnateur IDS', incube?.accompagnateur || '—'],
-      ['Site Web / Portfolio', incube?.site_web || '—', 'Réf. Porteur (PP)', incube?.pp_numero || '—'],
-      [
-        { content: 'Description du projet', styles: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105] } },
-        { content: incube?.description_projet || 'Aucune description renseignée pour ce projet.', colSpan: 3, styles: { textColor: [15, 23, 42], fontStyle: incube?.description_projet ? 'normal' : 'italic' } }
-      ]
+      ['Site Web / Portfolio', incube?.site_web || '—', 'Réf. Porteur (PP)', incube?.pp_numero || '—']
     ]
   });
 
-  // 7. Section 3 : Associés & Membres de l'Équipe
+  // 7. Section 3 : Description & Synthèse du projet
+  const sec3Y = doc.lastAutoTable.finalY + 6;
+  drawSectionBadge("3. DESCRIPTION DU PROJET", sec3Y);
+
+  const descText = (incube?.description_projet && String(incube.description_projet).trim())
+    ? String(incube.description_projet).trim()
+    : "Aucune description renseignée pour ce projet.";
+
+  autoTable(doc, {
+    startY: sec3Y + 4,
+    margin: { left: 14, right: 14 },
+    theme: 'plain',
+    styles: { 
+      fontSize: 8, 
+      cellPadding: 3.5, 
+      font: 'helvetica', 
+      lineColor: [226, 232, 240], 
+      lineWidth: 0.3,
+      fillColor: [248, 250, 252],
+      textColor: incube?.description_projet ? [15, 23, 42] : [148, 163, 184],
+      fontStyle: incube?.description_projet ? 'normal' : 'italic'
+    },
+    body: [
+      [{ content: descText }]
+    ]
+  });
+
+  // 8. Section 4 : Associés & Membres de l'Équipe
   let associesList = [];
   if (Array.isArray(incube?.associes)) {
     associesList = incube.associes;
@@ -1702,12 +1725,12 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
     } catch (e) {}
   }
 
-  const sec3Y = doc.lastAutoTable.finalY + 6;
-  drawSectionBadge(`3. ASSOCIÉS & ÉQUIPE DU PROJET (${associesList.length})`, sec3Y);
+  const sec4Y = doc.lastAutoTable.finalY + 6;
+  drawSectionBadge(`4. ASSOCIÉS & ÉQUIPE DU PROJET (${associesList.length})`, sec4Y);
 
   if (associesList.length > 0) {
     autoTable(doc, {
-      startY: sec3Y + 4,
+      startY: sec4Y + 4,
       margin: { left: 14, right: 14 },
       theme: 'striped',
       headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.8, cellPadding: 2 },
@@ -1724,13 +1747,13 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
   } else {
     doc.setFillColor(248, 250, 252);
     doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(14, sec3Y + 4, contentWidth, 9, 1.5, 1.5, 'FD');
+    doc.roundedRect(14, sec4Y + 4, contentWidth, 9, 1.5, 1.5, 'FD');
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(7.8);
     doc.setTextColor(148, 163, 184);
-    doc.text("Aucun associé enregistré pour cette startup.", 18, sec3Y + 9.5);
+    doc.text("Aucun associé enregistré pour cette startup.", 18, sec4Y + 9.5);
     // Dummy table to set lastAutoTable.finalY
-    doc.lastAutoTable = { finalY: sec3Y + 14 };
+    doc.lastAutoTable = { finalY: sec4Y + 14 };
   }
 
   // 8. Pied de page officiel sur toutes les pages
