@@ -28,7 +28,7 @@ function parseDurationToHours(dureeStr) {
 }
 
 // GET /api/ateliers
-// Retrieve all ateliers with optional animator incubé details
+// Retrieve all ateliers with optional animator incubé details and live presence count
 router.get('/', auth, async (req, res) => {
   try {
     const ateliers = await Atelier.findAll({
@@ -41,7 +41,35 @@ router.get('/', auth, async (req, res) => {
       ],
       order: [['date', 'DESC'], ['heureDebut', 'DESC']]
     });
-    res.json(ateliers);
+
+    // Calculer le nombre réel de présents pour chaque atelier depuis la base de données
+    const atelierIds = ateliers.map(a => String(a.id));
+    const presenceCountMap = {};
+    if (atelierIds.length > 0) {
+      try {
+        const presences = await PresenceAtelier.findAll({
+          where: {
+            atelierId: { [Op.in]: atelierIds },
+            present: true
+          },
+          attributes: ['atelierId', 'incubeId']
+        });
+        presences.forEach(p => {
+          const aId = String(p.atelierId);
+          presenceCountMap[aId] = (presenceCountMap[aId] || 0) + 1;
+        });
+      } catch (errP) {
+        console.warn('Erreur calcul presences ateliers:', errP.message);
+      }
+    }
+
+    const result = ateliers.map(a => {
+      const plain = a.toJSON();
+      plain.nbPresents = presenceCountMap[String(a.id)] || 0;
+      return plain;
+    });
+
+    res.json(result);
   } catch (error) {
     console.error('Erreur récupération ateliers:', error);
     res.status(500).json({ message: 'Erreur lors de la récupération des ateliers' });
@@ -239,7 +267,33 @@ router.post('/upload-photos', auth, requireStaff, upload.array('photos', 10), as
 // Append photos to an existing atelier
 router.post('/:id/photos', auth, requireStaff, upload.array('photos', 10), async (req, res) => {
   try {
-    const atelier = await Atelier.findByPk(req.params.id);
+    let atelier = await Atelier.findByPk(req.params.id);
+    if (!atelier) {
+      try {
+        atelier = await Atelier.findOne({ where: { id: req.params.id } });
+      } catch (_) {}
+    }
+    if (!atelier && req.body.titre) {
+      try {
+        atelier = await Atelier.findOne({ where: { titre: req.body.titre } });
+      } catch (_) {}
+    }
+    if (!atelier) {
+      try {
+        atelier = await Atelier.create({
+          id: req.params.id,
+          titre: req.body.titre || 'Atelier IDS',
+          date: req.body.date || new Date().toISOString().split('T')[0],
+          heureDebut: req.body.heureDebut || '09:30',
+          heureFin: req.body.heureFin || '12:30',
+          duree: req.body.duree || '3h00',
+          statutOuverture: 'auto',
+          photos: []
+        });
+      } catch (errCreate) {
+        console.warn('Création auto atelier pour photos:', errCreate.message);
+      }
+    }
     if (!atelier) {
       return res.status(404).json({ message: 'Atelier non trouvé' });
     }
@@ -283,7 +337,7 @@ router.post('/:id/photos', auth, requireStaff, upload.array('photos', 10), async
       include: [{ model: Incube, as: 'animateurIncube', attributes: ['id', 'nom_incube', 'email', 'raison_sociale'] }]
     });
 
-    res.json(updatedWithAssoc);
+    res.json(updatedWithAssoc || atelier);
   } catch (error) {
     console.error('Erreur ajout photos atelier:', error);
     res.status(500).json({ message: "Erreur lors de l'ajout des photos", error: error.message });
@@ -294,12 +348,25 @@ router.post('/:id/photos', auth, requireStaff, upload.array('photos', 10), async
 // Remove a photo from an atelier
 router.delete('/:id/photos', auth, requireStaff, async (req, res) => {
   try {
-    const atelier = await Atelier.findByPk(req.params.id);
+    const { photoUrl } = req.body;
+    let atelier = await Atelier.findByPk(req.params.id);
     if (!atelier) {
-      return res.status(404).json({ message: 'Atelier non trouvé' });
+      try {
+        atelier = await Atelier.findOne({ where: { id: req.params.id } });
+      } catch (_) {}
     }
 
-    const { photoUrl } = req.body;
+    if (!atelier) {
+      if (photoUrl) {
+        const filename = path.basename(photoUrl);
+        const uploadsBase = process.env.UPLOAD_PATH || path.join(__dirname, '../../uploads');
+        const filePath = path.join(uploadsBase, 'ateliers', filename);
+        if (fs.existsSync(filePath)) {
+          try { fs.unlinkSync(filePath); } catch (_) {}
+        }
+      }
+      return res.json({ success: true, message: 'Photo supprimée', photos: [] });
+    }
     if (!photoUrl) {
       return res.status(400).json({ message: 'URL de la photo requise' });
     }

@@ -42,6 +42,7 @@ import api, { getPhotoUrl } from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import FeuilleEmargementPrint from '../components/common/FeuilleEmargementPrint';
+import { compressImage, compressImageList } from '../utils/imageCompressor';
 
 // =========================================================================
 // COMPOSANT CAROUSEL PHOTOS POUR ATELIER
@@ -155,6 +156,9 @@ function AtelierFullCard({
   const hasPhotos = photos.length > 0;
   const safeIdx = hasPhotos ? (((photoIndex % photos.length) + photos.length) % photos.length) : 0;
   const currentPhoto = hasPhotos ? photos[safeIdx] : null;
+  const effectivePresents = typeof nbPresents === 'number'
+    ? nbPresents
+    : (typeof atelier.nbPresents === 'number' ? atelier.nbPresents : 0);
 
   return (
     <div
@@ -299,12 +303,12 @@ function AtelierFullCard({
         <div className="pt-2 border-t border-white/15 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-full backdrop-blur-md ${
-              nbPresents > 0
+              effectivePresents > 0
                 ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-400/40'
                 : 'bg-black/50 text-white/70 border border-white/15'
             }`}>
-              <Users size={12} className={nbPresents > 0 ? 'text-emerald-400' : 'text-slate-400'} />
-              {nbPresents} présent{nbPresents !== 1 ? 's' : ''}
+              <Users size={12} className={effectivePresents > 0 ? 'text-emerald-400' : 'text-slate-400'} />
+              {effectivePresents} présent{effectivePresents !== 1 ? 's' : ''}
             </span>
 
             {atelier.invitedCount ? (
@@ -391,6 +395,7 @@ export default function Evenements() {
         return {
           ...local,
           ...a,
+          nbPresents: typeof a.nbPresents === 'number' ? a.nbPresents : (local.nbPresents || 0),
           targetMode: a.targetMode || meta.targetMode || local.targetMode || 'all',
           selectedIncubes: a.selectedIncubes || meta.selectedIncubes || local.selectedIncubes || [],
           invitedNames: a.invitedNames || meta.invitedNames || local.invitedNames || [],
@@ -398,8 +403,11 @@ export default function Evenements() {
           photos: Array.isArray(a.photos) ? a.photos : (Array.isArray(local.photos) ? local.photos : [])
         };
       });
-      setFormations(merged);
-      localStorage.setItem('ids_ateliers_list', JSON.stringify(merged));
+      const apiIdsSet = new Set(apiList.map(a => String(a.id)));
+      const localOnly = Object.values(savedMap).filter(loc => loc && loc.id && !apiIdsSet.has(String(loc.id)));
+      const fullList = [...merged, ...localOnly];
+      setFormations(fullList);
+      localStorage.setItem('ids_ateliers_list', JSON.stringify(fullList));
     } catch (err) {
       console.error('Erreur chargement ateliers', err);
       // Fallback au localstorage
@@ -445,19 +453,24 @@ export default function Evenements() {
 
   // Gestion des photos pour un atelier existant (Detail View)
   const handleUploadPhotosToExistingAtelier = async (filesList) => {
-    const files = Array.from(filesList || []).filter(f => f.type.startsWith('image/'));
-    if (files.length === 0 || !selectedAtelier) return;
-
-    const formData = new FormData();
-    files.forEach(f => formData.append('photos', f));
+    const rawFiles = Array.from(filesList || []).filter(f => f.type.startsWith('image/'));
+    if (rawFiles.length === 0 || !selectedAtelier) return;
 
     try {
-      toast.loading("Enregistrement des photos...", { id: 'upload_atelier_photos' });
+      toast.loading("Optimisation et compression des photos...", { id: 'upload_atelier_photos' });
+      const compressedFiles = await compressImageList(rawFiles, { maxWidth: 1600, maxHeight: 1600, quality: 0.82 });
+
+      const formData = new FormData();
+      compressedFiles.forEach(f => formData.append('photos', f));
+      formData.append('titre', selectedAtelier.titre || '');
+      formData.append('date', selectedAtelier.date || '');
+
+      toast.loading("Enregistrement sur le serveur...", { id: 'upload_atelier_photos' });
       const res = await api.post(`/ateliers/${selectedAtelier.id}/photos`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       toast.dismiss('upload_atelier_photos');
-      toast.success(`${files.length} photo(s) ajoutée(s) avec succès !`);
+      toast.success(`${compressedFiles.length} photo(s) optimisée(s) et ajoutée(s) !`);
       const updated = { ...selectedAtelier, photos: res.data.photos || [] };
       setSelectedAtelier(updated);
       setFormations(prev => prev.map(f => f.id === updated.id ? updated : f));
@@ -611,9 +624,12 @@ export default function Evenements() {
     return Object.values(map);
   };
 
-  // Compter le nombre de présents pour un atelier
-  const getPresenceCount = (atelierId) => {
-    return getPresences(atelierId).length;
+  // Compter le nombre de présents pour un atelier (fusion BDD / local)
+  const getPresenceCount = (atelierId, atelierObj) => {
+    const localCount = getPresences(atelierId).length;
+    const item = atelierObj || formations.find(f => String(f.id) === String(atelierId));
+    const serverCount = typeof item?.nbPresents === 'number' ? item.nbPresents : 0;
+    return Math.max(localCount, serverCount);
   };
 
   // Ajouter un nouvel atelier
@@ -663,12 +679,14 @@ export default function Evenements() {
       photos: []
     };
 
-    // Upload des photos sélectionnées si présentes
+    // Upload des photos sélectionnées si présentes (compressées côté client)
     if (newFormationPhotoFiles.length > 0) {
       try {
+        const rawFiles = newFormationPhotoFiles.map(pf => pf.file).filter(Boolean);
+        const compressedFiles = await compressImageList(rawFiles, { maxWidth: 1600, maxHeight: 1600, quality: 0.82 });
         const formData = new FormData();
-        newFormationPhotoFiles.forEach(pf => {
-          formData.append('photos', pf.file);
+        compressedFiles.forEach(cf => {
+          formData.append('photos', cf);
         });
         const resUpload = await api.post('/ateliers/upload-photos', formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
@@ -2526,7 +2544,7 @@ export default function Evenements() {
               key={f.id}
               atelier={f}
               isPasse={isAtelierPasse(f.date)}
-              nbPresents={getPresenceCount(f.id)}
+              nbPresents={getPresenceCount(f.id, f)}
               onSelect={() => setSelectedAtelier(f)}
               onDelete={handleDeleteFormation}
               onOpenQr={setQrModalAtelier}
