@@ -1055,7 +1055,7 @@ router.get('/atelier/:id/info', async (req, res) => {
 router.put('/atelier/:id/horaire', auth, requireStaff, async (req, res) => {
   try {
     const aId = req.params.id;
-    const { heureDebut, heureFin, date, duree, statutOuverture, titre, formateur } = req.body;
+    const { heureDebut, heureFin, date, dateFin, duree, statutOuverture, titre, formateur } = req.body;
 
     let atelier = await Atelier.findByPk(aId);
 
@@ -1065,6 +1065,7 @@ router.put('/atelier/:id/horaire', auth, requireStaff, async (req, res) => {
         titre: titre || 'Atelier & Formation IDS',
         formateur: formateur || 'Intervenant IDS',
         date: date || new Date().toISOString().split('T')[0],
+        dateFin: dateFin || null,
         heureDebut: heureDebut || '09:30',
         heureFin: heureFin || '12:30',
         duree: duree || '3h00',
@@ -1074,6 +1075,7 @@ router.put('/atelier/:id/horaire', auth, requireStaff, async (req, res) => {
       if (heureDebut !== undefined) atelier.heureDebut = heureDebut;
       if (heureFin !== undefined) atelier.heureFin = heureFin;
       if (date !== undefined) atelier.date = date;
+      if (dateFin !== undefined) atelier.dateFin = dateFin || null;
       if (duree !== undefined) atelier.duree = duree;
       if (statutOuverture !== undefined) atelier.statutOuverture = statutOuverture;
       if (titre !== undefined) atelier.titre = titre;

@@ -33,6 +33,11 @@ const Atelier = sequelize.define('Atelier', {
     type: DataTypes.DATEONLY,
     allowNull: false
   },
+  dateFin: {
+    type: DataTypes.DATEONLY,
+    allowNull: true,
+    field: 'date_fin'
+  },
   heureDebut: {
     type: DataTypes.STRING(10),
     allowNull: false,

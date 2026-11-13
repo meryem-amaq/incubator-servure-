@@ -403,7 +403,7 @@ router.delete('/:id/photos', auth, requireStaff, async (req, res) => {
 router.post('/', auth, requireStaff, async (req, res) => {
   try {
     const {
-      titre, formateur, intervenant, date,
+      titre, formateur, intervenant, date, dateFin,
       heureDebut, heureFin, duree, description, statutOuverture,
       animateurType, animateurIncubeId, photos
     } = req.body;
@@ -426,6 +426,7 @@ router.post('/', auth, requireStaff, async (req, res) => {
       animateurType: resolvedAnimateurType,
       animateurIncubeId: resolvedAnimateurIncubeId,
       date: date || new Date().toISOString().split('T')[0],
+      dateFin: dateFin || null,
       heureDebut: heureDebut || '09:30',
       heureFin: heureFin || '12:30',
       duree: duree || '3h00',
@@ -459,7 +460,7 @@ router.put('/:id', auth, requireStaff, async (req, res) => {
     }
 
     const {
-      titre, formateur, intervenant, date,
+      titre, formateur, intervenant, date, dateFin,
       heureDebut, heureFin, duree, description, statutOuverture,
       animateurType, animateurIncubeId, photos
     } = req.body;
@@ -468,6 +469,7 @@ router.put('/:id', auth, requireStaff, async (req, res) => {
     if (formateur !== undefined) atelier.formateur = formateur;
     if (intervenant !== undefined) atelier.intervenant = intervenant;
     if (date !== undefined) atelier.date = date;
+    if (dateFin !== undefined) atelier.dateFin = dateFin || null;
     if (heureDebut !== undefined) atelier.heureDebut = heureDebut;
     if (heureFin !== undefined) atelier.heureFin = heureFin;
     if (duree !== undefined) atelier.duree = duree;

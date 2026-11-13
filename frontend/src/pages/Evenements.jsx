@@ -42,7 +42,30 @@ import api, { getPhotoUrl } from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import FeuilleEmargementPrint from '../components/common/FeuilleEmargementPrint';
+import HotelDatePicker from '../components/common/HotelDatePicker';
 import { compressImage, compressImageList } from '../utils/imageCompressor';
+
+// Helper global de formatage de dates (supporte 1 jour unique ou plage de dates)
+export const formatDateFrench = (dateInput, dateEndInput) => {
+  if (!dateInput) return 'prochainement';
+  try {
+    const d1 = new Date(dateInput);
+    if (!isNaN(d1.getTime())) {
+      if (!dateEndInput || dateEndInput === dateInput) {
+        return d1.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+      }
+      const d2 = new Date(dateEndInput);
+      if (!isNaN(d2.getTime())) {
+        if (d1.getMonth() === d2.getMonth() && d1.getFullYear() === d2.getFullYear()) {
+          const m = d1.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+          return `du ${d1.getDate()} au ${d2.getDate()} ${m}`;
+        }
+        return `du ${d1.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} au ${d2.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+      }
+    }
+  } catch (e) {}
+  return String(dateInput);
+};
 
 // =========================================================================
 // COMPOSANT CAROUSEL PHOTOS POUR ATELIER
@@ -269,7 +292,7 @@ function AtelierFullCard({
         {/* Métadonnées en capsules semi-transparentes */}
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/50 backdrop-blur-md text-white border border-white/15 font-medium">
-            <Calendar size={13} className="text-amber-400" /> {new Date(atelier.date).toLocaleDateString('fr-FR')}
+            <Calendar size={13} className="text-amber-400" /> {formatDateFrench(atelier.date, atelier.dateFin)}
           </span>
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/50 backdrop-blur-md text-amber-300 border border-white/15 font-extrabold">
             <Clock size={13} /> {atelier.heureDebut || '09:30'} - {atelier.heureFin || '12:30'}
@@ -519,6 +542,7 @@ export default function Evenements() {
     heureDebut: '09:30',
     heureFin: '12:30',
     date: '',
+    dateFin: '',
     statutOuverture: 'auto'
   });
 
@@ -538,6 +562,7 @@ export default function Evenements() {
     formateur: '',
     intervenant: '',
     date: new Date().toISOString().split('T')[0],
+    dateFin: '',
     heureDebut: '09:30',
     heureFin: '12:30',
     duree: '3h00',
@@ -558,12 +583,12 @@ export default function Evenements() {
   }, [formations]);
 
   // Déterminer si un atelier est passé ou à venir
-  const isAtelierPasse = (dateStr) => {
+  const isAtelierPasse = (dateStr, dateFinStr) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const d = new Date(dateStr);
-    d.setHours(0, 0, 0, 0);
-    return d < today;
+    const target = dateFinStr ? new Date(dateFinStr) : new Date(dateStr);
+    target.setHours(0, 0, 0, 0);
+    return target < today;
   };
 
   // Présences reçues du serveur backend (temps réel)
@@ -676,6 +701,7 @@ export default function Evenements() {
       formateur: newFormation.formateur.trim(),
       intervenant: newFormation.intervenant.trim(),
       date: newFormation.date,
+      dateFin: newFormation.dateFin || null,
       heureDebut: newFormation.heureDebut || '09:30',
       heureFin: newFormation.heureFin || '12:30',
       duree: dureeCalc,
@@ -747,6 +773,7 @@ export default function Evenements() {
       formateur: '',
       intervenant: '',
       date: new Date().toISOString().split('T')[0],
+      dateFin: '',
       heureDebut: '09:30',
       heureFin: '12:30',
       duree: '3h00',
@@ -811,7 +838,7 @@ export default function Evenements() {
         f.titre?.toLowerCase().includes(searchWorkshop.toLowerCase()) ||
         f.formateur?.toLowerCase().includes(searchWorkshop.toLowerCase());
       
-      const passe = isAtelierPasse(f.date);
+      const passe = isAtelierPasse(f.date, f.dateFin);
       let matchStatus = true;
       if (filterStatus === 'passe') matchStatus = passe;
       if (filterStatus === 'a_venir') matchStatus = !passe;
@@ -825,7 +852,7 @@ export default function Evenements() {
     const total = ateliersList.length;
     let passes = 0;
     ateliersList.forEach(f => {
-      if (isAtelierPasse(f.date)) passes++;
+      if (isAtelierPasse(f.date, f.dateFin)) passes++;
     });
     const aVenir = total - passes;
     return { total, passes, aVenir };
@@ -974,17 +1001,6 @@ export default function Evenements() {
     sending: false
   });
 
-  const formatDateFrench = (dateInput) => {
-    if (!dateInput) return 'prochainement';
-    try {
-      const d = new Date(dateInput);
-      if (!isNaN(d.getTime())) {
-        return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
-      }
-    } catch (e) {}
-    return String(dateInput);
-  };
-
   const handleOpenMailCustomModal = (mode, atelier, targetList) => {
     if (!atelier) return;
     const targets = targetList && targetList.length > 0 ? targetList : allIncubes;
@@ -994,7 +1010,7 @@ export default function Evenements() {
       return;
     }
 
-    const dateStr = formatDateFrench(atelier.date);
+    const dateStr = formatDateFrench(atelier.date, atelier.dateFin);
 
     if (mode === 'convocation') {
       const defaultSubject = `🛠️ Invitation : Atelier pratique — ${atelier.titre}`;
@@ -1165,6 +1181,7 @@ export default function Evenements() {
       const updated = {
         ...selectedAtelier,
         date: adjustHoraireModal.date,
+        dateFin: adjustHoraireModal.dateFin || null,
         heureDebut: adjustHoraireModal.heureDebut,
         heureFin: adjustHoraireModal.heureFin,
         duree: dureeCalc,
@@ -1176,6 +1193,7 @@ export default function Evenements() {
         headers: getAuthHeaders(),
         body: JSON.stringify({
           date: updated.date,
+          dateFin: updated.dateFin,
           heureDebut: updated.heureDebut,
           heureFin: updated.heureFin,
           duree: dureeCalc,
@@ -1193,7 +1211,7 @@ export default function Evenements() {
       setFormations(prev => prev.map(f => f.id === updated.id ? updated : f));
 
       toast.success("Horaire et statut d'émargement mis à jour !", { icon: '⏱️' });
-      setAdjustHoraireModal({ open: false, heureDebut: '09:30', heureFin: '12:30', date: '', statutOuverture: 'auto' });
+      setAdjustHoraireModal({ open: false, heureDebut: '09:30', heureFin: '12:30', date: '', dateFin: '', statutOuverture: 'auto' });
     } catch (err) {
       toast.error("Erreur lors de la mise à jour de l'horaire");
     }
@@ -1471,7 +1489,7 @@ export default function Evenements() {
     const previewBadge = isRappel ? 'RAPPEL • ATELIER PRATIQUE' : 'CONVOCATION • ATELIER PRATIQUE';
     const previewTheme = atelier.titre || 'Atelier Pratique IDS';
     const previewParcours = 'Atelier Pratique & Collaboratif';
-    const previewDate = formatDateFrench(atelier.date);
+    const previewDate = formatDateFrench(atelier.date, atelier.dateFin);
     const previewHoraires = `${atelier.heureDebut || '09:30'} - ${atelier.heureFin || '12:30'} (${atelier.duree || '3h00'})`;
     const previewIntervenant = atelier.intervenant || atelier.formateur || 'Équipe d’Animation IDS';
     const rawLieu = atelier.salle || atelier.lieu;
@@ -1853,7 +1871,7 @@ export default function Evenements() {
                   {selectedAtelier.titre}
                 </h1>
                 <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500 dark:text-dark-400 font-medium">
-                  <span>📅 {new Date(selectedAtelier.date).toLocaleDateString('fr-FR')}</span>
+                  <span>📅 {formatDateFrench(selectedAtelier.date, selectedAtelier.dateFin)}</span>
                   <span>•</span>
                   <span className="font-extrabold text-primary-600 dark:text-primary-400">
                     ⏰ {selectedAtelier.heureDebut || '09:30'} - {selectedAtelier.heureFin || '12:30'}
@@ -1906,6 +1924,7 @@ export default function Evenements() {
                   heureDebut: selectedAtelier.heureDebut || '09:30',
                   heureFin: selectedAtelier.heureFin || '12:30',
                   date: selectedAtelier.date || new Date().toISOString().split('T')[0],
+                  dateFin: selectedAtelier.dateFin || '',
                   statutOuverture: selectedAtelier.statutOuverture || 'auto'
                 })}
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-dark-800 dark:hover:bg-dark-700 text-slate-700 dark:text-dark-200 text-xs font-bold transition-all border border-slate-200 dark:border-dark-700 cursor-pointer shadow-xs"
@@ -2374,7 +2393,7 @@ export default function Evenements() {
             <div className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-left space-y-1">
               <h2 className="text-base font-black text-slate-900">{selectedAtelier.titre}</h2>
               <div className="flex items-center justify-between text-xs font-semibold text-slate-700 pt-0.5">
-                <span>📅 Date : {new Date(selectedAtelier.date).toLocaleDateString('fr-FR')}</span>
+                <span>📅 Date : {formatDateFrench(selectedAtelier.date, selectedAtelier.dateFin)}</span>
                 <span>⏱️ Durée : {selectedAtelier.duree}</span>
                 <span>👨‍🏫 Formateur : {selectedAtelier.formateur}{selectedAtelier.intervenant ? ` / ${selectedAtelier.intervenant}` : ''}</span>
                 <span>👥 Présents : {presentCount} / {totalCount} ({attendanceRate}%)</span>
@@ -2552,7 +2571,7 @@ export default function Evenements() {
             <AtelierFullCard
               key={f.id}
               atelier={f}
-              isPasse={isAtelierPasse(f.date)}
+              isPasse={isAtelierPasse(f.date, f.dateFin)}
               nbPresents={getPresenceCount(f.id, f)}
               onSelect={() => setSelectedAtelier(f)}
               onDelete={handleDeleteFormation}
@@ -2686,19 +2705,37 @@ export default function Evenements() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="label">Date de la session *</label>
-                    <input
-                      type="date"
-                      required
-                      className="input"
-                      value={newFormation.date}
-                      onChange={(e) => setNewFormation({ ...newFormation, date: e.target.value })}
-                    />
+                {/* CALENDRIER STYLE BOOKING HÔTELIER */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="label mb-0 font-bold text-slate-800 dark:text-dark-200 flex items-center gap-1.5">
+                      <Calendar size={14} className="text-primary-600 dark:text-primary-400" />
+                      Dates de l'atelier (Style Booking) *
+                    </label>
+                    <span className="text-[11px] font-semibold text-primary-600 dark:text-primary-400">
+                      {newFormation.dateFin && newFormation.dateFin !== newFormation.date
+                        ? '🏨 Plage de dates (Plusieurs jours)'
+                        : '⚡ 1 Journée'}
+                    </span>
                   </div>
+
+                  <HotelDatePicker
+                    startDate={newFormation.date}
+                    endDate={newFormation.dateFin}
+                    onChange={({ startDate, endDate }) => {
+                      setNewFormation(prev => ({
+                        ...prev,
+                        date: startDate,
+                        dateFin: endDate
+                      }));
+                    }}
+                  />
+                </div>
+
+                {/* HORAIRES QUOTIDIENS DE L'ATELIER */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                   <div>
-                    <label className="label">Heure Début *</label>
+                    <label className="label">Heure Début (Quotidienne) *</label>
                     <input
                       type="time"
                       required
@@ -2719,7 +2756,7 @@ export default function Evenements() {
                     />
                   </div>
                   <div>
-                    <label className="label">Heure Fin *</label>
+                    <label className="label">Heure Fin (Quotidienne) *</label>
                     <input
                       type="time"
                       required
@@ -2738,6 +2775,13 @@ export default function Evenements() {
                         setNewFormation({ ...newFormation, heureFin: hF, duree: dStr });
                       }}
                     />
+                  </div>
+                  <div>
+                    <label className="label">Durée par jour</label>
+                    <div className="input bg-slate-100 dark:bg-dark-800 font-mono font-bold text-slate-700 dark:text-dark-200 flex items-center justify-between cursor-not-allowed select-none">
+                      <span>⏱️ {newFormation.duree || '3h00'}</span>
+                      <span className="text-[10px] text-slate-400 font-normal">Calculé auto</span>
+                    </div>
                   </div>
                 </div>
 
@@ -2991,13 +3035,17 @@ export default function Evenements() {
 
             <form onSubmit={handleSaveHoraire} className="p-5 space-y-4">
               <div>
-                <label className="label">Date de l'atelier</label>
-                <input
-                  type="date"
-                  required
-                  className="input"
-                  value={adjustHoraireModal.date}
-                  onChange={(e) => setAdjustHoraireModal({ ...adjustHoraireModal, date: e.target.value })}
+                <label className="label">Dates & Calendrier de l'atelier (Style Booking)</label>
+                <HotelDatePicker
+                  startDate={adjustHoraireModal.date}
+                  endDate={adjustHoraireModal.dateFin}
+                  onChange={({ startDate, endDate }) => {
+                    setAdjustHoraireModal(prev => ({
+                      ...prev,
+                      date: startDate,
+                      dateFin: endDate
+                    }));
+                  }}
                 />
               </div>
 
