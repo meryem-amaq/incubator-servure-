@@ -4,11 +4,8 @@ import {
   ChevronLeft, 
   ChevronRight, 
   ArrowRight, 
-  Sparkles, 
-  Check, 
-  Sun, 
-  CalendarDays,
-  RotateCcw
+  RotateCcw,
+  Sparkles
 } from 'lucide-react';
 
 const MOIS = [
@@ -19,20 +16,16 @@ const MOIS = [
 const JOURS_SEMAINE = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
 /**
- * Composant de sélection de dates style Booking.com / Réservation Hôtelière
- * Permet de sélectionner soit un jour unique, soit une plage de dates (2 jours ou plus).
+ * Calendrier avec sélection de plage épuré (Style Booking)
+ * Interface légère sans boutons superflus :
+ * - 1 clic sur un jour = session d'une journée
+ * - 2ème clic sur un jour ultérieur = sélection de la plage (2 jours ou plus)
  */
 export default function HotelDatePicker({
   startDate = '',
   endDate = '',
-  onChange = () => {},
-  minDate = null
+  onChange = () => {}
 }) {
-  // Mode de sélection : 'single' (1 jour) ou 'range' (plage de dates)
-  const isMultiDay = Boolean(endDate && endDate !== startDate);
-  const [mode, setMode] = useState(isMultiDay ? 'range' : 'single');
-
-  // Mois & Année affichés dans le calendrier
   const initialDateObj = startDate ? new Date(startDate) : new Date();
   const [currentMonth, setCurrentMonth] = useState(
     isNaN(initialDateObj.getTime()) ? new Date().getMonth() : initialDateObj.getMonth()
@@ -41,7 +34,7 @@ export default function HotelDatePicker({
     isNaN(initialDateObj.getTime()) ? new Date().getFullYear() : initialDateObj.getFullYear()
   );
 
-  // État de survol (hover) pour prévisualiser la plage comme sur Booking.com
+  // État de survol (hover) pour prévisualiser la plage
   const [hoverDate, setHoverDate] = useState(null);
 
   // Helpers de date
@@ -59,7 +52,7 @@ export default function HotelDatePicker({
   };
 
   const formatDisplay = (dStr) => {
-    if (!dStr) return 'Sélectionner';
+    if (!dStr) return '—';
     const d = parseDate(dStr);
     if (!d) return dStr;
     return d.toLocaleDateString('fr-FR', {
@@ -100,17 +93,16 @@ export default function HotelDatePicker({
     }
   };
 
-  // Génération de la grille du mois (42 cellules : 6 semaines x 7 jours)
+  // Grille du mois (42 cellules : 6 semaines x 7 jours)
   const calendarCells = useMemo(() => {
     const firstDayIndex = new Date(currentYear, currentMonth, 1).getDay();
-    // En JS: 0 = Dimanche. On convertit pour Lun = 0 .. Dim = 6
-    const startOffset = (firstDayIndex + 6) % 7;
+    const startOffset = (firstDayIndex + 6) % 7; // Lundi = 0
     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
     const daysInPrevMonth = new Date(currentYear, currentMonth, 0).getDate();
 
     const cells = [];
 
-    // Jours du mois précédent (grisés)
+    // Jours du mois précédent
     for (let i = startOffset - 1; i >= 0; i--) {
       const dayNum = daysInPrevMonth - i;
       const prevM = currentMonth === 0 ? 11 : currentMonth - 1;
@@ -131,7 +123,7 @@ export default function HotelDatePicker({
       });
     }
 
-    // Jours du mois suivant pour compléter à 35 ou 42 cellules
+    // Jours du mois suivant
     const remaining = (7 - (cells.length % 7)) % 7;
     const totalNeeded = cells.length + remaining < 35 ? 35 : cells.length + remaining;
     const nextDaysCount = totalNeeded - cells.length;
@@ -149,69 +141,28 @@ export default function HotelDatePicker({
     return cells;
   }, [currentYear, currentMonth]);
 
-  // Clic sur un jour du calendrier (style Booking)
+  // Clic direct sur une date (logique naturelle de plage Booking)
   const handleDayClick = (dateStr) => {
-    if (mode === 'single') {
+    // Si pas de début OU si la plage était déjà complète : recommence à partir de cette date
+    if (!startDate || (startDate && endDate)) {
       onChange({ startDate: dateStr, endDate: '' });
+      setHoverDate(null);
       return;
     }
 
-    // Mode 'range'
-    if (!startDate || (startDate && endDate)) {
-      // Premier clic : initialise la date de début
-      onChange({ startDate: dateStr, endDate: '' });
-      setHoverDate(null);
-    } else if (startDate && !endDate) {
-      // Second clic : finalise la plage
-      if (dateStr < startDate) {
-        // Si l'utilisateur clique sur une date antérieure, on inverse
-        onChange({ startDate: dateStr, endDate: startDate });
-      } else if (dateStr === startDate) {
-        // Clic sur la même date = 1 seul jour
-        onChange({ startDate: dateStr, endDate: '' });
-      } else {
+    // Si on a déjà startDate et qu'on attend la date de fin :
+    if (startDate && !endDate) {
+      if (dateStr > startDate) {
+        // Crée la plage (2 jours ou plus)
         onChange({ startDate, endDate: dateStr });
+      } else if (dateStr === startDate) {
+        // Clic sur la même date = confirme 1 seul jour
+        onChange({ startDate, endDate: '' });
+      } else {
+        // Clic sur une date antérieure = devient la nouvelle date de début
+        onChange({ startDate: dateStr, endDate: '' });
       }
       setHoverDate(null);
-    }
-  };
-
-  // Basculer en mode 1 jour
-  const setSingleDayMode = () => {
-    setMode('single');
-    onChange({ startDate: startDate || new Date().toISOString().split('T')[0], endDate: '' });
-    setHoverDate(null);
-  };
-
-  // Basculer en mode plage de dates
-  const setRangeMode = () => {
-    setMode('range');
-    const start = startDate || new Date().toISOString().split('T')[0];
-    // Par défaut, propose +1 jour pour amorcer la plage si pas de dateFin
-    if (!endDate || endDate === start) {
-      const d = parseDate(start);
-      if (d) {
-        d.setDate(d.getDate() + 1);
-        const nextDayStr = toDateStr(d.getFullYear(), d.getMonth(), d.getDate());
-        onChange({ startDate: start, endDate: nextDayStr });
-      }
-    }
-  };
-
-  // Raccourcis rapides style Booking
-  const setQuickRange = (daysCount) => {
-    const start = startDate || new Date().toISOString().split('T')[0];
-    if (daysCount === 1) {
-      setMode('single');
-      onChange({ startDate: start, endDate: '' });
-    } else {
-      setMode('range');
-      const d = parseDate(start);
-      if (d) {
-        d.setDate(d.getDate() + (daysCount - 1));
-        const endStr = toDateStr(d.getFullYear(), d.getMonth(), d.getDate());
-        onChange({ startDate: start, endDate: endStr });
-      }
     }
   };
 
@@ -222,169 +173,67 @@ export default function HotelDatePicker({
   }, []);
 
   return (
-    <div className="bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 rounded-2xl p-4 shadow-sm space-y-3.5">
-      {/* 1. Onglets de sélection de type de session : 1 Jour vs Plusieurs Jours */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 dark:border-dark-700/60 pb-3">
-        <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-dark-800 p-1 rounded-xl">
-          <button
-            type="button"
-            onClick={setSingleDayMode}
-            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
-              mode === 'single'
-                ? 'bg-white dark:bg-dark-700 text-primary-600 dark:text-primary-400 shadow-sm'
-                : 'text-slate-600 dark:text-dark-300 hover:text-slate-900'
-            }`}
-          >
-            <Sparkles size={13} className="text-amber-500" />
-            1 Journée
-          </button>
-          <button
-            type="button"
-            onClick={setRangeMode}
-            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
-              mode === 'range'
-                ? 'bg-white dark:bg-dark-700 text-primary-600 dark:text-primary-400 shadow-sm'
-                : 'text-slate-600 dark:text-dark-300 hover:text-slate-900'
-            }`}
-          >
-            <CalendarDays size={13} className="text-primary-500" />
-            Plage de dates (2 jours ou +)
-          </button>
-        </div>
-
-        {/* Boutons d'ajustement rapide */}
-        <div className="flex items-center gap-1 text-[11px]">
-          <span className="text-slate-400 dark:text-dark-400 font-medium mr-1 hidden sm:inline">Raccourcis :</span>
-          <button
-            type="button"
-            onClick={() => setQuickRange(1)}
-            className="px-2 py-1 rounded-md bg-slate-100 dark:bg-dark-800 text-slate-700 dark:text-dark-200 hover:bg-primary-50 hover:text-primary-600 transition-colors font-medium"
-          >
-            1 j
-          </button>
-          <button
-            type="button"
-            onClick={() => setQuickRange(2)}
-            className="px-2 py-1 rounded-md bg-slate-100 dark:bg-dark-800 text-slate-700 dark:text-dark-200 hover:bg-primary-50 hover:text-primary-600 transition-colors font-medium"
-          >
-            2 j
-          </button>
-          <button
-            type="button"
-            onClick={() => setQuickRange(3)}
-            className="px-2 py-1 rounded-md bg-slate-100 dark:bg-dark-800 text-slate-700 dark:text-dark-200 hover:bg-primary-50 hover:text-primary-600 transition-colors font-medium"
-          >
-            3 j
-          </button>
-          <button
-            type="button"
-            onClick={() => setQuickRange(5)}
-            className="px-2 py-1 rounded-md bg-slate-100 dark:bg-dark-800 text-slate-700 dark:text-dark-200 hover:bg-primary-50 hover:text-primary-600 transition-colors font-medium"
-          >
-            Semaine (5j)
-          </button>
-        </div>
-      </div>
-
-      {/* 2. Cartes d'affichage style Booking (Date d'arrivée / Date de départ) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-        {/* CARTE DÉBUT */}
-        <div 
-          onClick={() => {
-            if (mode === 'range' && startDate && endDate) {
-              onChange({ startDate, endDate: '' });
-            }
-          }}
-          className={`p-3 rounded-xl border transition-all cursor-pointer ${
-            !endDate || mode === 'single'
-              ? 'border-primary-500 bg-primary-500/5 ring-2 ring-primary-500/20'
-              : 'border-slate-200 dark:border-dark-700 bg-slate-50/60 dark:bg-dark-800/40 hover:border-slate-300'
-          }`}
-        >
-          <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 dark:text-dark-400 uppercase tracking-wider mb-1">
-            <span className="flex items-center gap-1.5">
-              <CalendarIcon size={12} className="text-primary-600 dark:text-primary-400" />
-              {mode === 'single' ? 'Date de la session' : 'Date de début (Arrivée)'}
-            </span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 font-semibold">
-              Jour 1
+    <div className="bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 rounded-2xl p-3 sm:p-4 shadow-xs space-y-3">
+      {/* 1. En-tête épuré : Date Début -> Date Fin + Durée */}
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50/70 dark:bg-dark-800/60 p-2.5 rounded-xl border border-slate-200/60 dark:border-dark-700/60">
+        <div className="flex items-center gap-2 flex-wrap text-xs">
+          {/* Badge Début */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-dark-700 border border-slate-200 dark:border-dark-600 shadow-2xs">
+            <CalendarIcon size={12} className="text-primary-600 dark:text-primary-400" />
+            <span className="font-bold text-slate-700 dark:text-slate-200 capitalize">
+              {formatDisplay(startDate)}
             </span>
           </div>
-          <div className="text-sm font-bold text-slate-900 dark:text-white capitalize">
-            {formatDisplay(startDate)}
+
+          <ArrowRight size={13} className="text-slate-400" />
+
+          {/* Badge Fin */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-dark-700 border border-slate-200 dark:border-dark-600 shadow-2xs">
+            <span className="font-bold text-slate-700 dark:text-slate-200 capitalize">
+              {endDate ? formatDisplay(endDate) : 'Même jour (1 j)'}
+            </span>
           </div>
         </div>
 
-        {/* CARTE FIN (Si mode plage de dates) */}
-        {mode === 'range' ? (
-          <div 
-            onClick={() => {
-              if (startDate && !endDate) {
-                // Focus en attente
-              }
-            }}
-            className={`p-3 rounded-xl border transition-all cursor-pointer ${
-              startDate && !endDate
-                ? 'border-amber-500 bg-amber-500/5 ring-2 ring-amber-500/20 animate-pulse'
-                : 'border-slate-200 dark:border-dark-700 bg-slate-50/60 dark:bg-dark-800/40 hover:border-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 dark:text-dark-400 uppercase tracking-wider mb-1">
-              <span className="flex items-center gap-1.5">
-                <ArrowRight size={12} className="text-amber-600 dark:text-amber-400" />
-                Date de fin (Départ / Clôture)
-              </span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-semibold">
-                {totalDays > 1 ? `${totalDays} jours` : 'À choisir'}
-              </span>
-            </div>
-            <div className="text-sm font-bold text-slate-900 dark:text-white capitalize">
-              {endDate ? formatDisplay(endDate) : (
-                <span className="text-amber-600 dark:text-amber-400 italic font-normal text-xs">
-                  👉 Cliquez sur le calendrier pour choisir la date de fin
-                </span>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="p-3 rounded-xl border border-dashed border-slate-200 dark:border-dark-700/80 bg-slate-50/30 dark:bg-dark-800/20 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-slate-700 dark:text-dark-200">
-                Session concentrée sur 1 journée
-              </p>
-              <p className="text-[11px] text-slate-400 dark:text-dark-400">
-                Passez en « Plage de dates » pour un atelier sur 2 jours ou plus.
-              </p>
-            </div>
+        {/* Badge Durée & Reset */}
+        <div className="flex items-center gap-2">
+          <span className={`px-2.5 py-1 rounded-lg font-black text-xs ${
+            totalDays > 1 
+              ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700' 
+              : 'bg-primary-500/10 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800'
+          }`}>
+            {totalDays > 1 ? `Plage : ${totalDays} jours` : '1 journée'}
+          </span>
+
+          {endDate && (
             <button
               type="button"
-              onClick={setRangeMode}
-              className="text-xs font-bold text-primary-600 dark:text-primary-400 hover:underline px-2 py-1 rounded bg-primary-50 dark:bg-primary-900/30"
+              onClick={() => onChange({ startDate, endDate: '' })}
+              className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-dark-700 transition-colors"
+              title="Revenir à 1 seul jour"
             >
-              + Ajouter fin
+              <RotateCcw size={13} />
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* 3. CALENDRIER INTERACTIF (Navigation mois + Grille) */}
-      <div className="border border-slate-200 dark:border-dark-700 rounded-xl p-3 bg-slate-50/40 dark:bg-dark-800/40">
-        {/* En-tête mois avec chevrons */}
-        <div className="flex items-center justify-between mb-3 px-1">
+      {/* 2. Calendrier interactif avec ruban de plage */}
+      <div className="border border-slate-200 dark:border-dark-700 rounded-xl p-2.5 sm:p-3 bg-slate-50/30 dark:bg-dark-800/30">
+        {/* Navigation mois */}
+        <div className="flex items-center justify-between mb-2.5 px-1">
           <button
             type="button"
             onClick={prevMonth}
             className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-dark-700 text-slate-600 dark:text-dark-300 transition-colors"
             title="Mois précédent"
           >
-            <ChevronLeft size={18} />
+            <ChevronLeft size={17} />
           </button>
 
-          <div className="text-center">
-            <span className="text-sm font-bold text-slate-800 dark:text-white capitalize">
-              {MOIS[currentMonth]} {currentYear}
-            </span>
-          </div>
+          <span className="text-sm font-bold text-slate-800 dark:text-white capitalize">
+            {MOIS[currentMonth]} {currentYear}
+          </span>
 
           <button
             type="button"
@@ -392,20 +241,20 @@ export default function HotelDatePicker({
             className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-dark-700 text-slate-600 dark:text-dark-300 transition-colors"
             title="Mois suivant"
           >
-            <ChevronRight size={18} />
+            <ChevronRight size={17} />
           </button>
         </div>
 
-        {/* Noms des jours de la semaine */}
+        {/* Jours de la semaine */}
         <div className="grid grid-cols-7 gap-1 text-center mb-1">
           {JOURS_SEMAINE.map(j => (
-            <div key={j} className="text-[11px] font-bold text-slate-400 dark:text-dark-400 py-1">
+            <div key={j} className="text-[11px] font-bold text-slate-400 dark:text-dark-400 py-0.5">
               {j}
             </div>
           ))}
         </div>
 
-        {/* Grille des cellules jours avec mise en valeur de la plage */}
+        {/* Grille des cellules avec surbrillance continue de la plage */}
         <div className="grid grid-cols-7 gap-y-1">
           {calendarCells.map((cell, idx) => {
             const dateStr = cell.dateStr;
@@ -413,13 +262,13 @@ export default function HotelDatePicker({
             const isEnd = dateStr === endDate;
             const isToday = dateStr === todayStr;
 
-            // Déterminer la plage active
+            // Plage effective (prend en compte le hover si en cours de sélection)
             const effectiveEnd = endDate || (hoverDate && hoverDate > startDate ? hoverDate : null);
             const isInRange = Boolean(
               startDate && effectiveEnd && dateStr > startDate && dateStr < effectiveEnd
             );
 
-            // Classes de plage Booking : ruban continu
+            // Style ruban continu Booking
             let rangeClass = '';
             if (isInRange) {
               rangeClass = 'bg-primary-100/80 dark:bg-primary-950/60 text-primary-900 dark:text-primary-100';
@@ -434,7 +283,7 @@ export default function HotelDatePicker({
                 key={`${dateStr}-${idx}`}
                 className={`relative flex items-center justify-center py-0.5 ${rangeClass}`}
                 onMouseEnter={() => {
-                  if (mode === 'range' && startDate && !endDate) {
+                  if (startDate && !endDate) {
                     setHoverDate(dateStr);
                   }
                 }}
@@ -463,40 +312,10 @@ export default function HotelDatePicker({
         </div>
       </div>
 
-      {/* 4. Barre de synthèse Booking : Durée totale et dates retenues */}
-      <div className="flex items-center justify-between bg-primary-50/70 dark:bg-primary-950/40 border border-primary-200/70 dark:border-primary-900/50 rounded-xl px-3.5 py-2.5 text-xs">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg bg-primary-600 text-white flex items-center justify-center font-bold text-[11px] shadow-sm">
-            {totalDays}j
-          </div>
-          <div>
-            <span className="font-bold text-slate-800 dark:text-white">
-              {totalDays === 1 ? "Atelier d'une journée :" : `Atelier sur ${totalDays} jours :`}
-            </span>{' '}
-            <span className="text-primary-700 dark:text-primary-300 font-medium">
-              {totalDays === 1 ? (
-                formatDisplay(startDate)
-              ) : (
-                <>du <strong>{formatDisplay(startDate)}</strong> au <strong>{formatDisplay(endDate)}</strong></>
-              )}
-            </span>
-          </div>
-        </div>
-
-        {/* Bouton de réinitialisation */}
-        <button
-          type="button"
-          onClick={() => {
-            const today = new Date().toISOString().split('T')[0];
-            onChange({ startDate: today, endDate: '' });
-            setMode('single');
-          }}
-          className="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded hover:bg-primary-100/50 dark:hover:bg-primary-900/30 transition-colors"
-          title="Réinitialiser à aujourd'hui"
-        >
-          <RotateCcw size={13} />
-        </button>
-      </div>
+      {/* 3. Petite légende discrète */}
+      <p className="text-[11px] text-slate-400 dark:text-dark-400 text-center italic">
+        💡 Cliquez sur une date de début, puis sur une date de fin pour créer une plage (ou une seule date pour 1 jour).
+      </p>
     </div>
   );
 }
