@@ -16,7 +16,7 @@ if (startIndex === -1 || endIndex === -1) {
 }
 
 const replacement = `export const generateFicheSignaletiqueDocument = async (incube) => {
-  // Format Horizontal Paysage A4 (297mm x 210mm) - Style Moderne Aligné Pleine Largeur
+  // Format Horizontal Paysage A4 (297mm x 210mm) - Style Moderne Aligné Pleine Largeur Aéré
   const doc = new jsPDF({
     orientation: 'landscape',
     unit: 'mm',
@@ -56,14 +56,14 @@ const replacement = `export const generateFicheSignaletiqueDocument = async (inc
   // Logo IDS (gauche)
   if (logoIds) {
     try {
-      doc.addImage(logoIds, 'PNG', col1X, 8, 24, 15, '', 'FAST');
+      doc.addImage(logoIds, 'PNG', col1X, 9, 23, 14.5, '', 'FAST');
     } catch (e) {}
   }
 
   // Logo CTPES (droite)
   if (logoCtpes) {
     try {
-      doc.addImage(logoCtpes, 'PNG', pw - marginX - 52, 9.5, 52, 12, '', 'FAST');
+      doc.addImage(logoCtpes, 'PNG', pw - marginX - 52, 10, 52, 12, '', 'FAST');
     } catch (e) {}
   }
 
@@ -71,12 +71,12 @@ const replacement = `export const generateFicheSignaletiqueDocument = async (inc
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(15);
   doc.setTextColor(15, 23, 42); // Navy
-  doc.text('FICHE SIGNALÉTIQUE & INFORMATIONS GÉNÉRALES', pw / 2, 14, { align: 'center' });
+  doc.text('FICHE SIGNALÉTIQUE & INFORMATIONS GÉNÉRALES', pw / 2, 15, { align: 'center' });
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(100, 116, 139); // Slate
-  doc.text('Incubateur Digital Solidaire (IDS) • Fiche signalétique officielle', pw / 2, 19.5, { align: 'center' });
+  doc.text('Incubateur Digital Solidaire (IDS) • Fiche signalétique officielle', pw / 2, 20.5, { align: 'center' });
 
   // Palette exacte du style moderne de référence
   const borderBlue = [2, 132, 199];      // #0284C7 bleu cyan élégant
@@ -86,10 +86,10 @@ const replacement = `export const generateFicheSignaletiqueDocument = async (inc
   const textDark = [30, 41, 59];
 
   // ========================================================
-  // 2. BLOC PROFIL : PLEINE LARGEUR EN HAUT DE PAGE (SANS DÉCALAGE)
+  // 2. BLOC PROFIL : DESCENDU POUR LAISSER RESPIRER LES LOGOS (9.5 mm d'espace)
   //    Cartouche sur toute la largeur (269 mm), QR codes aérés et très lisibles
   // ========================================================
-  const cartoucheY = 27;
+  const cartoucheY = 32;
   const cartoucheH = 34;
   const cartoucheW = pw - marginX * 2; // 269 mm
 
@@ -203,11 +203,9 @@ const replacement = `export const generateFicheSignaletiqueDocument = async (inc
 
   // ========================================================
   // 3. DEUX COLONNES PARFAITEMENT ALIGNÉES SANS AUCUN DÉCALAGE
-  //    Départ synchrone à secStartY = 68 mm
-  //    Gauche: Section 1 (Perso) puis Section 3 (Description)
-  //    Droite: Section 2 (Entreprise) puis Section 4 (Associés)
+  //    Départ synchrone à secStartY = 73 mm
   // ========================================================
-  const secStartY = cartoucheY + cartoucheH + 7; // 68 mm
+  const secStartY = cartoucheY + cartoucheH + 7; // 73 mm
 
   // --- TITRES DES SECTIONS DU HAUT (PARFAITEMENT SUR LA MÊME LIGNE) ---
   doc.setFont('helvetica', 'bold');
@@ -408,4 +406,4 @@ const replacement = `export const generateFicheSignaletiqueDocument = async (inc
 
 const newContent = content.slice(0, startIndex) + replacement + content.slice(endIndex);
 fs.writeFileSync(targetPath, newContent, 'utf8');
-console.log('Successfully updated frontend/src/utils/pdfExport.js with aligned layout!');
+console.log('Successfully updated frontend/src/utils/pdfExport.js with spaced profile layout!');

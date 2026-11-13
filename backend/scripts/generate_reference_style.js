@@ -74,31 +74,31 @@ async function buildNewStylePdf(incube) {
   const col1X = marginX;
   const col2X = marginX + colW + colGap;
 
-  // 1. EN-TÊTE
+  // 1. EN-TÊTE : LOGOS BIEN AÉRÉS
   // Logo IDS (gauche)
   const idsPath = path.resolve(__dirname, '../../frontend/public/logo-ids.png');
   if (fs.existsSync(idsPath)) {
     const idsData = 'data:image/png;base64,' + fs.readFileSync(idsPath).toString('base64');
-    doc.addImage(idsData, 'PNG', col1X, 8, 24, 15, '', 'FAST');
+    doc.addImage(idsData, 'PNG', col1X, 9, 23, 14.5, '', 'FAST');
   }
 
   // Logo CTPES (droite)
   const ctpesPath = path.resolve(__dirname, '../../frontend/public/logo-ctpes.png');
   if (fs.existsSync(ctpesPath)) {
     const ctpesData = 'data:image/png;base64,' + fs.readFileSync(ctpesPath).toString('base64');
-    doc.addImage(ctpesData, 'PNG', pw - marginX - 52, 9.5, 52, 12, '', 'FAST');
+    doc.addImage(ctpesData, 'PNG', pw - marginX - 52, 10, 52, 12, '', 'FAST');
   }
 
   // Titre & Sous-titre centrés
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(15);
   doc.setTextColor(15, 23, 42); // Navy
-  doc.text('FICHE SIGNALÉTIQUE & INFORMATIONS GÉNÉRALES', pw / 2, 14, { align: 'center' });
+  doc.text('FICHE SIGNALÉTIQUE & INFORMATIONS GÉNÉRALES', pw / 2, 15, { align: 'center' });
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(100, 116, 139); // Slate
-  doc.text('Incubateur Digital Solidaire (IDS) • Fiche signalétique officielle', pw / 2, 19.5, { align: 'center' });
+  doc.text('Incubateur Digital Solidaire (IDS) • Fiche signalétique officielle', pw / 2, 20.5, { align: 'center' });
 
   // Palette exacte du style de référence
   const borderBlue = [2, 132, 199];      // #0284C7 bleu cyan élégant
@@ -108,10 +108,10 @@ async function buildNewStylePdf(incube) {
   const textDark = [30, 41, 59];
 
   // ========================================================
-  // 2. BLOC PROFIL : PLEINE LARGEUR EN HAUT DE PAGE (ALIGNÉ SANS DÉCALAGE)
-  //    Cartouche sur toute la largeur (269 mm), QR codes aérés et très lisibles
+  // 2. BLOC PROFIL : DESCENDU POUR LAISSER RESPIRER LES LOGOS
+  //    cartoucheY = 32 mm (9.5 mm d'espace libre sous les logos !)
   // ========================================================
-  const cartoucheY = 27;
+  const cartoucheY = 32;
   const cartoucheH = 34;
   const cartoucheW = pw - marginX * 2; // 269 mm
 
@@ -140,7 +140,7 @@ async function buildNewStylePdf(incube) {
   const textX = photoX + photoSize + 6;
   let curY = cartoucheY + 8.5;
 
-  // Nom complet (en grand et bien détaché)
+  // Nom complet
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12.5);
   doc.setTextColor(...darkNavy);
@@ -167,7 +167,7 @@ async function buildNewStylePdf(incube) {
   doc.setTextColor(100, 116, 139);
   doc.text(`Phase : ${incube.phase_projet || 'Lancement'}   •   Promotion : ${incube.promotion || 'Promo 2026'}   •   Accompagnement : ${incube.accompagnateur || 'Conseiller IDS'}`, textX, curY);
 
-  // QR Codes à droite du cartouche pleine largeur (très lisibles & grands !)
+  // QR Codes à droite du cartouche pleine largeur
   const qrSize = 19;
   const qrGap = 7;
   const qrWebX = marginX + cartoucheW - qrSize - 6;
@@ -182,7 +182,7 @@ async function buildNewStylePdf(incube) {
   const qrLinkedInUrl = await QRCode.toDataURL(incube.linkedin || 'https://linkedin.com', { margin: 1, width: 200 });
   const qrWebUrl = await QRCode.toDataURL(incube.site_web || 'https://ids.ma', { margin: 1, width: 200 });
 
-  // Fond blanc pour les QR codes afin de maximiser le contraste et la scannabilité
+  // Fond blanc pour les QR codes
   doc.setFillColor(255, 255, 255);
   doc.setDrawColor(203, 213, 225);
   doc.roundedRect(qrLinkedInX, qrY, qrSize, qrSize, 1.5, 1.5, 'FD');
@@ -199,13 +199,11 @@ async function buildNewStylePdf(incube) {
 
   // ========================================================
   // 3. DEUX COLONNES PARFAITEMENT ALIGNÉES SANS AUCUN DÉCALAGE
-  //    Départ synchrone à secStartY = 68 mm
-  //    Gauche: Section 1 (Perso) puis Section 3 (Description)
-  //    Droite: Section 2 (Entreprise) puis Section 4 (Associés)
+  //    Départ à secStartY = 73 mm (espace de 7 mm sous le profil)
   // ========================================================
-  const secStartY = cartoucheY + cartoucheH + 7; // 68 mm
+  const secStartY = cartoucheY + cartoucheH + 7; // 73 mm
 
-  // --- TITRES DES SECTIONS DU HAUT (PARFAITEMENT SUR LA MÊME LIGNE) ---
+  // --- TITRES DES SECTIONS DU HAUT ---
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(...darkNavy);
@@ -283,10 +281,10 @@ async function buildNewStylePdf(incube) {
 
   const t2FinalY = doc.lastAutoTable.finalY;
 
-  // Calcul du Y max commun pour que les sections inférieures soient PARFAITEMENT alignées
+  // Calcul du Y max commun pour alignement parfait des sections inférieures
   const commonMidY = Math.max(t1FinalY, t2FinalY) + 7;
 
-  // --- TITRES DES SECTIONS DU BAS (PARFAITEMENT SUR LA MÊME LIGNE) ---
+  // --- TITRES DES SECTIONS DU BAS ---
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(...darkNavy);
