@@ -3,7 +3,7 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const requireStaff = require('../middleware/requireStaff');
 const upload = require('../middleware/upload');
-const { Atelier, Incube, PresenceAtelier } = require('../models');
+const { Atelier, Incube, PresenceAtelier, sequelize } = require('../models');
 const { Op } = require('sequelize');
 const syncService = require('../services/SyncService');
 const fs = require('fs');
@@ -31,16 +31,53 @@ function parseDurationToHours(dureeStr) {
 // Retrieve all ateliers with optional animator incubé details and live presence count
 router.get('/', auth, async (req, res) => {
   try {
-    const ateliers = await Atelier.findAll({
-      include: [
-        {
-          model: Incube,
-          as: 'animateurIncube',
-          attributes: ['id', 'nom_incube', 'email', 'raison_sociale']
+    let ateliers;
+    try {
+      ateliers = await Atelier.findAll({
+        include: [
+          {
+            model: Incube,
+            as: 'animateurIncube',
+            attributes: ['id', 'nom_incube', 'email', 'raison_sociale']
+          }
+        ],
+        order: [['date', 'DESC'], ['heureDebut', 'DESC']]
+      });
+    } catch (dbErr) {
+      const errMsg = String(dbErr.message || '') + String(dbErr.parent?.sqlMessage || '');
+      if (errMsg.includes('date_fin') || errMsg.includes('Unknown column')) {
+        console.warn('⚠️ Colonne date_fin absente dans la table ateliers. Migration automatique en cours...');
+        try {
+          await sequelize.query('ALTER TABLE ateliers ADD COLUMN date_fin DATE NULL AFTER date');
+          console.log('✅ Auto-migration réussie : colonne date_fin ajoutée à la table ateliers !');
+          ateliers = await Atelier.findAll({
+            include: [
+              {
+                model: Incube,
+                as: 'animateurIncube',
+                attributes: ['id', 'nom_incube', 'email', 'raison_sociale']
+              }
+            ],
+            order: [['date', 'DESC'], ['heureDebut', 'DESC']]
+          });
+        } catch (alterErr) {
+          console.error('Erreur migration date_fin, fallback sans date_fin:', alterErr.message);
+          ateliers = await Atelier.findAll({
+            attributes: { exclude: ['dateFin'] },
+            include: [
+              {
+                model: Incube,
+                as: 'animateurIncube',
+                attributes: ['id', 'nom_incube', 'email', 'raison_sociale']
+              }
+            ],
+            order: [['date', 'DESC'], ['heureDebut', 'DESC']]
+          });
         }
-      ],
-      order: [['date', 'DESC'], ['heureDebut', 'DESC']]
-    });
+      } else {
+        throw dbErr;
+      }
+    }
 
     // Calculer le nombre réel de présents pour chaque atelier depuis la base de données
     const atelierIds = ateliers.map(a => String(a.id));
@@ -94,21 +131,41 @@ router.get('/incube-stats/:incubeId', auth, async (req, res) => {
     }
 
     // 1. Récupérer tous les ateliers de l'année
-    const ateliersAnnee = await Atelier.findAll({
-      where: {
-        date: {
-          [Op.between]: [`${annee}-01-01`, `${annee}-12-31`]
-        }
-      },
-      include: [
-        {
-          model: Incube,
-          as: 'animateurIncube',
-          attributes: ['id', 'nom_incube', 'email', 'raison_sociale']
-        }
-      ],
-      order: [['date', 'ASC']]
-    });
+    let ateliersAnnee;
+    try {
+      ateliersAnnee = await Atelier.findAll({
+        where: {
+          date: {
+            [Op.between]: [`${annee}-01-01`, `${annee}-12-31`]
+          }
+        },
+        include: [
+          {
+            model: Incube,
+            as: 'animateurIncube',
+            attributes: ['id', 'nom_incube', 'email', 'raison_sociale']
+          }
+        ],
+        order: [['date', 'ASC']]
+      });
+    } catch (dbErr) {
+      ateliersAnnee = await Atelier.findAll({
+        attributes: { exclude: ['dateFin'] },
+        where: {
+          date: {
+            [Op.between]: [`${annee}-01-01`, `${annee}-12-31`]
+          }
+        },
+        include: [
+          {
+            model: Incube,
+            as: 'animateurIncube',
+            attributes: ['id', 'nom_incube', 'email', 'raison_sociale']
+          }
+        ],
+        order: [['date', 'ASC']]
+      });
+    }
 
     // 2. Récupérer les présences de cet incubé pour ces ateliers
     const atelierIds = ateliersAnnee.map(a => String(a.id));
@@ -329,7 +386,21 @@ router.post('/:id/photos', auth, requireStaff, upload.array('photos', 10), async
     const currentPhotos = Array.isArray(atelier.photos) ? [...atelier.photos] : [];
     const updatedPhotos = [...currentPhotos, ...newUrls];
     atelier.photos = updatedPhotos;
-    await atelier.save();
+    try {
+      await atelier.save();
+    } catch (saveErr) {
+      if (String(saveErr.message || '').includes('date_fin')) {
+        try {
+          await sequelize.query('ALTER TABLE ateliers ADD COLUMN date_fin DATE NULL AFTER date');
+          await atelier.save();
+        } catch (_) {
+          atelier.dateFin = undefined;
+          await atelier.save();
+        }
+      } else {
+        throw saveErr;
+      }
+    }
 
     syncService.pushAteliersToCloud(atelier).catch(() => {});
 
@@ -373,7 +444,21 @@ router.delete('/:id/photos', auth, requireStaff, async (req, res) => {
 
     const currentPhotos = Array.isArray(atelier.photos) ? atelier.photos : [];
     atelier.photos = currentPhotos.filter(u => u !== photoUrl);
-    await atelier.save();
+    try {
+      await atelier.save();
+    } catch (saveErr) {
+      if (String(saveErr.message || '').includes('date_fin')) {
+        try {
+          await sequelize.query('ALTER TABLE ateliers ADD COLUMN date_fin DATE NULL AFTER date');
+          await atelier.save();
+        } catch (_) {
+          atelier.dateFin = undefined;
+          await atelier.save();
+        }
+      } else {
+        throw saveErr;
+      }
+    }
 
     // Supprimer le fichier local si c'est un fichier hébergé dans /uploads/ateliers
     if (typeof photoUrl === 'string' && photoUrl.startsWith('/uploads/ateliers/')) {
@@ -419,7 +504,8 @@ router.post('/', auth, requireStaff, async (req, res) => {
       }
     }
 
-    const atelier = await Atelier.create({
+    let atelier;
+    const atelierData = {
       titre: titre || 'Nouvel Atelier',
       formateur: formateur || 'Intervenant IDS',
       intervenant: finalIntervenant,
@@ -433,7 +519,23 @@ router.post('/', auth, requireStaff, async (req, res) => {
       description: description || null,
       photos: Array.isArray(photos) ? photos : [],
       statutOuverture: statutOuverture || 'auto'
-    });
+    };
+
+    try {
+      atelier = await Atelier.create(atelierData);
+    } catch (createErr) {
+      if (String(createErr.message || '').includes('date_fin')) {
+        try {
+          await sequelize.query('ALTER TABLE ateliers ADD COLUMN date_fin DATE NULL AFTER date');
+          atelier = await Atelier.create(atelierData);
+        } catch (_) {
+          delete atelierData.dateFin;
+          atelier = await Atelier.create(atelierData);
+        }
+      } else {
+        throw createErr;
+      }
+    }
 
     // Pousser l'atelier vers le cloud relay (silencieux si hors ligne)
     syncService.pushAteliersToCloud(atelier).catch(() => {});
@@ -488,7 +590,21 @@ router.put('/:id', auth, requireStaff, async (req, res) => {
       }
     }
 
-    await atelier.save();
+    try {
+      await atelier.save();
+    } catch (saveErr) {
+      if (String(saveErr.message || '').includes('date_fin')) {
+        try {
+          await sequelize.query('ALTER TABLE ateliers ADD COLUMN date_fin DATE NULL AFTER date');
+          await atelier.save();
+        } catch (_) {
+          atelier.dateFin = undefined;
+          await atelier.save();
+        }
+      } else {
+        throw saveErr;
+      }
+    }
 
     // Mettre à jour l'atelier sur le cloud relay
     syncService.pushAteliersToCloud(atelier).catch(() => {});
