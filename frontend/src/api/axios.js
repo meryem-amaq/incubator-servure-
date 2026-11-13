@@ -47,7 +47,12 @@ export const getPhotoUrl = (path) => {
     return path;
   }
 
-  const clean = path.replace(/^uploads[\\/]/, '');
+  // Nettoyer tous les préfixes "uploads/", "/uploads/", "\uploads\", etc. (sans doubler le préfixe)
+  let clean = String(path).trim().replace(/^[/\\]+/, '');
+  while (/^uploads[/\\]+/i.test(clean)) {
+    clean = clean.replace(/^uploads[/\\]+/i, '').replace(/^[/\\]+/, '');
+  }
+
   const baseUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://127.0.0.1:5000');
   return `${baseUrl}/uploads/${clean}`;
 };

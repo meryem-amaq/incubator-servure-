@@ -49,10 +49,17 @@ import { compressImage, compressImageList } from '../utils/imageCompressor';
 // =========================================================================
 function AtelierCarousel({ photos = [], title = '', heightClass = 'h-44 sm:h-48' }) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [failedPhotos, setFailedPhotos] = useState({});
 
   const validPhotos = Array.isArray(photos) ? photos.filter(p => typeof p === 'string' && p.trim()) : [];
 
-  if (validPhotos.length === 0) {
+  const safeIdx = validPhotos.length > 0
+    ? (((currentIndex % validPhotos.length) + validPhotos.length) % validPhotos.length)
+    : 0;
+  const currentPhoto = validPhotos[safeIdx];
+  const hasFailed = failedPhotos[safeIdx];
+
+  if (validPhotos.length === 0 || hasFailed) {
     return (
       <div className={`relative w-full ${heightClass} bg-gradient-to-br from-slate-900 via-primary-950 to-slate-900 flex flex-col items-center justify-center text-center p-4 overflow-hidden select-none`}>
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:16px_16px]" />
@@ -69,9 +76,6 @@ function AtelierCarousel({ photos = [], title = '', heightClass = 'h-44 sm:h-48'
     );
   }
 
-  const safeIdx = ((currentIndex % validPhotos.length) + validPhotos.length) % validPhotos.length;
-  const currentPhoto = validPhotos[safeIdx];
-
   return (
     <div className={`relative w-full ${heightClass} overflow-hidden bg-slate-950 group/carousel select-none`}>
       <img
@@ -79,6 +83,7 @@ function AtelierCarousel({ photos = [], title = '', heightClass = 'h-44 sm:h-48'
         alt={`${title} - vue ${safeIdx + 1}`}
         className="w-full h-full object-cover transition-transform duration-500 group-hover/carousel:scale-105"
         loading="lazy"
+        onError={() => setFailedPhotos(prev => ({ ...prev, [safeIdx]: true }))}
       />
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20 pointer-events-none" />
 
@@ -152,6 +157,7 @@ function AtelierFullCard({
   onOpenQr
 }) {
   const [photoIndex, setPhotoIndex] = useState(0);
+  const [imgFailed, setImgFailed] = useState({});
   const photos = Array.isArray(atelier.photos) ? atelier.photos.filter(p => typeof p === 'string' && p.trim()) : [];
   const hasPhotos = photos.length > 0;
   const safeIdx = hasPhotos ? (((photoIndex % photos.length) + photos.length) % photos.length) : 0;
@@ -160,6 +166,8 @@ function AtelierFullCard({
     ? nbPresents
     : (typeof atelier.nbPresents === 'number' ? atelier.nbPresents : 0);
 
+  const canShowPhoto = hasPhotos && currentPhoto && !imgFailed[safeIdx];
+
   return (
     <div
       onClick={onSelect}
@@ -167,12 +175,13 @@ function AtelierFullCard({
     >
       {/* 1. IMAGE DE FOND / CARROUSEL SUR TOUT LE CADRE */}
       <div className="absolute inset-0 z-0">
-        {hasPhotos ? (
+        {canShowPhoto ? (
           <img
             src={getPhotoUrl(currentPhoto)}
             alt={atelier.titre}
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
             loading="lazy"
+            onError={() => setImgFailed(prev => ({ ...prev, [safeIdx]: true }))}
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-slate-900 via-sky-950 to-slate-950 relative">

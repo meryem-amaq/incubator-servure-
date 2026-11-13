@@ -90,3 +90,4 @@ export async function compressImageList(files, options = {}) {
   if (!Array.isArray(files) || files.length === 0) return [];
   return Promise.all(files.map(f => compressImage(f, options)));
 }
+
