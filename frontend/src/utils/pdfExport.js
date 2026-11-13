@@ -1529,7 +1529,7 @@ export const formatAgeAnnees = (ageStr, dob) => {
 };
 
 export const generateFicheSignaletiqueDocument = async (incube) => {
-  // Format Horizontal Paysage A4 (297mm x 210mm)
+  // Format Horizontal Paysage A4 (297mm x 210mm) - Style Moderne Référence
   const doc = new jsPDF({
     orientation: 'landscape',
     unit: 'mm',
@@ -1539,10 +1539,14 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
   const pw = doc.internal.pageSize.width; // 297 mm
   const ph = doc.internal.pageSize.height; // 210 mm
   const marginX = 14;
+  const colGap = 10;
+  const colW = (pw - marginX * 2 - colGap) / 2; // 129.5 mm
+  const col1X = marginX;
+  const col2X = marginX + colW + colGap;
 
   const incubeName = incube?.nom_incube || 'Incubé';
   const displayName = formatOfficialName(incubeName);
-  const displayAccomp = formatOfficialName(incube?.accompagnateur) || 'Conseiller IDS';
+  const displayAccomp = formatOfficialName(incube?.accompagnateur) || 'Mme Nadia Sefiani';
   const ageAnnees = formatAgeAnnees(incube?.age, incube?.date_naissance);
 
   // 1. Chargement des logos et de la photo
@@ -1560,240 +1564,259 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
   }
 
   // ==========================================
-  // 1. EN-TÊTE : LOGOS ÉQUILIBRÉS & PROPORTIONS RESPECTÉES
+  // 1. EN-TÊTE : LOGOS ÉQUILIBRÉS & TITRES CENTRÉS
   // ==========================================
-  const headerY = 8;
-  const headerH = 15;
-
-  // 1.1 Logo IDS (Gauche) - Format Carré 1:1
-  const idsBoxW = 28, idsBoxH = 15;
-  doc.setFillColor(255, 255, 255);
-  doc.setDrawColor(226, 232, 240);
-  doc.setLineWidth(0.35);
-  doc.roundedRect(marginX, headerY, idsBoxW, idsBoxH, 2.5, 2.5, 'FD');
+  // Logo IDS (gauche)
   if (logoIds) {
     try {
-      doc.addImage(logoIds, 'PNG', marginX + (idsBoxW - 12.5) / 2, headerY + (idsBoxH - 12.5) / 2, 12.5, 12.5);
+      doc.addImage(logoIds, 'PNG', col1X, 9, 24, 15, '', 'FAST');
     } catch (e) {}
   }
 
-  // 1.2 Logo CTPES (Droite) - Format Rectangulaire 4.35:1
-  const ctpesBoxW = 58, ctpesBoxH = 15;
-  const ctpesX = pw - marginX - ctpesBoxW;
-  doc.setFillColor(255, 255, 255);
-  doc.setDrawColor(226, 232, 240);
-  doc.setLineWidth(0.35);
-  doc.roundedRect(ctpesX, headerY, ctpesBoxW, ctpesBoxH, 2.5, 2.5, 'FD');
+  // Logo CTPES (droite)
   if (logoCtpes) {
     try {
-      doc.addImage(logoCtpes, 'PNG', ctpesX + (ctpesBoxW - 50) / 2, headerY + (ctpesBoxH - 11.5) / 2, 50, 11.5);
+      doc.addImage(logoCtpes, 'PNG', pw - marginX - 52, 10.5, 52, 12, '', 'FAST');
     } catch (e) {}
   }
 
-  // 1.3 Titres Centrés Parfaitement
+  // Titre & Sous-titre centrés
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(15, 23, 42); // slate-900 (Bleu marine profond)
-  doc.text('INCUBATEUR DIGITAL SOLIDAIRE (IDS)', pw / 2, headerY + 6, { align: 'center' });
+  doc.setFontSize(15);
+  doc.setTextColor(15, 23, 42); // Navy
+  doc.text('FICHE SIGNALÉTIQUE & INFORMATIONS GÉNÉRALES', pw / 2, 15, { align: 'center' });
 
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(100, 116, 139); // Slate
+  doc.text('Incubateur Digital Solidaire (IDS) • Fiche signalétique officielle', pw / 2, 20.5, { align: 'center' });
+
+  // Palette exacte du style de référence
+  const borderBlue = [2, 132, 199];      // #0284C7 bleu cyan élégant
+  const labelBg = [224, 242, 254];       // #E0F2FE bleu ciel très doux
+  const whiteBg = [255, 255, 255];
+  const darkNavy = [15, 23, 42];
+  const textDark = [30, 41, 59];
+
+  // Y de départ du contenu
+  const startContentY = 30;
+
+  // ========================================================
+  // COLONNE GAUCHE (col1X = 14 mm, colW = 129.5 mm)
+  // 1. Profil (Cartouche)
+  // 2. INFORMATIONS PERSONNELLES
+  // 3. DESCRIPTION DU PROJET (sans rien ajouter)
+  // ========================================================
+
+  // --- 1. PROFIL ---
+  doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
-  doc.setTextColor(2, 132, 199); // primary sky-600 (Bleu clair officiel)
-  doc.text('FICHE SIGNALÉTIQUE & INFORMATIONS GÉNÉRALES', pw / 2, headerY + 12, { align: 'center' });
+  doc.setTextColor(...darkNavy);
+  doc.text('Profil', col1X, startContentY);
 
-  // Ligne de séparation fine sous l'en-tête (placée à Y=26, 3mm sous les boîtes de logos)
-  doc.setDrawColor(226, 232, 240);
-  doc.setLineWidth(0.4);
-  doc.line(marginX, 26, pw - marginX, 26);
-
-  // ==========================================
-  // 2. CARTOUCHE PORTEUR & IDENTITÉ (Y = 30 à 62 mm, Hauteur 32 mm)
-  //    ESPACÉ, AÉRÉ, AUCUN ÉLÉMENT COMPRESSÉ
-  // ==========================================
-  const cartoucheY = 30;
+  const cartoucheY = startContentY + 3;
   const cartoucheH = 32;
-  const cartoucheW = pw - marginX * 2; // 269 mm
 
-  doc.setFillColor(248, 250, 252);
-  doc.setDrawColor(226, 232, 240);
-  doc.setLineWidth(0.4);
-  doc.roundedRect(marginX, cartoucheY, cartoucheW, cartoucheH, 3.5, 3.5, 'FD');
+  // Boîte Profil (fond gris très doux arrondi)
+  doc.setFillColor(241, 245, 249); // #F1F5F9
+  doc.setDrawColor(226, 232, 240); // #E2E8F0
+  doc.setLineWidth(0.25);
+  doc.roundedRect(col1X, cartoucheY, colW, cartoucheH, 2.5, 2.5, 'FD');
 
-  // 2.1 Photo / Avatar
-  const photoSize = 24;
-  const photoX = marginX + 4.5;
-  const photoY = cartoucheY + 4;
-
-  doc.setFillColor(241, 245, 249);
-  doc.setDrawColor(203, 213, 225);
-  doc.setLineWidth(0.5);
-  doc.roundedRect(photoX, photoY, photoSize, photoSize, 2.5, 2.5, 'FD');
+  // Avatar / Photo
+  const avatarSize = 23;
+  const avatarX = col1X + 4.5;
+  const avatarY = cartoucheY + (cartoucheH - avatarSize) / 2;
 
   if (photoDataUrl) {
     try {
-      doc.addImage(photoDataUrl, 'PNG', photoX, photoY, photoSize, photoSize);
+      doc.addImage(photoDataUrl, 'PNG', avatarX, avatarY, avatarSize, avatarSize);
       doc.setDrawColor(2, 132, 199);
-      doc.setLineWidth(0.5);
-      doc.roundedRect(photoX, photoY, photoSize, photoSize, 2.5, 2.5, 'S');
+      doc.setLineWidth(0.35);
+      doc.roundedRect(avatarX, avatarY, avatarSize, avatarSize, 2, 2, 'S');
     } catch (e) {
       photoDataUrl = null;
     }
   }
+
   if (!photoDataUrl) {
+    doc.setFillColor(226, 232, 240);
+    doc.setDrawColor(203, 213, 225);
+    doc.roundedRect(avatarX, avatarY, avatarSize, avatarSize, 2, 2, 'FD');
+
     const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'IN';
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(148, 163, 184);
-    doc.text(initials, photoX + photoSize / 2, photoY + 14.5, { align: 'center' });
+    doc.setFontSize(11.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text(initials, avatarX + avatarSize / 2, avatarY + avatarSize / 2 + 4, { align: 'center' });
   }
 
-  // 2.2 Informations Porteur & Entreprise (avec espacement vertical équilibré)
-  const textLeftX = photoX + photoSize + 8; // 8 mm d'espace après la photo
+  // Textes Profil
+  const textX = avatarX + avatarSize + 5;
+  let curY = cartoucheY + 8;
 
-  // Nom complet en grand
+  // Nom complet
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.setTextColor(15, 23, 42); // Bleu marine
-  doc.text(displayName, textLeftX, cartoucheY + 11.5);
+  doc.setFontSize(11.5);
+  doc.setTextColor(...darkNavy);
+  doc.text(displayName, textX, curY);
 
-  // Raison sociale
-  doc.setFontSize(10.5);
-  doc.setTextColor(2, 132, 199); // Bleu clair
-  doc.text(incube?.raison_sociale || 'Projet d\'incubation', textLeftX, cartoucheY + 19);
-
-  // Tagline / Sous-titre léger
+  // Spécialité / Métier
+  curY += 5;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.8);
-  doc.setTextColor(100, 116, 139); // Slate-500
-  const phaseLabel = incube?.phase_projet ? `Phase : ${incube.phase_projet}` : 'Phase : Lancement';
-  const promoLabel = incube?.promotion ? `Promotion : ${incube.promotion}` : 'Promotion 2026';
-  doc.text(`${phaseLabel}   •   ${promoLabel}   •   Accompagnement : ${displayAccomp}`, textLeftX, cartoucheY + 26);
+  doc.setTextColor(100, 116, 139);
+  doc.text(incube?.specialite_metier || 'Porteur de projet', textX, curY);
 
-  // 2.3 QR Codes (Droite du Cartouche)
-  const qrBoxSize = 19;
-  const qr2X = pw - marginX - qrBoxSize - 6; // QR Site Web
-  const qr1X = qr2X - qrBoxSize - 8;         // QR LinkedIn (8mm d'espace entre les deux !)
-  const qrY = cartoucheY + 3.5;
+  // Raison Sociale
+  curY += 5.5;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(2, 132, 199);
+  doc.text(incube?.raison_sociale || '—', textX, curY);
 
-  // Séparateur vertical fin avant les QR codes
-  doc.setDrawColor(226, 232, 240);
-  doc.setLineWidth(0.4);
-  doc.line(qr1X - 8, cartoucheY + 4, qr1X - 8, cartoucheY + cartoucheH - 4);
+  // Phase / Promotion
+  curY += 4.5;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(100, 116, 139);
+  const phaseStr = incube?.phase_projet || 'Lancement';
+  const promoStr = incube?.promotion || 'Promotion 2026';
+  doc.text(`${phaseStr} • ${promoStr}`, textX, curY);
 
-  // Helper pour dessiner des QR codes vectoriels natifs fiables
-  const drawQrBox = async (text, x, y, size, label, labelColor = [10, 102, 194]) => {
-    doc.setFillColor(255, 255, 255);
-    doc.setDrawColor(203, 213, 225);
-    doc.setLineWidth(0.35);
-    doc.roundedRect(x, y, size, size, 2, 2, 'FD');
+  // QR Codes à droite dans le cartouche
+  const qrSize = 15;
+  const qrGap = 4.5;
+  const qrLinkedInX = col1X + colW - (qrSize * 2 + qrGap + 5);
+  const qrWebX = col1X + colW - (qrSize + 5);
+  const qrY = cartoucheY + 4;
 
-    try {
-      const qrDataUrl = await QRCode.toDataURL(text || 'https://ids.org.ma', {
-        margin: 1,
-        width: 256,
-        color: {
-          dark: '#081B38',
-          light: '#FFFFFF'
-        }
-      });
-      doc.addImage(qrDataUrl, 'PNG', x + 0.8, y + 0.8, size - 1.6, size - 1.6);
-    } catch (e) {
-      console.warn('Erreur QR:', e);
-    }
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(6.8);
-    doc.setTextColor(...labelColor);
-    doc.text(label, x + size / 2, y + size + 4.2, { align: 'center' });
-  };
-
-  // QR 1 : LinkedIn
   const linkedinUrl = incube?.linkedin && String(incube.linkedin).trim() !== ''
     ? incube.linkedin
     : `https://www.linkedin.com/search/results/all/?keywords=${encodeURIComponent(incube?.nom_incube || 'IDS')}`;
-  await drawQrBox(linkedinUrl, qr1X, qrY, qrBoxSize, 'QR LinkedIn', [10, 102, 194]);
-
-  // QR 2 : Site Web
   const siteWebUrl = incube?.site_web && String(incube.site_web).trim() !== ''
     ? incube.site_web
     : 'https://ids.org.ma';
-  await drawQrBox(siteWebUrl, qr2X, qrY, qrBoxSize, 'QR Site Web', [2, 132, 199]);
 
-  // ==========================================
-  // 3. DEUX COLONNES DE TABLEAUX ÉPURÉS
-  //    ESPACEMENT AÉRÉ : secStartY = 70 mm (8 mm d'espace sous le cartouche !)
-  //    GAP ENTRE COLONNES ÉLARGI : colGap = 10 mm (au lieu de 8 mm)
-  // ==========================================
-  const colGap = 10;
-  const colW = (pw - marginX * 2 - colGap) / 2; // 129.5 mm
-  const col1X = marginX;
-  const col2X = marginX + colW + colGap;
-  const secStartY = 70;
+  try {
+    const qrLinkedInUrl = await QRCode.toDataURL(linkedinUrl, { margin: 0, width: 140 });
+    const qrWebUrl = await QRCode.toDataURL(siteWebUrl, { margin: 0, width: 140 });
 
-  // --- COLONNE GAUCHE : 1. RENSEIGNEMENTS PERSONNELS ---
+    doc.addImage(qrLinkedInUrl, 'PNG', qrLinkedInX, qrY, qrSize, qrSize);
+    doc.addImage(qrWebUrl, 'PNG', qrWebX, qrY, qrSize, qrSize);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6);
+    doc.setTextColor(2, 132, 199);
+    doc.text('LinkedIn', qrLinkedInX + qrSize / 2, qrY + qrSize + 3.5, { align: 'center' });
+    doc.text('Site Web', qrWebX + qrSize / 2, qrY + qrSize + 3.5, { align: 'center' });
+  } catch (e) {
+    console.warn('Erreur génération QR codes:', e);
+  }
+
+  // --- 2. INFORMATIONS PERSONNELLES ---
+  const persY = cartoucheY + cartoucheH + 6.5;
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(15, 23, 42);
-  doc.text('1. RENSEIGNEMENTS PERSONNELS DU PORTEUR', col1X, secStartY);
+  doc.setFontSize(9.5);
+  doc.setTextColor(...darkNavy);
+  doc.text('INFORMATIONS PERSONNELLES', col1X, persY);
 
   const dateNaisText = incube?.date_naissance ? new Date(incube.date_naissance).toLocaleDateString('fr-FR') : '—';
-  const vText = `${incube?.ville || '—'}${incube?.province && incube.province !== incube.ville ? ' / ' + incube.province : ''}`;
+  const ageStr = incube?.age ? ` (${incube.age})` : '';
 
   autoTable(doc, {
-    startY: secStartY + 3.5,
+    startY: persY + 3,
     margin: { left: col1X, right: pw - col1X - colW },
     tableWidth: colW,
     theme: 'grid',
-    styles: { 
-      fontSize: 7.7, 
-      cellPadding: { top: 2.3, bottom: 2.3, left: 3, right: 3 }, 
-      font: 'helvetica', 
-      lineColor: [226, 232, 240], 
-      lineWidth: 0.25 
+    styles: {
+      fontSize: 7.6,
+      font: 'helvetica',
+      lineColor: borderBlue,
+      lineWidth: 0.28,
+      cellPadding: { top: 2.8, bottom: 2.8, left: 3.5, right: 3.5 }
     },
     columnStyles: {
-      0: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105], cellWidth: 42 },
-      1: { textColor: [15, 23, 42], cellWidth: colW - 42 }
+      0: { fontStyle: 'bold', fillColor: labelBg, textColor: darkNavy, cellWidth: 40 },
+      1: { fillColor: whiteBg, textColor: textDark, cellWidth: colW - 40 }
     },
     body: [
       ['Carte Nationale (CIN)', incube?.cin || '—'],
-      ['Date de naissance & Âge', `${dateNaisText} (${ageAnnees})`],
-      ['Genre & Situation', `${incube?.genre || '—'} • ${incube?.situation_familiale || '—'}`],
+      ['Date de naissance & Âge', `${dateNaisText}${ageStr}`],
+      ['Genre & Situation', `${incube?.genre || '—'} • ${incube?.situation_familiale || 'Célibataire'}`],
       ['Niveau d\'étude', incube?.niveau_etude || '—'],
-      ['Spécialité / Métier', incube?.specialite || incube?.secteur_activite || '—'],
-      ['Ville & Province', vText],
-      ['Téléphone', incube?.telephone || '—']
+      ['Spécialité / Métier', incube?.specialite_metier || '—'],
+      ['Ville & Province', `${incube?.ville || '—'}${incube?.province && incube.province !== incube.ville ? ' / ' + incube.province : ''}`],
+      ['Téléphone', incube?.telephone || '—'],
+      ['E-mail', incube?.email || '—']
     ]
   });
 
-  // --- COLONNE DROITE : 2. RENSEIGNEMENTS ENTREPRISE & ENCADREMENT ---
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(15, 23, 42);
-  doc.text('2. RENSEIGNEMENTS ENTREPRISE & ENCADREMENT', col2X, secStartY);
+  const persFinalY = doc.lastAutoTable.finalY;
 
-  // Calcul dynamique des effectifs RH
-  const rhPersonnel = Array.isArray(incube?.personnel) ? incube.personnel : [];
-  const rhCount = rhPersonnel.filter(p => p && p.nom_complet && String(p.nom_complet).trim() !== '').length || 1;
-  const teamText = `${rhCount} collaborateur(s) (calculé depuis RH)`;
-  const dateDemText = incube?.date_demarrage ? new Date(incube.date_demarrage).toLocaleDateString('fr-FR') : '—';
+  // --- 3. DESCRIPTION DU PROJET --- (sans rien ajouter)
+  const descTitleY = persFinalY + 6.5;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(...darkNavy);
+  doc.text('DESCRIPTION DU PROJET', col1X, descTitleY);
+
+  const descContent = (incube?.description_projet && String(incube.description_projet).trim())
+    ? String(incube.description_projet).trim()
+    : "Aucune description renseignée pour ce projet.";
 
   autoTable(doc, {
-    startY: secStartY + 3.5,
+    startY: descTitleY + 3,
+    margin: { left: col1X, right: pw - col1X - colW },
+    tableWidth: colW,
+    theme: 'grid',
+    styles: {
+      fontSize: 7.8,
+      font: 'helvetica',
+      lineColor: borderBlue,
+      lineWidth: 0.28,
+      fillColor: whiteBg,
+      textColor: textDark,
+      cellPadding: { top: 3.8, bottom: 3.8, left: 4, right: 4 },
+      lineHeightFactor: 1.4
+    },
+    body: [
+      [{ content: descContent }]
+    ]
+  });
+
+  // ========================================================
+  // COLONNE DROITE (col2X = 153.5 mm, colW = 129.5 mm)
+  // 1. RENSEIGNEMENTS ENTREPRISE & ENCADREMENT
+  // 2. ASSOCIÉS DU PROJET
+  // ========================================================
+
+  // --- ENTREPRISE & ENCADREMENT ---
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(...darkNavy);
+  doc.text('RENSEIGNEMENTS ENTREPRISE & ENCADREMENT', col2X, startContentY);
+
+  const dateDemText = incube?.date_demarrage ? new Date(incube.date_demarrage).toLocaleDateString('fr-FR') : '—';
+  const teamText = `${incube?.personnel_count || 1} collaborateur(s) (calculé depuis RH)`;
+
+  autoTable(doc, {
+    startY: startContentY + 3,
     margin: { left: col2X, right: marginX },
     tableWidth: colW,
     theme: 'grid',
-    styles: { 
-      fontSize: 7.7, 
-      cellPadding: { top: 2.3, bottom: 2.3, left: 3, right: 3 }, 
-      font: 'helvetica', 
-      lineColor: [226, 232, 240], 
-      lineWidth: 0.25 
+    styles: {
+      fontSize: 7.6,
+      font: 'helvetica',
+      lineColor: borderBlue,
+      lineWidth: 0.28,
+      cellPadding: { top: 2.8, bottom: 2.8, left: 3.5, right: 3.5 }
     },
     columnStyles: {
-      0: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105], cellWidth: 38 },
-      1: { textColor: [15, 23, 42], cellWidth: 27 },
-      2: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105], cellWidth: 36 },
-      3: { textColor: [15, 23, 42], cellWidth: colW - 38 - 27 - 36 }
+      0: { fontStyle: 'bold', fillColor: labelBg, textColor: darkNavy, cellWidth: 34 },
+      1: { fillColor: whiteBg, textColor: textDark, cellWidth: 31 },
+      2: { fontStyle: 'bold', fillColor: labelBg, textColor: darkNavy, cellWidth: 31 },
+      3: { fillColor: whiteBg, textColor: textDark, cellWidth: colW - 34 - 31 - 31 }
     },
     body: [
       ['Raison sociale', { content: incube?.raison_sociale || '—', colSpan: 3, styles: { fontStyle: 'bold', textColor: [2, 132, 199] } }],
@@ -1806,43 +1829,10 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
     ]
   });
 
-  // ==========================================
-  // 4. PARTIE BASSE : 3. DESCRIPTION & 4. ASSOCIÉS
-  //    ESPACEMENT AÉRÉ : bottomY = finalY + 8 mm
-  // ==========================================
-  const bottomY = doc.lastAutoTable.finalY + 8;
+  const entFinalY = doc.lastAutoTable.finalY;
 
-  // 3. Description du projet (Gauche - uniquement la description réelle sans ajout)
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(15, 23, 42);
-  doc.text('3. DESCRIPTION DU PROJET', col1X, bottomY);
-
-  const descContent = (incube?.description_projet && String(incube.description_projet).trim())
-    ? String(incube.description_projet).trim()
-    : "Aucune description renseignée pour ce projet.";
-
-  autoTable(doc, {
-    startY: bottomY + 3.5,
-    margin: { left: col1X, right: pw - col1X - colW },
-    tableWidth: colW,
-    theme: 'grid',
-    styles: { 
-      fontSize: 8, 
-      font: 'helvetica', 
-      lineColor: [226, 232, 240], 
-      lineWidth: 0.25,
-      fillColor: [248, 250, 252],
-      textColor: [30, 41, 59],
-      cellPadding: { top: 3.5, bottom: 3.5, left: 3.5, right: 3.5 },
-      lineHeightFactor: 1.38
-    },
-    body: [
-      [{ content: descContent }]
-    ]
-  });
-
-  // 4. Associés du Projet (Droite)
+  // --- ASSOCIÉS DU PROJET ---
+  const assocY = entFinalY + 6.5;
   let associesList = [];
   if (Array.isArray(incube?.associes)) {
     associesList = incube.associes;
@@ -1854,37 +1844,38 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
   }
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(15, 23, 42);
-  doc.text(`4. ASSOCIÉS DU PROJET (${associesList.length})`, col2X, bottomY);
+  doc.setFontSize(9.5);
+  doc.setTextColor(...darkNavy);
+  doc.text(`ASSOCIÉS DU PROJET (${associesList.length})`, col2X, assocY);
 
   if (associesList.length > 0) {
     autoTable(doc, {
-      startY: bottomY + 3.5,
+      startY: assocY + 3,
       margin: { left: col2X, right: marginX },
       tableWidth: colW,
-      theme: 'striped',
-      headStyles: { 
-        fillColor: [15, 23, 42], 
-        textColor: [255, 255, 255], 
-        fontStyle: 'bold', 
-        fontSize: 7.2, 
-        cellPadding: { top: 2.2, bottom: 2.2, left: 2.5, right: 2.5 } 
+      theme: 'grid',
+      headStyles: {
+        fillColor: labelBg,
+        textColor: darkNavy,
+        fontStyle: 'bold',
+        fontSize: 7.4,
+        lineColor: borderBlue,
+        lineWidth: 0.28,
+        cellPadding: { top: 3, bottom: 3, left: 3.5, right: 3.5 }
       },
-      styles: { 
-        fontSize: 7.2, 
-        cellPadding: { top: 2.2, bottom: 2.2, left: 2.5, right: 2.5 }, 
-        font: 'helvetica', 
-        lineColor: [226, 232, 240], 
-        lineWidth: 0.2 
+      styles: {
+        fontSize: 7.4,
+        font: 'helvetica',
+        lineColor: borderBlue,
+        lineWidth: 0.28,
+        cellPadding: { top: 3, bottom: 3, left: 3.5, right: 3.5 }
       },
       columnStyles: {
-        0: { cellWidth: 42 },
-        1: { cellWidth: 22 },
-        2: { cellWidth: 42 },
-        3: { cellWidth: 23.5 }
+        0: { fontStyle: 'bold', cellWidth: 42 },
+        1: { cellWidth: 26 },
+        2: { cellWidth: 38 },
+        3: { cellWidth: colW - 42 - 26 - 38 }
       },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
       head: [['Nom & Prénom', 'CIN', 'Fonction', 'Badge RFID']],
       body: associesList.map(a => [
         formatOfficialName(a.nom),
@@ -1895,31 +1886,34 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
     });
   } else {
     autoTable(doc, {
-      startY: bottomY + 3.5,
+      startY: assocY + 3,
       margin: { left: col2X, right: marginX },
       tableWidth: colW,
-      theme: 'striped',
-      headStyles: { 
-        fillColor: [15, 23, 42], 
-        textColor: [255, 255, 255], 
-        fontStyle: 'bold', 
-        fontSize: 7.2, 
-        cellPadding: { top: 2.2, bottom: 2.2, left: 2.5, right: 2.5 } 
+      theme: 'grid',
+      headStyles: {
+        fillColor: labelBg,
+        textColor: darkNavy,
+        fontStyle: 'bold',
+        fontSize: 7.4,
+        lineColor: borderBlue,
+        lineWidth: 0.28,
+        cellPadding: { top: 3, bottom: 3, left: 3.5, right: 3.5 }
       },
-      styles: { 
-        fontSize: 7.2, 
-        cellPadding: 2.5, 
-        font: 'helvetica', 
-        lineColor: [226, 232, 240], 
-        lineWidth: 0.2 
+      styles: {
+        fontSize: 7.4,
+        font: 'helvetica',
+        lineColor: borderBlue,
+        lineWidth: 0.28,
+        cellPadding: { top: 3, bottom: 3, left: 3.5, right: 3.5 }
       },
       head: [['Nom & Prénom', 'CIN', 'Fonction', 'Badge RFID']],
       body: [
-        [{ content: "Aucun associé enregistré pour cette startup.", colSpan: 4, styles: { fontStyle: 'italic', textColor: [148, 163, 184], halign: 'center', cellPadding: 3.5 } }]
+        [{ content: "Aucun associé enregistré pour cette startup.", colSpan: 4, styles: { fontStyle: 'italic', textColor: [148, 163, 184], halign: 'center', cellPadding: 4 } }]
       ]
     });
   }
 
+  // Aucun footer
   return doc;
 };
 
