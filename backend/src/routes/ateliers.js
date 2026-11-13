@@ -38,44 +38,49 @@ router.get('/', auth, async (req, res) => {
           {
             model: Incube,
             as: 'animateurIncube',
-            attributes: ['id', 'nom_incube', 'email', 'raison_sociale']
+            attributes: ['id', 'nom_incube', 'email', 'raison_sociale'],
+            required: false
           }
         ],
         order: [['date', 'DESC'], ['heureDebut', 'DESC']]
       });
-    } catch (dbErr) {
-      const errMsg = String(dbErr.message || '') + String(dbErr.parent?.sqlMessage || '');
-      if (errMsg.includes('date_fin') || errMsg.includes('Unknown column')) {
-        console.warn('⚠️ Colonne date_fin absente dans la table ateliers. Migration automatique en cours...');
-        try {
-          await sequelize.query('ALTER TABLE ateliers ADD COLUMN date_fin DATE NULL AFTER date');
-          console.log('✅ Auto-migration réussie : colonne date_fin ajoutée à la table ateliers !');
-          ateliers = await Atelier.findAll({
-            include: [
-              {
-                model: Incube,
-                as: 'animateurIncube',
-                attributes: ['id', 'nom_incube', 'email', 'raison_sociale']
-              }
-            ],
-            order: [['date', 'DESC'], ['heureDebut', 'DESC']]
-          });
-        } catch (alterErr) {
-          console.error('Erreur migration date_fin, fallback sans date_fin:', alterErr.message);
-          ateliers = await Atelier.findAll({
-            attributes: { exclude: ['dateFin'] },
-            include: [
-              {
-                model: Incube,
-                as: 'animateurIncube',
-                attributes: ['id', 'nom_incube', 'email', 'raison_sociale']
-              }
-            ],
-            order: [['date', 'DESC'], ['heureDebut', 'DESC']]
-          });
-        }
-      } else {
-        throw dbErr;
+    } catch (e1) {
+      console.warn('⚠️ Erreur association atelier/incube, tentative sans include:', e1.message);
+      try {
+        ateliers = await Atelier.findAll({
+          order: [['date', 'DESC'], ['heureDebut', 'DESC']]
+        });
+      } catch (e2) {
+        console.warn('⚠️ Erreur Sequelize findAll, passage en requête brute SQL directe:', e2.message);
+        const [rows] = await sequelize.query('SELECT * FROM ateliers ORDER BY date DESC');
+        ateliers = rows.map(r => {
+          let parsedPhotos = [];
+          if (r.photos) {
+            try {
+              parsedPhotos = typeof r.photos === 'string' ? JSON.parse(r.photos) : r.photos;
+            } catch (_) {
+              parsedPhotos = [r.photos];
+            }
+          }
+          return {
+            id: r.id,
+            titre: r.titre,
+            formateur: r.formateur || 'Formateur IDS',
+            intervenant: r.intervenant || null,
+            animateurType: r.animateur_type || 'externe',
+            animateurIncubeId: r.animateur_incube_id || null,
+            date: r.date,
+            dateFin: r.date_fin || null,
+            heureDebut: r.heure_debut || '09:30',
+            heureFin: r.heure_fin || '12:30',
+            duree: r.duree || '3h00',
+            description: r.description || '',
+            photos: Array.isArray(parsedPhotos) ? parsedPhotos : [],
+            statutOuverture: r.statut_ouverture || 'auto',
+            driveLink: r.drive_link || null,
+            toJSON() { return this; }
+          };
+        });
       }
     }
 
@@ -109,7 +114,7 @@ router.get('/', auth, async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Erreur récupération ateliers:', error);
-    res.status(500).json({ message: 'Erreur lors de la récupération des ateliers' });
+    res.status(500).json({ message: 'Erreur lors de la récupération des ateliers', error: error.message });
   }
 });
 
