@@ -139,6 +139,204 @@ function AtelierCarousel({ photos = [], title = '', heightClass = 'h-44 sm:h-48'
   );
 }
 
+// =========================================================================
+// CARTE D'ATELIER PLEIN FORMAT IMMERSIVE (IMAGE COUVRANT TOUT LE CADRE SANS BORDURE)
+// =========================================================================
+function AtelierFullCard({
+  atelier,
+  isPasse,
+  nbPresents,
+  onSelect,
+  onDelete,
+  onOpenQr
+}) {
+  const [photoIndex, setPhotoIndex] = useState(0);
+  const photos = Array.isArray(atelier.photos) ? atelier.photos.filter(p => typeof p === 'string' && p.trim()) : [];
+  const hasPhotos = photos.length > 0;
+  const safeIdx = hasPhotos ? (((photoIndex % photos.length) + photos.length) % photos.length) : 0;
+  const currentPhoto = hasPhotos ? photos[safeIdx] : null;
+
+  return (
+    <div
+      onClick={onSelect}
+      className="relative rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 group cursor-pointer min-h-[350px] flex flex-col justify-between border-0 bg-slate-950 select-none"
+    >
+      {/* 1. IMAGE DE FOND / CARROUSEL SUR TOUT LE CADRE */}
+      <div className="absolute inset-0 z-0">
+        {hasPhotos ? (
+          <img
+            src={getPhotoUrl(currentPhoto)}
+            alt={atelier.titre}
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-slate-900 via-sky-950 to-slate-950 relative">
+            <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#38bdf8_1.5px,transparent_1.5px)] [background-size:20px_20px]" />
+            <div className="absolute -right-10 -bottom-10 w-64 h-64 rounded-full bg-primary-600/10 blur-3xl pointer-events-none" />
+          </div>
+        )}
+
+        {/* Dégradé sombre pour lisibilité maximale des textes */}
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/75 to-slate-950/30" />
+      </div>
+
+      {/* 2. CONTRÔLES CARROUSEL GAUCHE / DROITE SI PLUSIEURS PHOTOS */}
+      {photos.length > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setPhotoIndex(prev => (prev === 0 ? photos.length - 1 : prev - 1));
+            }}
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/50 hover:bg-black/85 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all backdrop-blur-md z-20 shadow-md cursor-pointer border border-white/10"
+            title="Photo précédente"
+          >
+            <ChevronLeft size={18} />
+          </button>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setPhotoIndex(prev => (prev === photos.length - 1 ? 0 : prev + 1));
+            }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/50 hover:bg-black/85 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all backdrop-blur-md z-20 shadow-md cursor-pointer border border-white/10"
+            title="Photo suivante"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </>
+      )}
+
+      {/* 3. EN-TÊTE DE LA CARTE (PAR-DESSUS L'IMAGE) */}
+      <div className="relative z-10 p-5 pb-0 flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-white text-[11px] font-extrabold tracking-wider border border-white/20 shadow-xs">
+            <GraduationCap size={13} className="text-amber-400" /> ATELIER IDS
+          </span>
+
+          {isPasse ? (
+            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-500/80 backdrop-blur-md text-white text-[11px] font-black border border-emerald-400/40 shadow-xs">
+              <Check size={12} /> Passé
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/80 backdrop-blur-md text-white text-[11px] font-black border border-amber-400/40 shadow-xs">
+              À venir
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {photos.length > 1 && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-white text-[11px] font-bold border border-white/15 shadow-xs">
+              <Camera size={12} /> {safeIdx + 1}/{photos.length}
+            </span>
+          )}
+
+          <button
+            type="button"
+            onClick={(e) => onDelete(atelier.id, e)}
+            title="Supprimer cet atelier"
+            className="p-1.5 text-white/70 hover:text-red-400 rounded-full bg-black/40 hover:bg-black/70 backdrop-blur-md transition-colors cursor-pointer border border-white/10"
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
+      </div>
+
+      {/* 4. BAS DE LA CARTE : TITRE, INFORMATIONS ET ACTIONS */}
+      <div className="relative z-10 p-5 pt-12 space-y-3">
+        {/* Titre */}
+        <h4 className="text-lg sm:text-xl font-black text-white leading-snug drop-shadow-md group-hover:text-amber-300 transition-colors">
+          {atelier.titre}
+        </h4>
+
+        {/* Métadonnées en capsules semi-transparentes */}
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/50 backdrop-blur-md text-white border border-white/15 font-medium">
+            <Calendar size={13} className="text-amber-400" /> {new Date(atelier.date).toLocaleDateString('fr-FR')}
+          </span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/50 backdrop-blur-md text-amber-300 border border-white/15 font-extrabold">
+            <Clock size={13} /> {atelier.heureDebut || '09:30'} - {atelier.heureFin || '12:30'}
+          </span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/50 backdrop-blur-md text-white/80 border border-white/15 font-medium">
+            <Clock size={13} className="text-slate-400" /> {atelier.duree || '3h00'}
+          </span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/50 backdrop-blur-md text-white border border-white/15 font-medium">
+            {(atelier.animateurType === 'incube' || atelier.animateurIncubeId) ? (
+              <span className="text-amber-400 font-bold">🎤 Incubé IDS</span>
+            ) : (
+              <GraduationCap size={13} className="text-sky-400" />
+            )} {atelier.formateur}{atelier.intervenant ? ` / ${atelier.intervenant}` : ''}
+          </span>
+        </div>
+
+        {/* Puces de pagination carrousel */}
+        {photos.length > 1 && (
+          <div className="flex items-center gap-1.5 pt-1">
+            {photos.map((_, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPhotoIndex(idx);
+                }}
+                className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                  idx === safeIdx
+                    ? 'w-5 bg-amber-400'
+                    : 'w-1.5 bg-white/40 hover:bg-white/70'
+                }`}
+                aria-label={`Photo ${idx + 1}`}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Barre d'action inférieure */}
+        <div className="pt-2 border-t border-white/15 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-full backdrop-blur-md ${
+              nbPresents > 0
+                ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-400/40'
+                : 'bg-black/50 text-white/70 border border-white/15'
+            }`}>
+              <Users size={12} className={nbPresents > 0 ? 'text-emerald-400' : 'text-slate-400'} />
+              {nbPresents} présent{nbPresents !== 1 ? 's' : ''}
+            </span>
+
+            {atelier.invitedCount ? (
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-500/25 text-blue-200 border border-blue-400/40 backdrop-blur-md">
+                ✉️ {atelier.invitedCount} invité{atelier.invitedCount > 1 ? 's' : ''}
+              </span>
+            ) : null}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenQr(atelier);
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-black transition-all shadow-md cursor-pointer border border-amber-400/50"
+              title="Afficher et imprimer le QR Code de cet atelier"
+            >
+              <QrCode size={14} /> Voir QR Code
+            </button>
+
+            <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-white text-xs font-black transition-all border border-white/30 backdrop-blur-md shadow-md">
+              <Eye size={14} /> Feuille d'Émargement
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const currentYear = new Date().getFullYear();
 const todayStr = new Date().toISOString().split('T')[0];
 const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split('T')[0];
@@ -2014,133 +2212,18 @@ export default function Evenements() {
           <p className="text-xs text-slate-500 mt-1">Modifiez vos critères de recherche ou planifiez une nouvelle session.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {displayedFormations.map((f) => {
-            const passe = isAtelierPasse(f.date);
-            const nbPresents = getPresenceCount(f.id);
-
-            return (
-              <div 
-                key={f.id} 
-                onClick={() => setSelectedAtelier(f)}
-                className={`rounded-2xl border transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer overflow-hidden ${
-                  passe
-                    ? 'bg-emerald-500/[0.04] border-emerald-500/30 dark:bg-emerald-950/20 hover:border-emerald-500/60'
-                    : 'bg-white dark:bg-dark-900/60 border-slate-200 dark:border-dark-700/60 hover:border-primary-500/60'
-                } flex flex-col justify-between group`}
-              >
-                {/* 1. CAROUSEL PHOTO SUR LE HAUT DE LA CARTE */}
-                <AtelierCarousel photos={f.photos} title={f.titre} heightClass="h-44 sm:h-48" />
-
-                {/* 2. CORPS DE LA CARTE */}
-                <div className="p-4 flex-1 flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 text-primary-600 dark:text-primary-400 text-[11px] font-extrabold uppercase tracking-wider mb-1">
-                          <GraduationCap size={14} className="shrink-0" />
-                          <span>Nom de l'atelier</span>
-                        </div>
-                        <h4 className="text-base font-black text-slate-900 dark:text-dark-100 leading-snug group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
-                          {f.titre}
-                        </h4>
-                      </div>
-                      
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {passe ? (
-                          <span className="badge badge-green shrink-0 flex items-center gap-1 text-[11px]">
-                            <Check size={12} /> Passé
-                          </span>
-                        ) : (
-                          <span className="badge badge-gray shrink-0 text-[11px]">
-                            À venir
-                          </span>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={(e) => handleDeleteFormation(f.id, e)}
-                          title="Supprimer cet atelier"
-                          className="p-1 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-dark-300">
-                      <span className="inline-flex items-center gap-1.5 font-medium bg-slate-100 dark:bg-dark-800 px-2.5 py-1 rounded-lg">
-                        <Calendar size={13} className="text-slate-400" /> {new Date(f.date).toLocaleDateString('fr-FR')}
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 font-extrabold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 px-2.5 py-1 rounded-lg">
-                        <Clock size={13} /> {f.heureDebut || '09:30'} - {f.heureFin || '12:30'}
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 font-medium text-slate-500 bg-slate-100 dark:bg-dark-800 px-2.5 py-1 rounded-lg">
-                        <Clock size={13} className="text-slate-400" /> {f.duree || '3h00'}
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 font-medium text-slate-700 dark:text-dark-200">
-                        {(f.animateurType === 'incube' || f.animateurIncubeId) ? (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-                          🎤 Incubé IDS
-                        </span>
-                      ) : (
-                        <GraduationCap size={13} className="text-slate-400" />
-                      )} {f.formateur}{f.intervenant ? ` / ${f.intervenant}` : ''}
-                      </span>
-                    </div>
-
-                    {/* Description supprimée de dessous le titre pour un design aéré et épuré */}
-                    {f.description && (
-                      <div className="mt-2.5 flex items-center gap-1.5 text-[11px] text-slate-400 dark:text-dark-400">
-                        <Info size={12} className="text-slate-400 shrink-0" />
-                        <span className="truncate italic">Détails et objectifs consultables dans la fiche</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-4 pt-3.5 border-t border-slate-100 dark:border-dark-700/40 flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      {/* Compteur de présents */}
-                      <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full ${
-                        nbPresents > 0
-                          ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
-                          : 'bg-slate-100 dark:bg-dark-800 text-slate-500 dark:text-dark-400'
-                      }`}>
-                        <Users size={12} /> {nbPresents} présent{nbPresents !== 1 ? 's' : ''}
-                      </span>
-
-                      {/* Badge nombre d'invités */}
-                      {f.invitedCount ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                          ✉️ {f.invitedCount} invité{f.invitedCount > 1 ? 's' : ''}
-                        </span>
-                      ) : null}
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {/* Bouton Voir QR Code (ouvre le modal dédié) */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setQrModalAtelier(f);
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold transition-all border border-amber-500/30 shadow-xs cursor-pointer"
-                        title="Afficher et imprimer le QR Code de cet atelier"
-                      >
-                        <QrCode size={14} /> Voir QR Code
-                      </button>
-
-                      {/* Bouton Détails & Feuille d'émargement */}
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary-500/10 group-hover:bg-primary-500/20 text-primary-700 dark:text-primary-300 text-xs font-bold transition-all border border-primary-500/30 shadow-xs">
-                        <Eye size={14} /> Feuille d'Émargement
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {displayedFormations.map((f) => (
+            <AtelierFullCard
+              key={f.id}
+              atelier={f}
+              isPasse={isAtelierPasse(f.date)}
+              nbPresents={getPresenceCount(f.id)}
+              onSelect={() => setSelectedAtelier(f)}
+              onDelete={handleDeleteFormation}
+              onOpenQr={setQrModalAtelier}
+            />
+          ))}
         </div>
       )}
 
