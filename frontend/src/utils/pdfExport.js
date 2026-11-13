@@ -1529,7 +1529,7 @@ export const formatAgeAnnees = (ageStr, dob) => {
 };
 
 export const generateFicheSignaletiqueDocument = async (incube) => {
-  // Format Horizontal Paysage A4 (297mm x 210mm) - Style Moderne Référence
+  // Format Horizontal Paysage A4 (297mm x 210mm) - Style Moderne Aligné Pleine Largeur
   const doc = new jsPDF({
     orientation: 'landscape',
     unit: 'mm',
@@ -1569,14 +1569,14 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
   // Logo IDS (gauche)
   if (logoIds) {
     try {
-      doc.addImage(logoIds, 'PNG', col1X, 9, 24, 15, '', 'FAST');
+      doc.addImage(logoIds, 'PNG', col1X, 8, 24, 15, '', 'FAST');
     } catch (e) {}
   }
 
   // Logo CTPES (droite)
   if (logoCtpes) {
     try {
-      doc.addImage(logoCtpes, 'PNG', pw - marginX - 52, 10.5, 52, 12, '', 'FAST');
+      doc.addImage(logoCtpes, 'PNG', pw - marginX - 52, 9.5, 52, 12, '', 'FAST');
     } catch (e) {}
   }
 
@@ -1584,56 +1584,45 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(15);
   doc.setTextColor(15, 23, 42); // Navy
-  doc.text('FICHE SIGNALÉTIQUE & INFORMATIONS GÉNÉRALES', pw / 2, 15, { align: 'center' });
+  doc.text('FICHE SIGNALÉTIQUE & INFORMATIONS GÉNÉRALES', pw / 2, 14, { align: 'center' });
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(100, 116, 139); // Slate
-  doc.text('Incubateur Digital Solidaire (IDS) • Fiche signalétique officielle', pw / 2, 20.5, { align: 'center' });
+  doc.text('Incubateur Digital Solidaire (IDS) • Fiche signalétique officielle', pw / 2, 19.5, { align: 'center' });
 
-  // Palette exacte du style de référence
+  // Palette exacte du style moderne de référence
   const borderBlue = [2, 132, 199];      // #0284C7 bleu cyan élégant
   const labelBg = [224, 242, 254];       // #E0F2FE bleu ciel très doux
   const whiteBg = [255, 255, 255];
   const darkNavy = [15, 23, 42];
   const textDark = [30, 41, 59];
 
-  // Y de départ du contenu
-  const startContentY = 30;
-
   // ========================================================
-  // COLONNE GAUCHE (col1X = 14 mm, colW = 129.5 mm)
-  // 1. Profil (Cartouche)
-  // 2. INFORMATIONS PERSONNELLES
-  // 3. DESCRIPTION DU PROJET (sans rien ajouter)
+  // 2. BLOC PROFIL : PLEINE LARGEUR EN HAUT DE PAGE (SANS DÉCALAGE)
+  //    Cartouche sur toute la largeur (269 mm), QR codes aérés et très lisibles
   // ========================================================
+  const cartoucheY = 27;
+  const cartoucheH = 34;
+  const cartoucheW = pw - marginX * 2; // 269 mm
 
-  // --- 1. PROFIL ---
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(...darkNavy);
-  doc.text('Profil', col1X, startContentY);
-
-  const cartoucheY = startContentY + 3;
-  const cartoucheH = 32;
-
-  // Boîte Profil (fond gris très doux arrondi)
+  // Boîte Profil (fond gris très doux avec coins arrondis)
   doc.setFillColor(241, 245, 249); // #F1F5F9
   doc.setDrawColor(226, 232, 240); // #E2E8F0
-  doc.setLineWidth(0.25);
-  doc.roundedRect(col1X, cartoucheY, colW, cartoucheH, 2.5, 2.5, 'FD');
+  doc.setLineWidth(0.3);
+  doc.roundedRect(marginX, cartoucheY, cartoucheW, cartoucheH, 3, 3, 'FD');
 
   // Avatar / Photo
-  const avatarSize = 23;
-  const avatarX = col1X + 4.5;
-  const avatarY = cartoucheY + (cartoucheH - avatarSize) / 2;
+  const photoSize = 25;
+  const photoX = marginX + 4.5;
+  const photoY = cartoucheY + (cartoucheH - photoSize) / 2;
 
   if (photoDataUrl) {
     try {
-      doc.addImage(photoDataUrl, 'PNG', avatarX, avatarY, avatarSize, avatarSize);
+      doc.addImage(photoDataUrl, 'PNG', photoX, photoY, photoSize, photoSize);
       doc.setDrawColor(2, 132, 199);
       doc.setLineWidth(0.35);
-      doc.roundedRect(avatarX, avatarY, avatarSize, avatarSize, 2, 2, 'S');
+      doc.roundedRect(photoX, photoY, photoSize, photoSize, 2, 2, 'S');
     } catch (e) {
       photoDataUrl = null;
     }
@@ -1642,54 +1631,59 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
   if (!photoDataUrl) {
     doc.setFillColor(226, 232, 240);
     doc.setDrawColor(203, 213, 225);
-    doc.roundedRect(avatarX, avatarY, avatarSize, avatarSize, 2, 2, 'FD');
+    doc.roundedRect(photoX, photoY, photoSize, photoSize, 2, 2, 'FD');
 
     const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'IN';
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11.5);
+    doc.setFontSize(12);
     doc.setTextColor(71, 85, 105);
-    doc.text(initials, avatarX + avatarSize / 2, avatarY + avatarSize / 2 + 4, { align: 'center' });
+    doc.text(initials, photoX + photoSize / 2, photoY + photoSize / 2 + 4.2, { align: 'center' });
   }
 
-  // Textes Profil
-  const textX = avatarX + avatarSize + 5;
-  let curY = cartoucheY + 8;
+  // Textes Profil (bien espacés et aérés)
+  const textX = photoX + photoSize + 6;
+  let curY = cartoucheY + 8.5;
 
   // Nom complet
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11.5);
+  doc.setFontSize(12.5);
   doc.setTextColor(...darkNavy);
   doc.text(displayName, textX, curY);
 
   // Spécialité / Métier
-  curY += 5;
+  curY += 5.2;
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.8);
+  doc.setFontSize(8.2);
   doc.setTextColor(100, 116, 139);
   doc.text(incube?.specialite_metier || 'Porteur de projet', textX, curY);
 
   // Raison Sociale
-  curY += 5.5;
+  curY += 6;
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
+  doc.setFontSize(10.5);
   doc.setTextColor(2, 132, 199);
   doc.text(incube?.raison_sociale || '—', textX, curY);
 
-  // Phase / Promotion
-  curY += 4.5;
+  // Phase / Promotion / Accompagnateur
+  curY += 5;
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
+  doc.setFontSize(7.5);
   doc.setTextColor(100, 116, 139);
   const phaseStr = incube?.phase_projet || 'Lancement';
   const promoStr = incube?.promotion || 'Promotion 2026';
-  doc.text(`${phaseStr} • ${promoStr}`, textX, curY);
+  doc.text(`Phase : ${phaseStr}   •   Promotion : ${promoStr}   •   Accompagnement : ${displayAccomp}`, textX, curY);
 
-  // QR Codes à droite dans le cartouche
-  const qrSize = 15;
-  const qrGap = 4.5;
-  const qrLinkedInX = col1X + colW - (qrSize * 2 + qrGap + 5);
-  const qrWebX = col1X + colW - (qrSize + 5);
+  // QR Codes à droite du cartouche pleine largeur (très lisibles & grands !)
+  const qrSize = 19;
+  const qrGap = 7;
+  const qrWebX = marginX + cartoucheW - qrSize - 6;
+  const qrLinkedInX = qrWebX - qrSize - qrGap;
   const qrY = cartoucheY + 4;
+
+  // Séparateur vertical fin avant les QR codes
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.35);
+  doc.line(qrLinkedInX - 7, cartoucheY + 4, qrLinkedInX - 7, cartoucheY + cartoucheH - 4);
 
   const linkedinUrl = incube?.linkedin && String(incube.linkedin).trim() !== ''
     ? incube.linkedin
@@ -1699,33 +1693,50 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
     : 'https://ids.org.ma';
 
   try {
-    const qrLinkedInUrl = await QRCode.toDataURL(linkedinUrl, { margin: 0, width: 140 });
-    const qrWebUrl = await QRCode.toDataURL(siteWebUrl, { margin: 0, width: 140 });
+    const qrLinkedInUrl = await QRCode.toDataURL(linkedinUrl, { margin: 1, width: 200 });
+    const qrWebUrl = await QRCode.toDataURL(siteWebUrl, { margin: 1, width: 200 });
 
-    doc.addImage(qrLinkedInUrl, 'PNG', qrLinkedInX, qrY, qrSize, qrSize);
-    doc.addImage(qrWebUrl, 'PNG', qrWebX, qrY, qrSize, qrSize);
+    // Fond blanc pour contraste et scannabilité parfaite
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(203, 213, 225);
+    doc.roundedRect(qrLinkedInX, qrY, qrSize, qrSize, 1.5, 1.5, 'FD');
+    doc.roundedRect(qrWebX, qrY, qrSize, qrSize, 1.5, 1.5, 'FD');
+
+    doc.addImage(qrLinkedInUrl, 'PNG', qrLinkedInX + 0.5, qrY + 0.5, qrSize - 1, qrSize - 1);
+    doc.addImage(qrWebUrl, 'PNG', qrWebX + 0.5, qrY + 0.5, qrSize - 1, qrSize - 1);
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(6);
+    doc.setFontSize(6.5);
     doc.setTextColor(2, 132, 199);
-    doc.text('LinkedIn', qrLinkedInX + qrSize / 2, qrY + qrSize + 3.5, { align: 'center' });
-    doc.text('Site Web', qrWebX + qrSize / 2, qrY + qrSize + 3.5, { align: 'center' });
+    doc.text('QR LinkedIn', qrLinkedInX + qrSize / 2, qrY + qrSize + 4, { align: 'center' });
+    doc.text('QR Site Web', qrWebX + qrSize / 2, qrY + qrSize + 4, { align: 'center' });
   } catch (e) {
     console.warn('Erreur génération QR codes:', e);
   }
 
-  // --- 2. INFORMATIONS PERSONNELLES ---
-  const persY = cartoucheY + cartoucheH + 6.5;
+  // ========================================================
+  // 3. DEUX COLONNES PARFAITEMENT ALIGNÉES SANS AUCUN DÉCALAGE
+  //    Départ synchrone à secStartY = 68 mm
+  //    Gauche: Section 1 (Perso) puis Section 3 (Description)
+  //    Droite: Section 2 (Entreprise) puis Section 4 (Associés)
+  // ========================================================
+  const secStartY = cartoucheY + cartoucheH + 7; // 68 mm
+
+  // --- TITRES DES SECTIONS DU HAUT (PARFAITEMENT SUR LA MÊME LIGNE) ---
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(...darkNavy);
-  doc.text('INFORMATIONS PERSONNELLES', col1X, persY);
+  doc.text('1. INFORMATIONS PERSONNELLES DU PORTEUR', col1X, secStartY);
+  doc.text('2. RENSEIGNEMENTS ENTREPRISE & ENCADREMENT', col2X, secStartY);
 
+  const upperTablesY = secStartY + 3;
+
+  // TABLEAU 1 (Gauche) : INFORMATIONS PERSONNELLES
   const dateNaisText = incube?.date_naissance ? new Date(incube.date_naissance).toLocaleDateString('fr-FR') : '—';
   const ageStr = incube?.age ? ` (${incube.age})` : '';
 
   autoTable(doc, {
-    startY: persY + 3,
+    startY: upperTablesY,
     margin: { left: col1X, right: pw - col1X - colW },
     tableWidth: colW,
     theme: 'grid',
@@ -1734,7 +1745,7 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
       font: 'helvetica',
       lineColor: borderBlue,
       lineWidth: 0.28,
-      cellPadding: { top: 2.8, bottom: 2.8, left: 3.5, right: 3.5 }
+      cellPadding: { top: 2.6, bottom: 2.6, left: 3.5, right: 3.5 }
     },
     columnStyles: {
       0: { fontStyle: 'bold', fillColor: labelBg, textColor: darkNavy, cellWidth: 40 },
@@ -1752,56 +1763,14 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
     ]
   });
 
-  const persFinalY = doc.lastAutoTable.finalY;
+  const t1FinalY = doc.lastAutoTable.finalY;
 
-  // --- 3. DESCRIPTION DU PROJET --- (sans rien ajouter)
-  const descTitleY = persFinalY + 6.5;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(...darkNavy);
-  doc.text('DESCRIPTION DU PROJET', col1X, descTitleY);
-
-  const descContent = (incube?.description_projet && String(incube.description_projet).trim())
-    ? String(incube.description_projet).trim()
-    : "Aucune description renseignée pour ce projet.";
-
-  autoTable(doc, {
-    startY: descTitleY + 3,
-    margin: { left: col1X, right: pw - col1X - colW },
-    tableWidth: colW,
-    theme: 'grid',
-    styles: {
-      fontSize: 7.8,
-      font: 'helvetica',
-      lineColor: borderBlue,
-      lineWidth: 0.28,
-      fillColor: whiteBg,
-      textColor: textDark,
-      cellPadding: { top: 3.8, bottom: 3.8, left: 4, right: 4 },
-      lineHeightFactor: 1.4
-    },
-    body: [
-      [{ content: descContent }]
-    ]
-  });
-
-  // ========================================================
-  // COLONNE DROITE (col2X = 153.5 mm, colW = 129.5 mm)
-  // 1. RENSEIGNEMENTS ENTREPRISE & ENCADREMENT
-  // 2. ASSOCIÉS DU PROJET
-  // ========================================================
-
-  // --- ENTREPRISE & ENCADREMENT ---
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(...darkNavy);
-  doc.text('RENSEIGNEMENTS ENTREPRISE & ENCADREMENT', col2X, startContentY);
-
+  // TABLEAU 2 (Droite) : RENSEIGNEMENTS ENTREPRISE & ENCADREMENT
   const dateDemText = incube?.date_demarrage ? new Date(incube.date_demarrage).toLocaleDateString('fr-FR') : '—';
   const teamText = `${incube?.personnel_count || 1} collaborateur(s) (calculé depuis RH)`;
 
   autoTable(doc, {
-    startY: startContentY + 3,
+    startY: upperTablesY,
     margin: { left: col2X, right: marginX },
     tableWidth: colW,
     theme: 'grid',
@@ -1810,7 +1779,7 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
       font: 'helvetica',
       lineColor: borderBlue,
       lineWidth: 0.28,
-      cellPadding: { top: 2.8, bottom: 2.8, left: 3.5, right: 3.5 }
+      cellPadding: { top: 2.6, bottom: 2.6, left: 3.5, right: 3.5 }
     },
     columnStyles: {
       0: { fontStyle: 'bold', fillColor: labelBg, textColor: darkNavy, cellWidth: 34 },
@@ -1829,10 +1798,17 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
     ]
   });
 
-  const entFinalY = doc.lastAutoTable.finalY;
+  const t2FinalY = doc.lastAutoTable.finalY;
 
-  // --- ASSOCIÉS DU PROJET ---
-  const assocY = entFinalY + 6.5;
+  // Calcul du Y max commun pour que les sections inférieures démarrent exactement sur la même ligne horizontale
+  const commonMidY = Math.max(t1FinalY, t2FinalY) + 7;
+
+  // --- TITRES DES SECTIONS DU BAS (PARFAITEMENT SUR LA MÊME LIGNE) ---
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(...darkNavy);
+  doc.text('3. DESCRIPTION DU PROJET', col1X, commonMidY);
+
   let associesList = [];
   if (Array.isArray(incube?.associes)) {
     associesList = incube.associes;
@@ -1842,15 +1818,39 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
       if (Array.isArray(parsed)) associesList = parsed;
     } catch (e) {}
   }
+  doc.text(`4. ASSOCIÉS DU PROJET (${associesList.length})`, col2X, commonMidY);
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(...darkNavy);
-  doc.text(`ASSOCIÉS DU PROJET (${associesList.length})`, col2X, assocY);
+  const lowerTablesY = commonMidY + 3;
 
+  // TABLEAU 3 (Gauche) : DESCRIPTION DU PROJET (sans rien ajouter)
+  const descContent = (incube?.description_projet && String(incube.description_projet).trim())
+    ? String(incube.description_projet).trim()
+    : "Aucune description renseignée pour ce projet.";
+
+  autoTable(doc, {
+    startY: lowerTablesY,
+    margin: { left: col1X, right: pw - col1X - colW },
+    tableWidth: colW,
+    theme: 'grid',
+    styles: {
+      fontSize: 7.8,
+      font: 'helvetica',
+      lineColor: borderBlue,
+      lineWidth: 0.28,
+      fillColor: whiteBg,
+      textColor: textDark,
+      cellPadding: { top: 4, bottom: 4, left: 4, right: 4 },
+      lineHeightFactor: 1.4
+    },
+    body: [
+      [{ content: descContent }]
+    ]
+  });
+
+  // TABLEAU 4 (Droite) : ASSOCIÉS DU PROJET
   if (associesList.length > 0) {
     autoTable(doc, {
-      startY: assocY + 3,
+      startY: lowerTablesY,
       margin: { left: col2X, right: marginX },
       tableWidth: colW,
       theme: 'grid',
@@ -1861,14 +1861,14 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
         fontSize: 7.4,
         lineColor: borderBlue,
         lineWidth: 0.28,
-        cellPadding: { top: 3, bottom: 3, left: 3.5, right: 3.5 }
+        cellPadding: { top: 2.8, bottom: 2.8, left: 3.5, right: 3.5 }
       },
       styles: {
         fontSize: 7.4,
         font: 'helvetica',
         lineColor: borderBlue,
         lineWidth: 0.28,
-        cellPadding: { top: 3, bottom: 3, left: 3.5, right: 3.5 }
+        cellPadding: { top: 2.8, bottom: 2.8, left: 3.5, right: 3.5 }
       },
       columnStyles: {
         0: { fontStyle: 'bold', cellWidth: 42 },
@@ -1886,7 +1886,7 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
     });
   } else {
     autoTable(doc, {
-      startY: assocY + 3,
+      startY: lowerTablesY,
       margin: { left: col2X, right: marginX },
       tableWidth: colW,
       theme: 'grid',
@@ -1897,14 +1897,14 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
         fontSize: 7.4,
         lineColor: borderBlue,
         lineWidth: 0.28,
-        cellPadding: { top: 3, bottom: 3, left: 3.5, right: 3.5 }
+        cellPadding: { top: 2.8, bottom: 2.8, left: 3.5, right: 3.5 }
       },
       styles: {
         fontSize: 7.4,
         font: 'helvetica',
         lineColor: borderBlue,
         lineWidth: 0.28,
-        cellPadding: { top: 3, bottom: 3, left: 3.5, right: 3.5 }
+        cellPadding: { top: 2.8, bottom: 2.8, left: 3.5, right: 3.5 }
       },
       head: [['Nom & Prénom', 'CIN', 'Fonction', 'Badge RFID']],
       body: [
