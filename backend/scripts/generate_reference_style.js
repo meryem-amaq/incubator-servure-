@@ -27,7 +27,7 @@ const mockIncube = {
   phase_projet: 'Croissance',
   cible: 'B2B / B2G / B2B2C',
   date_demarrage: '2026-02-07',
-  promotion: 'Promotion 2026 - S1',
+  promotion: 'Promotion 1',
   accompagnateur: 'Mme Nadia Sefiani',
   description_projet: "AGRI-DATA SOLUTIONS développe une plateforme intelligente d'analyse prédictive et de monitoring agricole connectée aux stations météorologiques et capteurs IoT, pour optimiser l'irrigation et sécuriser le rendement des cultures à haute valeur ajoutée.",
   personnel_count: 5,
@@ -65,6 +65,24 @@ function formatOfficialName(input) {
   return title + words[0].toUpperCase() + ' ' + words.slice(1).map(capitalize).join(' ');
 }
 
+// Nom sans civilité (pas de Mme, M., Mr, etc.)
+function formatNameWithoutTitle(input) {
+  if (!input || typeof input !== 'string') return '—';
+  let str = input.trim().replace(/^(M\.|Mme|Mlle|Mr|Ms|Dr|Pr)\s+/i, '').trim();
+  return formatOfficialName(str);
+}
+
+// Format Promotion : Promotion 1, Promotion 2, etc. (jamais S1)
+function formatPromotionClean(p) {
+  if (!p) return 'Promotion 1';
+  let clean = String(p).trim();
+  // Enlever - S1, S1, - S2, etc.
+  clean = clean.replace(/[-–—]?\s*S\d+/gi, '').trim();
+  if (/^\d+$/.test(clean)) return `Promotion ${clean}`;
+  if (!/^promotion/i.test(clean)) return `Promotion ${clean}`;
+  return clean;
+}
+
 async function buildNewStylePdf(incube) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const pw = 297, ph = 210;
@@ -73,6 +91,9 @@ async function buildNewStylePdf(incube) {
   const colW = (pw - marginX * 2 - colGap) / 2; // 129.5 mm
   const col1X = marginX;
   const col2X = marginX + colW + colGap;
+
+  const displayAccomp = formatNameWithoutTitle(incube.accompagnateur);
+  const displayPromo = formatPromotionClean(incube.promotion);
 
   // 1. EN-TÊTE : LOGOS BIEN AÉRÉS
   // Logo IDS (gauche)
@@ -109,7 +130,7 @@ async function buildNewStylePdf(incube) {
 
   // ========================================================
   // 2. BLOC PROFIL : DESCENDU POUR LAISSER RESPIRER LES LOGOS
-  //    cartoucheY = 32 mm (9.5 mm d'espace libre sous les logos !)
+  //    cartoucheY = 32 mm (9.5 mm d'espace sous les logos)
   // ========================================================
   const cartoucheY = 32;
   const cartoucheH = 34;
@@ -160,27 +181,27 @@ async function buildNewStylePdf(incube) {
   doc.setTextColor(2, 132, 199);
   doc.text(incube.raison_sociale || '—', textX, curY);
 
-  // Phase / Promotion / Accompagnateur
+  // Phase / Promotion / Accompagnateur (sans Mme/M., et promotion propre sans S1)
   curY += 5;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(100, 116, 139);
-  doc.text(`Phase : ${incube.phase_projet || 'Lancement'}   •   Promotion : ${incube.promotion || 'Promo 2026'}   •   Accompagnement : ${incube.accompagnateur || 'Conseiller IDS'}`, textX, curY);
+  doc.text(`Phase : ${incube.phase_projet || 'Lancement'}   •   ${displayPromo}   •   Accompagnement : ${displayAccomp}`, textX, curY);
 
-  // QR Codes à droite du cartouche pleine largeur
+  // QR Codes à droite du cartouche pleine largeur (avec icônes au lieu de texte)
   const qrSize = 19;
-  const qrGap = 7;
+  const qrGap = 8;
   const qrWebX = marginX + cartoucheW - qrSize - 6;
   const qrLinkedInX = qrWebX - qrSize - qrGap;
-  const qrY = cartoucheY + 4;
+  const qrY = cartoucheY + 3.5;
 
   // Séparateur vertical fin avant les QR codes
   doc.setDrawColor(226, 232, 240);
   doc.setLineWidth(0.35);
   doc.line(qrLinkedInX - 7, cartoucheY + 4, qrLinkedInX - 7, cartoucheY + cartoucheH - 4);
 
-  const qrLinkedInUrl = await QRCode.toDataURL(incube.linkedin || 'https://linkedin.com', { margin: 1, width: 200 });
-  const qrWebUrl = await QRCode.toDataURL(incube.site_web || 'https://ids.ma', { margin: 1, width: 200 });
+  const qrLinkedInUrl = await QRCode.toDataURL(incube.linkedin || 'https://linkedin.com', { errorCorrectionLevel: 'H', margin: 1, width: 220 });
+  const qrWebUrl = await QRCode.toDataURL(incube.site_web || 'https://ids.ma', { errorCorrectionLevel: 'H', margin: 1, width: 220 });
 
   // Fond blanc pour les QR codes
   doc.setFillColor(255, 255, 255);
@@ -191,15 +212,32 @@ async function buildNewStylePdf(incube) {
   doc.addImage(qrLinkedInUrl, 'PNG', qrLinkedInX + 0.5, qrY + 0.5, qrSize - 1, qrSize - 1);
   doc.addImage(qrWebUrl, 'PNG', qrWebX + 0.5, qrY + 0.5, qrSize - 1, qrSize - 1);
 
+  // --- ICÔNES SOIGNÉES SOUS LES QR CODES (AU LIEU DU TEXTE "QR LinkedIn" / "QR Site Web") ---
+  const iconY = qrY + qrSize + 2.2;
+
+  // 1. Icône LinkedIn officielle (Badge bleu #0A66C2 avec "in" blanc)
+  const inBadgeW = 9, inBadgeH = 4.2;
+  const inBadgeX = qrLinkedInX + (qrSize - inBadgeW) / 2;
+  doc.setFillColor(10, 102, 194); // #0A66C2 bleu LinkedIn
+  doc.roundedRect(inBadgeX, iconY, inBadgeW, inBadgeH, 1, 1, 'F');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(6.5);
-  doc.setTextColor(2, 132, 199);
-  doc.text('QR LinkedIn', qrLinkedInX + qrSize / 2, qrY + qrSize + 4, { align: 'center' });
-  doc.text('QR Site Web', qrWebX + qrSize / 2, qrY + qrSize + 4, { align: 'center' });
+  doc.setFontSize(4.8);
+  doc.setTextColor(255, 255, 255);
+  doc.text('in', inBadgeX + inBadgeW / 2, iconY + 3.1, { align: 'center' });
+
+  // 2. Icône Site Web (Badge bleu #0284C7 avec "WEB" blanc)
+  const webBadgeW = 11, webBadgeH = 4.2;
+  const webBadgeX = qrWebX + (qrSize - webBadgeW) / 2;
+  doc.setFillColor(2, 132, 199); // #0284C7 bleu ciel officiel
+  doc.roundedRect(webBadgeX, iconY, webBadgeW, webBadgeH, 1, 1, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(4.4);
+  doc.setTextColor(255, 255, 255);
+  doc.text('WEB', webBadgeX + webBadgeW / 2, iconY + 3.1, { align: 'center' });
 
   // ========================================================
   // 3. DEUX COLONNES PARFAITEMENT ALIGNÉES SANS AUCUN DÉCALAGE
-  //    Départ à secStartY = 73 mm (espace de 7 mm sous le profil)
+  //    Départ à secStartY = 73 mm
   // ========================================================
   const secStartY = cartoucheY + cartoucheH + 7; // 73 mm
 
@@ -274,8 +312,9 @@ async function buildNewStylePdf(incube) {
       ['Secteur d\'activité', { content: incube.secteur_activite || '—', colSpan: 3 }],
       ['Phase du projet', incube.phase_projet || 'Lancement', 'Date démarrage', dateDemText],
       ['Cible & Marché', { content: incube.cible || 'B2B / B2G / B2BC', colSpan: 3, styles: { fontStyle: 'bold' } }],
-      ['Promotion', incube.promotion || 'Promotion 2026', 'Accompagnateur', incube.accompagnateur || '—'],
-      ['Membres d\'équipe', { content: teamText, colSpan: 3, styles: { fontStyle: 'bold', textColor: [22, 163, 74] } }]
+      ['Promotion', displayPromo, 'Accompagnateur', displayAccomp],
+      // COULEUR DU NOMBRE D'ÉQUIPE IDENTIQUE AUX AUTRES INFOS (PAS DE VERT !)
+      ['Membres d\'équipe', { content: teamText, colSpan: 3, styles: { textColor: textDark } }]
     ]
   });
 

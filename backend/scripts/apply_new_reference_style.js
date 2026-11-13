@@ -33,7 +33,23 @@ const replacement = `export const generateFicheSignaletiqueDocument = async (inc
 
   const incubeName = incube?.nom_incube || 'Incubé';
   const displayName = formatOfficialName(incubeName);
-  const displayAccomp = formatOfficialName(incube?.accompagnateur) || 'Mme Nadia Sefiani';
+
+  // Nom de l'accompagnateur sans titre (pas de Mme, M., Mr, etc.)
+  const rawAccomp = incube?.accompagnateur || '';
+  const cleanAccomp = rawAccomp.replace(/^(M\\.|Mme|Mlle|Mr|Ms|Dr|Pr)\\s+/i, '').trim();
+  const displayAccomp = formatOfficialName(cleanAccomp) || 'Conseiller IDS';
+
+  // Promotion formatée proprement : "Promotion 1", "Promotion 2", etc. (sans mention S1 ni S2)
+  const formatPromotionClean = (p) => {
+    if (!p) return 'Promotion 1';
+    let clean = String(p).trim();
+    clean = clean.replace(/[-–—]?\\s*S\\d+/gi, '').trim();
+    if (/^\\d+$/.test(clean)) return \`Promotion \${clean}\`;
+    if (!/^promotion/i.test(clean)) return \`Promotion \${clean}\`;
+    return clean;
+  };
+  const displayPromo = formatPromotionClean(incube?.promotion);
+
   const ageAnnees = formatAgeAnnees(incube?.age, incube?.date_naissance);
 
   // 1. Chargement des logos et de la photo
@@ -87,7 +103,7 @@ const replacement = `export const generateFicheSignaletiqueDocument = async (inc
 
   // ========================================================
   // 2. BLOC PROFIL : DESCENDU POUR LAISSER RESPIRER LES LOGOS (9.5 mm d'espace)
-  //    Cartouche sur toute la largeur (269 mm), QR codes aérés et très lisibles
+  //    Cartouche sur toute la largeur (269 mm), QR codes avec icônes (sans texte)
   // ========================================================
   const cartoucheY = 32;
   const cartoucheH = 34;
@@ -151,21 +167,20 @@ const replacement = `export const generateFicheSignaletiqueDocument = async (inc
   doc.setTextColor(2, 132, 199);
   doc.text(incube?.raison_sociale || '—', textX, curY);
 
-  // Phase / Promotion / Accompagnateur
+  // Phase / Promotion / Accompagnateur (sans Mme/M., et promotion propre sans S1)
   curY += 5;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(100, 116, 139);
   const phaseStr = incube?.phase_projet || 'Lancement';
-  const promoStr = incube?.promotion || 'Promotion 2026';
-  doc.text(\`Phase : \${phaseStr}   •   Promotion : \${promoStr}   •   Accompagnement : \${displayAccomp}\`, textX, curY);
+  doc.text(\`Phase : \${phaseStr}   •   \${displayPromo}   •   Accompagnement : \${displayAccomp}\`, textX, curY);
 
-  // QR Codes à droite du cartouche pleine largeur (très lisibles & grands !)
+  // QR Codes à droite du cartouche pleine largeur
   const qrSize = 19;
-  const qrGap = 7;
+  const qrGap = 8;
   const qrWebX = marginX + cartoucheW - qrSize - 6;
   const qrLinkedInX = qrWebX - qrSize - qrGap;
-  const qrY = cartoucheY + 4;
+  const qrY = cartoucheY + 3.5;
 
   // Séparateur vertical fin avant les QR codes
   doc.setDrawColor(226, 232, 240);
@@ -180,8 +195,8 @@ const replacement = `export const generateFicheSignaletiqueDocument = async (inc
     : 'https://ids.org.ma';
 
   try {
-    const qrLinkedInUrl = await QRCode.toDataURL(linkedinUrl, { margin: 1, width: 200 });
-    const qrWebUrl = await QRCode.toDataURL(siteWebUrl, { margin: 1, width: 200 });
+    const qrLinkedInUrl = await QRCode.toDataURL(linkedinUrl, { errorCorrectionLevel: 'H', margin: 1, width: 220 });
+    const qrWebUrl = await QRCode.toDataURL(siteWebUrl, { errorCorrectionLevel: 'H', margin: 1, width: 220 });
 
     // Fond blanc pour contraste et scannabilité parfaite
     doc.setFillColor(255, 255, 255);
@@ -192,11 +207,28 @@ const replacement = `export const generateFicheSignaletiqueDocument = async (inc
     doc.addImage(qrLinkedInUrl, 'PNG', qrLinkedInX + 0.5, qrY + 0.5, qrSize - 1, qrSize - 1);
     doc.addImage(qrWebUrl, 'PNG', qrWebX + 0.5, qrY + 0.5, qrSize - 1, qrSize - 1);
 
+    // --- ICÔNES ÉLÉGANTES SOUS LES QR CODES (AU LIEU DU TEXTE "QR LinkedIn" / "QR Site Web") ---
+    const iconY = qrY + qrSize + 2.2;
+
+    // 1. Icône LinkedIn (Badge officiel bleu #0A66C2 avec "in" blanc)
+    const inBadgeW = 9, inBadgeH = 4.2;
+    const inBadgeX = qrLinkedInX + (qrSize - inBadgeW) / 2;
+    doc.setFillColor(10, 102, 194);
+    doc.roundedRect(inBadgeX, iconY, inBadgeW, inBadgeH, 1, 1, 'F');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(6.5);
-    doc.setTextColor(2, 132, 199);
-    doc.text('QR LinkedIn', qrLinkedInX + qrSize / 2, qrY + qrSize + 4, { align: 'center' });
-    doc.text('QR Site Web', qrWebX + qrSize / 2, qrY + qrSize + 4, { align: 'center' });
+    doc.setFontSize(4.8);
+    doc.setTextColor(255, 255, 255);
+    doc.text('in', inBadgeX + inBadgeW / 2, iconY + 3.1, { align: 'center' });
+
+    // 2. Icône Site Web (Badge bleu #0284C7 avec "WEB" blanc)
+    const webBadgeW = 11, webBadgeH = 4.2;
+    const webBadgeX = qrWebX + (qrSize - webBadgeW) / 2;
+    doc.setFillColor(2, 132, 199);
+    doc.roundedRect(webBadgeX, iconY, webBadgeW, webBadgeH, 1, 1, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(4.4);
+    doc.setTextColor(255, 255, 255);
+    doc.text('WEB', webBadgeX + webBadgeW / 2, iconY + 3.1, { align: 'center' });
   } catch (e) {
     console.warn('Erreur génération QR codes:', e);
   }
@@ -278,8 +310,9 @@ const replacement = `export const generateFicheSignaletiqueDocument = async (inc
       ['Secteur d\\'activité', { content: incube?.secteur_activite || '—', colSpan: 3 }],
       ['Phase du projet', incube?.phase_projet || 'Lancement', 'Date démarrage', dateDemText],
       ['Cible & Marché', { content: incube?.cible || 'B2B / B2G / B2BC', colSpan: 3, styles: { fontStyle: 'bold' } }],
-      ['Promotion', incube?.promotion || 'Promotion 2026', 'Accompagnateur', displayAccomp],
-      ['Membres d\\'équipe', { content: teamText, colSpan: 3, styles: { fontStyle: 'bold', textColor: [22, 163, 74] } }]
+      ['Promotion', displayPromo, 'Accompagnateur', displayAccomp],
+      // COULEUR DU NOMBRE D'ÉQUIPE IDENTIQUE AUX AUTRES INFOS (PAS DE VERT !)
+      ['Membres d\\'équipe', { content: teamText, colSpan: 3, styles: { textColor: textDark } }]
     ]
   });
 
@@ -406,4 +439,4 @@ const replacement = `export const generateFicheSignaletiqueDocument = async (inc
 
 const newContent = content.slice(0, startIndex) + replacement + content.slice(endIndex);
 fs.writeFileSync(targetPath, newContent, 'utf8');
-console.log('Successfully updated frontend/src/utils/pdfExport.js with spaced profile layout!');
+console.log('Successfully updated frontend/src/utils/pdfExport.js with icons and clean styling!');
