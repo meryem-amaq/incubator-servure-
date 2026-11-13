@@ -4,8 +4,7 @@ import {
   ChevronLeft, 
   ChevronRight, 
   ArrowRight, 
-  RotateCcw,
-  Sparkles
+  RotateCcw
 } from 'lucide-react';
 
 const MOIS = [
@@ -13,13 +12,12 @@ const MOIS = [
   'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
 ];
 
-const JOURS_SEMAINE = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+const JOURS_SEMAINE = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di'];
 
 /**
- * Calendrier avec sélection de plage épuré (Style Booking)
- * Interface légère sans boutons superflus :
- * - 1 clic sur un jour = session d'une journée
- * - 2ème clic sur un jour ultérieur = sélection de la plage (2 jours ou plus)
+ * Calendrier compact avec sélection de plage directe
+ * - 1er clic sur un jour = date de début (1 seule journée)
+ * - 2ème clic sur un jour ultérieur = sélection de plage
  */
 export default function HotelDatePicker({
   startDate = '',
@@ -56,10 +54,8 @@ export default function HotelDatePicker({
     const d = parseDate(dStr);
     if (!d) return dStr;
     return d.toLocaleDateString('fr-FR', {
-      weekday: 'short',
       day: 'numeric',
-      month: 'short',
-      year: 'numeric'
+      month: 'short'
     });
   };
 
@@ -141,25 +137,20 @@ export default function HotelDatePicker({
     return cells;
   }, [currentYear, currentMonth]);
 
-  // Clic direct sur une date (logique naturelle de plage Booking)
+  // Clic direct sur une date
   const handleDayClick = (dateStr) => {
-    // Si pas de début OU si la plage était déjà complète : recommence à partir de cette date
     if (!startDate || (startDate && endDate)) {
       onChange({ startDate: dateStr, endDate: '' });
       setHoverDate(null);
       return;
     }
 
-    // Si on a déjà startDate et qu'on attend la date de fin :
     if (startDate && !endDate) {
       if (dateStr > startDate) {
-        // Crée la plage (2 jours ou plus)
         onChange({ startDate, endDate: dateStr });
       } else if (dateStr === startDate) {
-        // Clic sur la même date = confirme 1 seul jour
         onChange({ startDate, endDate: '' });
       } else {
-        // Clic sur une date antérieure = devient la nouvelle date de début
         onChange({ startDate: dateStr, endDate: '' });
       }
       setHoverDate(null);
@@ -173,96 +164,91 @@ export default function HotelDatePicker({
   }, []);
 
   return (
-    <div className="bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 rounded-2xl p-3 sm:p-4 shadow-xs space-y-3">
-      {/* 1. En-tête épuré : Date Début -> Date Fin + Durée */}
-      <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50/70 dark:bg-dark-800/60 p-2.5 rounded-xl border border-slate-200/60 dark:border-dark-700/60">
-        <div className="flex items-center gap-2 flex-wrap text-xs">
-          {/* Badge Début */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-dark-700 border border-slate-200 dark:border-dark-600 shadow-2xs">
-            <CalendarIcon size={12} className="text-primary-600 dark:text-primary-400" />
-            <span className="font-bold text-slate-700 dark:text-slate-200 capitalize">
-              {formatDisplay(startDate)}
-            </span>
-          </div>
-
-          <ArrowRight size={13} className="text-slate-400" />
-
-          {/* Badge Fin */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-dark-700 border border-slate-200 dark:border-dark-600 shadow-2xs">
-            <span className="font-bold text-slate-700 dark:text-slate-200 capitalize">
-              {endDate ? formatDisplay(endDate) : 'Même jour (1 j)'}
-            </span>
-          </div>
+    <div className="bg-white dark:bg-dark-900 border border-slate-200 dark:border-dark-700 rounded-2xl p-2.5 sm:p-3 shadow-xs space-y-2">
+      {/* 1. Mini barre récapitulative compacte */}
+      <div className="flex items-center justify-between gap-1 bg-slate-50 dark:bg-dark-800/80 px-2.5 py-1.5 rounded-xl border border-slate-200/60 dark:border-dark-700/60 text-xs">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <CalendarIcon size={12} className="text-primary-600 dark:text-primary-400 shrink-0" />
+          <span className="font-bold text-slate-800 dark:text-white capitalize text-[11px] sm:text-xs truncate">
+            {formatDisplay(startDate)}
+          </span>
+          {endDate && endDate !== startDate && (
+            <>
+              <ArrowRight size={11} className="text-slate-400 shrink-0" />
+              <span className="font-bold text-slate-800 dark:text-white capitalize text-[11px] sm:text-xs truncate">
+                {formatDisplay(endDate)}
+              </span>
+            </>
+          )}
         </div>
 
-        {/* Badge Durée & Reset */}
-        <div className="flex items-center gap-2">
-          <span className={`px-2.5 py-1 rounded-lg font-black text-xs ${
+        <div className="flex items-center gap-1 shrink-0">
+          <span className={`px-1.5 py-0.5 rounded font-black text-[10px] sm:text-[11px] ${
             totalDays > 1 
-              ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700' 
-              : 'bg-primary-500/10 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800'
+              ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-300/80 dark:border-amber-700/80' 
+              : 'bg-primary-500/10 text-primary-700 dark:text-primary-300 border border-primary-200/80 dark:border-primary-800/80'
           }`}>
-            {totalDays > 1 ? `Plage : ${totalDays} jours` : '1 journée'}
+            {totalDays > 1 ? `${totalDays} jours` : '1 jour'}
           </span>
 
           {endDate && (
             <button
               type="button"
               onClick={() => onChange({ startDate, endDate: '' })}
-              className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-dark-700 transition-colors"
+              className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-dark-700 transition-colors"
               title="Revenir à 1 seul jour"
             >
-              <RotateCcw size={13} />
+              <RotateCcw size={11} />
             </button>
           )}
         </div>
       </div>
 
-      {/* 2. Calendrier interactif avec ruban de plage */}
-      <div className="border border-slate-200 dark:border-dark-700 rounded-xl p-2.5 sm:p-3 bg-slate-50/30 dark:bg-dark-800/30">
+      {/* 2. Calendrier interactif compact avec ruban de plage */}
+      <div className="border border-slate-200 dark:border-dark-700 rounded-xl p-2 bg-slate-50/30 dark:bg-dark-800/30">
         {/* Navigation mois */}
-        <div className="flex items-center justify-between mb-2.5 px-1">
+        <div className="flex items-center justify-between mb-1.5 px-0.5">
           <button
             type="button"
             onClick={prevMonth}
-            className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-dark-700 text-slate-600 dark:text-dark-300 transition-colors"
+            className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-dark-700 text-slate-600 dark:text-dark-300 transition-colors cursor-pointer"
             title="Mois précédent"
           >
-            <ChevronLeft size={17} />
+            <ChevronLeft size={15} />
           </button>
 
-          <span className="text-sm font-bold text-slate-800 dark:text-white capitalize">
+          <span className="text-xs font-bold text-slate-800 dark:text-white capitalize">
             {MOIS[currentMonth]} {currentYear}
           </span>
 
           <button
             type="button"
             onClick={nextMonth}
-            className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-dark-700 text-slate-600 dark:text-dark-300 transition-colors"
+            className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-dark-700 text-slate-600 dark:text-dark-300 transition-colors cursor-pointer"
             title="Mois suivant"
           >
-            <ChevronRight size={17} />
+            <ChevronRight size={15} />
           </button>
         </div>
 
-        {/* Jours de la semaine */}
-        <div className="grid grid-cols-7 gap-1 text-center mb-1">
+        {/* Jours de la semaine abrégés */}
+        <div className="grid grid-cols-7 gap-0.5 text-center mb-1">
           {JOURS_SEMAINE.map(j => (
-            <div key={j} className="text-[11px] font-bold text-slate-400 dark:text-dark-400 py-0.5">
+            <div key={j} className="text-[10px] font-bold text-slate-400 dark:text-dark-400 py-0.5">
               {j}
             </div>
           ))}
         </div>
 
         {/* Grille des cellules avec surbrillance continue de la plage */}
-        <div className="grid grid-cols-7 gap-y-1">
+        <div className="grid grid-cols-7 gap-y-0.5">
           {calendarCells.map((cell, idx) => {
             const dateStr = cell.dateStr;
             const isStart = dateStr === startDate;
             const isEnd = dateStr === endDate;
             const isToday = dateStr === todayStr;
 
-            // Plage effective (prend en compte le hover si en cours de sélection)
+            // Plage effective
             const effectiveEnd = endDate || (hoverDate && hoverDate > startDate ? hoverDate : null);
             const isInRange = Boolean(
               startDate && effectiveEnd && dateStr > startDate && dateStr < effectiveEnd
@@ -291,9 +277,9 @@ export default function HotelDatePicker({
                 <button
                   type="button"
                   onClick={() => handleDayClick(dateStr)}
-                  className={`w-8 h-8 text-xs font-semibold rounded-lg flex items-center justify-center transition-all relative z-10 ${
+                  className={`w-7 h-7 sm:w-7.5 sm:h-7.5 text-[11px] font-semibold rounded-lg flex items-center justify-center transition-all relative z-10 cursor-pointer ${
                     isStart || isEnd
-                      ? 'bg-primary-600 text-white font-bold shadow-md shadow-primary-600/30 scale-105'
+                      ? 'bg-primary-600 text-white font-bold shadow-sm shadow-primary-600/30 scale-105'
                       : isInRange
                       ? 'font-bold text-primary-700 dark:text-primary-300 hover:bg-primary-200/70 dark:hover:bg-primary-900/60'
                       : cell.isCurrentMonth
@@ -311,11 +297,6 @@ export default function HotelDatePicker({
           })}
         </div>
       </div>
-
-      {/* 3. Petite légende discrète */}
-      <p className="text-[11px] text-slate-400 dark:text-dark-400 text-center italic">
-        💡 Cliquez sur une date de début, puis sur une date de fin pour créer une plage (ou une seule date pour 1 jour).
-      </p>
     </div>
   );
 }

@@ -2584,7 +2584,7 @@ export default function Evenements() {
       {/* 5. MODAL AJOUT D'UN ATELIER */}
       {showAddModal && (
         <div className="modal-overlay" onClick={() => !isSubmitting && setShowAddModal(false)}>
-          <div className="modal slide-up max-w-lg max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="modal slide-up max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header border-b border-slate-100 dark:border-dark-800 pb-3 shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-primary-500/10 text-primary-600 dark:text-primary-400 flex items-center justify-center font-bold">
@@ -2705,82 +2705,94 @@ export default function Evenements() {
                   )}
                 </div>
 
-                {/* CALENDRIER STYLE BOOKING HÔTELIER */}
+                {/* CALENDRIER AVEC PLAGE + HORAIRES CÔTE À CÔTE */}
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="label mb-0 font-bold text-slate-800 dark:text-dark-200 flex items-center gap-1.5">
-                      <Calendar size={14} className="text-primary-600 dark:text-primary-400" />
-                      Dates de l'atelier (Style Booking) *
-                    </label>
-                    <span className="text-[11px] font-semibold text-primary-600 dark:text-primary-400">
-                      {newFormation.dateFin && newFormation.dateFin !== newFormation.date
-                        ? '🏨 Plage de dates (Plusieurs jours)'
-                        : '⚡ 1 Journée'}
-                    </span>
-                  </div>
+                  <label className="label mb-1 font-bold text-slate-800 dark:text-dark-200 flex items-center gap-1.5">
+                    <Calendar size={14} className="text-primary-600 dark:text-primary-400" />
+                    Date(s) et Horaires de l'atelier *
+                  </label>
 
-                  <HotelDatePicker
-                    startDate={newFormation.date}
-                    endDate={newFormation.dateFin}
-                    onChange={({ startDate, endDate }) => {
-                      setNewFormation(prev => ({
-                        ...prev,
-                        date: startDate,
-                        dateFin: endDate
-                      }));
-                    }}
-                  />
-                </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-stretch">
+                    {/* Colonne Gauche : Calendrier compact avec sélection de plage */}
+                    <div className="sm:col-span-7">
+                      <HotelDatePicker
+                        startDate={newFormation.date}
+                        endDate={newFormation.dateFin}
+                        onChange={({ startDate, endDate }) => {
+                          setNewFormation(prev => ({
+                            ...prev,
+                            date: startDate,
+                            dateFin: endDate
+                          }));
+                        }}
+                      />
+                    </div>
 
-                {/* HORAIRES QUOTIDIENS DE L'ATELIER */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                  <div>
-                    <label className="label">Heure Début (Quotidienne) *</label>
-                    <input
-                      type="time"
-                      required
-                      className="input font-mono font-bold"
-                      value={newFormation.heureDebut || '09:30'}
-                      onChange={(e) => {
-                        const hD = e.target.value;
-                        const hF = newFormation.heureFin || '12:30';
-                        const [hdH, hdM] = hD.split(':').map(Number);
-                        const [hfH, hfM] = hF.split(':').map(Number);
-                        let diff = (hfH * 60 + hfM) - (hdH * 60 + hdM);
-                        if (diff <= 0) diff = 180;
-                        const h = Math.floor(diff / 60);
-                        const m = diff % 60;
-                        const dStr = m > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${h}h00`;
-                        setNewFormation({ ...newFormation, heureDebut: hD, duree: dStr });
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label className="label">Heure Fin (Quotidienne) *</label>
-                    <input
-                      type="time"
-                      required
-                      className="input font-mono font-bold"
-                      value={newFormation.heureFin || '12:30'}
-                      onChange={(e) => {
-                        const hF = e.target.value;
-                        const hD = newFormation.heureDebut || '09:30';
-                        const [hdH, hdM] = hD.split(':').map(Number);
-                        const [hfH, hfM] = hF.split(':').map(Number);
-                        let diff = (hfH * 60 + hfM) - (hdH * 60 + hdM);
-                        if (diff <= 0) diff = 180;
-                        const h = Math.floor(diff / 60);
-                        const m = diff % 60;
-                        const dStr = m > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${h}h00`;
-                        setNewFormation({ ...newFormation, heureFin: hF, duree: dStr });
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label className="label">Durée par jour</label>
-                    <div className="input bg-slate-100 dark:bg-dark-800 font-mono font-bold text-slate-700 dark:text-dark-200 flex items-center justify-between cursor-not-allowed select-none">
-                      <span>⏱️ {newFormation.duree || '3h00'}</span>
-                      <span className="text-[10px] text-slate-400 font-normal">Calculé auto</span>
+                    {/* Colonne Droite : Horaires affichés à côté du calendrier */}
+                    <div className="sm:col-span-5 flex flex-col justify-between p-3 rounded-2xl border border-slate-200 dark:border-dark-700 bg-slate-50/50 dark:bg-dark-800/40">
+                      <div className="space-y-2.5">
+                        <span className="text-[11px] font-bold text-slate-500 dark:text-dark-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <Clock size={12} className="text-primary-500" />
+                          Horaires Quotidiens
+                        </span>
+
+                        <div>
+                          <label className="text-[11px] font-semibold text-slate-600 dark:text-dark-300 block mb-1">
+                            Heure Début *
+                          </label>
+                          <input
+                            type="time"
+                            required
+                            className="input font-mono font-bold text-sm w-full py-1.5"
+                            value={newFormation.heureDebut || '09:30'}
+                            onChange={(e) => {
+                              const hD = e.target.value;
+                              const hF = newFormation.heureFin || '12:30';
+                              const [hdH, hdM] = hD.split(':').map(Number);
+                              const [hfH, hfM] = hF.split(':').map(Number);
+                              let diff = (hfH * 60 + hfM) - (hdH * 60 + hdM);
+                              if (diff <= 0) diff = 180;
+                              const h = Math.floor(diff / 60);
+                              const m = diff % 60;
+                              const dStr = m > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${h}h00`;
+                              setNewFormation({ ...newFormation, heureDebut: hD, duree: dStr });
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[11px] font-semibold text-slate-600 dark:text-dark-300 block mb-1">
+                            Heure Fin *
+                          </label>
+                          <input
+                            type="time"
+                            required
+                            className="input font-mono font-bold text-sm w-full py-1.5"
+                            value={newFormation.heureFin || '12:30'}
+                            onChange={(e) => {
+                              const hF = e.target.value;
+                              const hD = newFormation.heureDebut || '09:30';
+                              const [hdH, hdM] = hD.split(':').map(Number);
+                              const [hfH, hfM] = hF.split(':').map(Number);
+                              let diff = (hfH * 60 + hfM) - (hdH * 60 + hdM);
+                              if (diff <= 0) diff = 180;
+                              const h = Math.floor(diff / 60);
+                              const m = diff % 60;
+                              const dStr = m > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${h}h00`;
+                              setNewFormation({ ...newFormation, heureFin: hF, duree: dStr });
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-200/60 dark:border-dark-700/60 mt-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-500 dark:text-dark-400 font-medium">Durée / jour :</span>
+                          <span className="font-mono font-black text-primary-600 dark:text-primary-400 px-2 py-0.5 rounded bg-primary-50 dark:bg-primary-950/40 border border-primary-200/60 dark:border-primary-800/60">
+                            ⏱️ {newFormation.duree || '3h00'}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
