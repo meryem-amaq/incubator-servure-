@@ -1540,8 +1540,6 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
   const ph = doc.internal.pageSize.height; // 210 mm
   const marginX = 14;
 
-  const today = new Date().toLocaleDateString('fr-FR');
-  const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   const incubeName = incube?.nom_incube || 'Incubé';
   const displayName = formatOfficialName(incubeName);
   const displayAccomp = formatOfficialName(incube?.accompagnateur) || 'Conseiller IDS';
@@ -1870,16 +1868,6 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
       ]
     });
   }
-
-  // ==========================================
-  // 5. PIED DE PAGE DISCRET
-  // ==========================================
-  doc.setFontSize(7);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(148, 163, 184);
-  doc.line(marginX, ph - 9, pw - marginX, ph - 9);
-  doc.text('IDS — Incubateur Digital Solidaire • Salé • Fiche Signalétique Officielle Paysage', marginX, ph - 5.5);
-  doc.text(`Édité le ${today} à ${time} • Page 1 sur 1`, pw - marginX, ph - 5.5, { align: 'right' });
 
   return doc;
 };

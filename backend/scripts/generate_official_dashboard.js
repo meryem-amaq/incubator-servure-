@@ -401,16 +401,6 @@ async function buildOfficialSpacedPdf(incube) {
     });
   }
 
-  // ==========================================
-  // 5. PIED DE PAGE DISCRET
-  // ==========================================
-  doc.setFontSize(7);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(148, 163, 184);
-  doc.line(marginX, ph - 9, pw - marginX, ph - 9);
-  doc.text('IDS — Incubateur Digital Solidaire • Salé • Fiche Signalétique Officielle Paysage', marginX, ph - 5.5);
-  doc.text('Édité le ' + new Date().toLocaleDateString('fr-FR') + ' • Page 1 sur 1', pw - marginX, ph - 5.5, { align: 'right' });
-
   return doc;
 }
 
