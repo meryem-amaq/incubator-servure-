@@ -2,9 +2,12 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const requireStaff = require('../middleware/requireStaff');
+const upload = require('../middleware/upload');
 const { Atelier, Incube, PresenceAtelier } = require('../models');
 const { Op } = require('sequelize');
 const syncService = require('../services/SyncService');
+const fs = require('fs');
+const path = require('path');
 
 const MOIS = [
   'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -185,6 +188,149 @@ router.get('/incube-stats/:incubeId', auth, async (req, res) => {
   }
 });
 
+// POST /api/ateliers/upload-photos
+// Upload multiple photos for an atelier
+router.post('/upload-photos', auth, requireStaff, upload.array('photos', 10), async (req, res) => {
+  try {
+    const files = req.files || [];
+    if (!files.length) {
+      return res.status(400).json({ message: 'Aucun fichier photo fourni' });
+    }
+
+    const uploadsBase = process.env.UPLOAD_PATH || path.join(__dirname, '../../uploads');
+    const atelierUploadDir = path.join(uploadsBase, 'ateliers');
+    if (!fs.existsSync(atelierUploadDir)) {
+      fs.mkdirSync(atelierUploadDir, { recursive: true });
+    }
+
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
+    const urls = [];
+
+    for (const file of files) {
+      const ext = path.extname(file.originalname || '').toLowerCase();
+      const check = typeof upload.detectAndValidateMagicBytes === 'function'
+        ? upload.detectAndValidateMagicBytes(file.buffer, ext)
+        : { valid: true, mime: file.mimetype };
+
+      if (!check.valid || !allowedMimes.includes(check.mime)) {
+        continue;
+      }
+
+      const safeExt = check.mime === 'image/png' ? '.png' : check.mime === 'image/webp' ? '.webp' : '.jpg';
+      const filename = `atelier_${Date.now()}_${Math.random().toString(36).substring(2, 9)}${safeExt}`;
+      const filePath = path.join(atelierUploadDir, filename);
+
+      fs.writeFileSync(filePath, file.buffer);
+      urls.push(`/uploads/ateliers/${filename}`);
+    }
+
+    if (urls.length === 0) {
+      return res.status(400).json({ message: 'Aucune image valide (formats autorisés : JPEG, PNG, WebP)' });
+    }
+
+    res.json({ urls });
+  } catch (error) {
+    console.error('Erreur upload photos atelier:', error);
+    res.status(500).json({ message: "Erreur lors de l'enregistrement des photos", error: error.message });
+  }
+});
+
+// POST /api/ateliers/:id/photos
+// Append photos to an existing atelier
+router.post('/:id/photos', auth, requireStaff, upload.array('photos', 10), async (req, res) => {
+  try {
+    const atelier = await Atelier.findByPk(req.params.id);
+    if (!atelier) {
+      return res.status(404).json({ message: 'Atelier non trouvé' });
+    }
+
+    const files = req.files || [];
+    let newUrls = [];
+
+    if (files.length > 0) {
+      const uploadsBase = process.env.UPLOAD_PATH || path.join(__dirname, '../../uploads');
+      const atelierUploadDir = path.join(uploadsBase, 'ateliers');
+      if (!fs.existsSync(atelierUploadDir)) {
+        fs.mkdirSync(atelierUploadDir, { recursive: true });
+      }
+
+      const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
+      for (const file of files) {
+        const ext = path.extname(file.originalname || '').toLowerCase();
+        const check = typeof upload.detectAndValidateMagicBytes === 'function'
+          ? upload.detectAndValidateMagicBytes(file.buffer, ext)
+          : { valid: true, mime: file.mimetype };
+
+        if (!check.valid || !allowedMimes.includes(check.mime)) continue;
+
+        const safeExt = check.mime === 'image/png' ? '.png' : check.mime === 'image/webp' ? '.webp' : '.jpg';
+        const filename = `atelier_${Date.now()}_${Math.random().toString(36).substring(2, 9)}${safeExt}`;
+        fs.writeFileSync(path.join(atelierUploadDir, filename), file.buffer);
+        newUrls.push(`/uploads/ateliers/${filename}`);
+      }
+    } else if (Array.isArray(req.body.photos)) {
+      newUrls = req.body.photos.filter(p => typeof p === 'string' && p.trim());
+    }
+
+    const currentPhotos = Array.isArray(atelier.photos) ? [...atelier.photos] : [];
+    const updatedPhotos = [...currentPhotos, ...newUrls];
+    atelier.photos = updatedPhotos;
+    await atelier.save();
+
+    syncService.pushAteliersToCloud(atelier).catch(() => {});
+
+    const updatedWithAssoc = await Atelier.findByPk(atelier.id, {
+      include: [{ model: Incube, as: 'animateurIncube', attributes: ['id', 'nom_incube', 'email', 'raison_sociale'] }]
+    });
+
+    res.json(updatedWithAssoc);
+  } catch (error) {
+    console.error('Erreur ajout photos atelier:', error);
+    res.status(500).json({ message: "Erreur lors de l'ajout des photos", error: error.message });
+  }
+});
+
+// DELETE /api/ateliers/:id/photos
+// Remove a photo from an atelier
+router.delete('/:id/photos', auth, requireStaff, async (req, res) => {
+  try {
+    const atelier = await Atelier.findByPk(req.params.id);
+    if (!atelier) {
+      return res.status(404).json({ message: 'Atelier non trouvé' });
+    }
+
+    const { photoUrl } = req.body;
+    if (!photoUrl) {
+      return res.status(400).json({ message: 'URL de la photo requise' });
+    }
+
+    const currentPhotos = Array.isArray(atelier.photos) ? atelier.photos : [];
+    atelier.photos = currentPhotos.filter(u => u !== photoUrl);
+    await atelier.save();
+
+    // Supprimer le fichier local si c'est un fichier hébergé dans /uploads/ateliers
+    if (typeof photoUrl === 'string' && photoUrl.startsWith('/uploads/ateliers/')) {
+      const filename = path.basename(photoUrl);
+      const uploadsBase = process.env.UPLOAD_PATH || path.join(__dirname, '../../uploads');
+      const filePath = path.join(uploadsBase, 'ateliers', filename);
+      if (fs.existsSync(filePath)) {
+        try { fs.unlinkSync(filePath); } catch (_) {}
+      }
+    }
+
+    syncService.pushAteliersToCloud(atelier).catch(() => {});
+
+    const updatedWithAssoc = await Atelier.findByPk(atelier.id, {
+      include: [{ model: Incube, as: 'animateurIncube', attributes: ['id', 'nom_incube', 'email', 'raison_sociale'] }]
+    });
+
+    res.json(updatedWithAssoc);
+  } catch (error) {
+    console.error('Erreur suppression photo atelier:', error);
+    res.status(500).json({ message: "Erreur lors de la suppression de la photo", error: error.message });
+  }
+});
+
 // POST /api/ateliers
 // Create a new atelier
 router.post('/', auth, requireStaff, async (req, res) => {
@@ -192,7 +338,7 @@ router.post('/', auth, requireStaff, async (req, res) => {
     const {
       titre, formateur, intervenant, date,
       heureDebut, heureFin, duree, description, statutOuverture,
-      animateurType, animateurIncubeId
+      animateurType, animateurIncubeId, photos
     } = req.body;
 
     let finalIntervenant = intervenant || null;
@@ -217,6 +363,7 @@ router.post('/', auth, requireStaff, async (req, res) => {
       heureFin: heureFin || '12:30',
       duree: duree || '3h00',
       description: description || null,
+      photos: Array.isArray(photos) ? photos : [],
       statutOuverture: statutOuverture || 'auto'
     });
 
@@ -247,7 +394,7 @@ router.put('/:id', auth, requireStaff, async (req, res) => {
     const {
       titre, formateur, intervenant, date,
       heureDebut, heureFin, duree, description, statutOuverture,
-      animateurType, animateurIncubeId
+      animateurType, animateurIncubeId, photos
     } = req.body;
 
     if (titre !== undefined) atelier.titre = titre;
@@ -258,6 +405,7 @@ router.put('/:id', auth, requireStaff, async (req, res) => {
     if (heureFin !== undefined) atelier.heureFin = heureFin;
     if (duree !== undefined) atelier.duree = duree;
     if (description !== undefined) atelier.description = description;
+    if (photos !== undefined) atelier.photos = Array.isArray(photos) ? photos : [];
     if (statutOuverture !== undefined) atelier.statutOuverture = statutOuverture;
 
     if (animateurType !== undefined) atelier.animateurType = animateurType;

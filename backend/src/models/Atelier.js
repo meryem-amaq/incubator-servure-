@@ -53,6 +53,38 @@ const Atelier = sequelize.define('Atelier', {
     type: DataTypes.TEXT,
     allowNull: true
   },
+  photos: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: [],
+    get() {
+      const raw = this.getDataValue('photos');
+      if (!raw) return [];
+      if (Array.isArray(raw)) return raw;
+      if (typeof raw === 'string') {
+        try {
+          const parsed = JSON.parse(raw);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+          return raw ? [raw] : [];
+        }
+      }
+      return [];
+    },
+    set(val) {
+      if (Array.isArray(val)) {
+        this.setDataValue('photos', val);
+      } else if (typeof val === 'string') {
+        try {
+          this.setDataValue('photos', JSON.parse(val));
+        } catch (e) {
+          this.setDataValue('photos', val ? [val] : []);
+        }
+      } else {
+        this.setDataValue('photos', []);
+      }
+    }
+  },
   statutOuverture: {
     type: DataTypes.ENUM('auto', 'ouvert_force', 'cloture'),
     defaultValue: 'auto',

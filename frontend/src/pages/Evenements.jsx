@@ -31,14 +31,113 @@ import {
   Bell,
   Lock,
   Unlock,
-  Hourglass
+  Hourglass,
+  ChevronLeft,
+  ChevronRight,
+  Camera,
+  Info
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import api, { getPhotoUrl } from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import FeuilleEmargementPrint from '../components/common/FeuilleEmargementPrint';
-import { exportAtelierPresencesToExcel } from '../utils/excelExport';
+
+// =========================================================================
+// COMPOSANT CAROUSEL PHOTOS POUR ATELIER
+// =========================================================================
+function AtelierCarousel({ photos = [], title = '', heightClass = 'h-44 sm:h-48' }) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const validPhotos = Array.isArray(photos) ? photos.filter(p => typeof p === 'string' && p.trim()) : [];
+
+  if (validPhotos.length === 0) {
+    return (
+      <div className={`relative w-full ${heightClass} bg-gradient-to-br from-slate-900 via-primary-950 to-slate-900 flex flex-col items-center justify-center text-center p-4 overflow-hidden select-none`}>
+        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:16px_16px]" />
+        <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-xs flex items-center justify-center text-white mb-2 shadow-inner border border-white/10">
+          <GraduationCap size={24} className="text-primary-300" />
+        </div>
+        <span className="text-[11px] font-extrabold uppercase tracking-widest text-primary-300/90">
+          Atelier IDS
+        </span>
+        <span className="text-xs text-slate-300 line-clamp-1 max-w-[85%] mt-0.5">
+          {title || "Session de formation"}
+        </span>
+      </div>
+    );
+  }
+
+  const safeIdx = ((currentIndex % validPhotos.length) + validPhotos.length) % validPhotos.length;
+  const currentPhoto = validPhotos[safeIdx];
+
+  return (
+    <div className={`relative w-full ${heightClass} overflow-hidden bg-slate-950 group/carousel select-none`}>
+      <img
+        src={getPhotoUrl(currentPhoto)}
+        alt={`${title} - vue ${safeIdx + 1}`}
+        className="w-full h-full object-cover transition-transform duration-500 group-hover/carousel:scale-105"
+        loading="lazy"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20 pointer-events-none" />
+
+      {validPhotos.length > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setCurrentIndex((prev) => (prev === 0 ? validPhotos.length - 1 : prev - 1));
+            }}
+            className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-all backdrop-blur-xs shadow-md z-10 cursor-pointer"
+            title="Photo précédente"
+          >
+            <ChevronLeft size={16} />
+          </button>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setCurrentIndex((prev) => (prev === validPhotos.length - 1 ? 0 : prev + 1));
+            }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-all backdrop-blur-xs shadow-md z-10 cursor-pointer"
+            title="Photo suivante"
+          >
+            <ChevronRight size={16} />
+          </button>
+
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-10 bg-black/50 px-2.5 py-1 rounded-full backdrop-blur-xs">
+            {validPhotos.map((_, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentIndex(idx);
+                }}
+                className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                  idx === safeIdx ? 'w-4 bg-white' : 'w-1.5 bg-white/50 hover:bg-white/80'
+                }`}
+                aria-label={`Photo ${idx + 1}`}
+              />
+            ))}
+          </div>
+
+          <span className="absolute top-2 right-2 bg-black/60 text-white text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-xs flex items-center gap-1 z-10 shadow-xs">
+            <Camera size={11} /> {safeIdx + 1} / {validPhotos.length}
+          </span>
+        </>
+      )}
+
+      {validPhotos.length === 1 && (
+        <span className="absolute top-2 right-2 bg-black/50 text-white text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-xs flex items-center gap-1 z-10">
+          <Camera size={11} /> 1 photo
+        </span>
+      )}
+    </div>
+  );
+}
 
 const currentYear = new Date().getFullYear();
 const todayStr = new Date().toISOString().split('T')[0];
@@ -97,7 +196,8 @@ export default function Evenements() {
           targetMode: a.targetMode || meta.targetMode || local.targetMode || 'all',
           selectedIncubes: a.selectedIncubes || meta.selectedIncubes || local.selectedIncubes || [],
           invitedNames: a.invitedNames || meta.invitedNames || local.invitedNames || [],
-          invitedCount: a.invitedCount || meta.invitedCount || local.invitedCount
+          invitedCount: a.invitedCount || meta.invitedCount || local.invitedCount,
+          photos: Array.isArray(a.photos) ? a.photos : (Array.isArray(local.photos) ? local.photos : [])
         };
       });
       setFormations(merged);
@@ -116,8 +216,75 @@ export default function Evenements() {
   const [searchWorkshop, setSearchWorkshop] = useState('');
   const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'passe', 'a_venir'
 
-  // Atelier actuellement sélectionné pour la VU PAGE DÉTAILLÉE (null = vue liste)
+  // Mode d'affichage de tous les incubés pour la saisie des anciens événements
+  const [showAllIncubesHistory, setShowAllIncubesHistory] = useState(false);
+
+  // Photos temporaires sélectionnées pour la création d'un atelier
+  const [newFormationPhotoFiles, setNewFormationPhotoFiles] = useState([]);
+
+  // Gestion de la sélection de photos lors de la création
+  const handleNewFormationPhotosSelected = (e) => {
+    const files = Array.from(e.target.files || []).filter(f => f.type.startsWith('image/'));
+    if (!files.length) return;
+    const newItems = files.map(file => ({
+      file,
+      preview: URL.createObjectURL(file)
+    }));
+    setNewFormationPhotoFiles(prev => [...prev, ...newItems]);
+  };
+
+  const removeNewFormationPhoto = (index) => {
+    setNewFormationPhotoFiles(prev => {
+      const next = [...prev];
+      if (next[index]?.preview) URL.revokeObjectURL(next[index].preview);
+      next.splice(index, 1);
+      return next;
+    });
+  };
+
+  // Atelier actuellement sélectionné pour la VUE PAGE DÉTAILLÉE (null = vue liste)
   const [selectedAtelier, setSelectedAtelier] = useState(null);
+
+  // Gestion des photos pour un atelier existant (Detail View)
+  const handleUploadPhotosToExistingAtelier = async (filesList) => {
+    const files = Array.from(filesList || []).filter(f => f.type.startsWith('image/'));
+    if (files.length === 0 || !selectedAtelier) return;
+
+    const formData = new FormData();
+    files.forEach(f => formData.append('photos', f));
+
+    try {
+      toast.loading("Enregistrement des photos...", { id: 'upload_atelier_photos' });
+      const res = await api.post(`/ateliers/${selectedAtelier.id}/photos`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      toast.dismiss('upload_atelier_photos');
+      toast.success(`${files.length} photo(s) ajoutée(s) avec succès !`);
+      const updated = { ...selectedAtelier, photos: res.data.photos || [] };
+      setSelectedAtelier(updated);
+      setFormations(prev => prev.map(f => f.id === updated.id ? updated : f));
+    } catch (err) {
+      toast.dismiss('upload_atelier_photos');
+      console.error(err);
+      toast.error("Erreur lors de l'enregistrement des photos");
+    }
+  };
+
+  const handleDeletePhotoFromExistingAtelier = async (photoUrl) => {
+    if (!selectedAtelier) return;
+    try {
+      const res = await api.delete(`/ateliers/${selectedAtelier.id}/photos`, {
+        data: { photoUrl }
+      });
+      toast.success("Photo supprimée");
+      const updated = { ...selectedAtelier, photos: res.data.photos || [] };
+      setSelectedAtelier(updated);
+      setFormations(prev => prev.map(f => f.id === updated.id ? updated : f));
+    } catch (err) {
+      console.error(err);
+      toast.error("Erreur lors de la suppression de la photo");
+    }
+  };
 
   // Atelier pour lequel afficher le QR Code dans un modal dédié
   const [qrModalAtelier, setQrModalAtelier] = useState(null);
@@ -294,8 +461,27 @@ export default function Evenements() {
       targetMode: newFormation.targetMode,
       selectedIncubes: targetIncubeIds,
       invitedCount: targetIncubeIds.length,
-      invitedNames: invitedNames
+      invitedNames: invitedNames,
+      photos: []
     };
+
+    // Upload des photos sélectionnées si présentes
+    if (newFormationPhotoFiles.length > 0) {
+      try {
+        const formData = new FormData();
+        newFormationPhotoFiles.forEach(pf => {
+          formData.append('photos', pf.file);
+        });
+        const resUpload = await api.post('/ateliers/upload-photos', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        if (resUpload.data && Array.isArray(resUpload.data.urls)) {
+          item.photos = resUpload.data.urls;
+        }
+      } catch (errUpload) {
+        console.error('Erreur upload photos atelier:', errUpload);
+      }
+    }
 
     let createdId = newId;
     try {
@@ -327,6 +513,10 @@ export default function Evenements() {
 
     setIsSubmitting(false);
     setShowAddModal(false);
+    newFormationPhotoFiles.forEach(item => {
+      if (item.preview) URL.revokeObjectURL(item.preview);
+    });
+    setNewFormationPhotoFiles([]);
     setNewFormation({
       titre: '',
       formateur: '',
@@ -1045,7 +1235,12 @@ export default function Evenements() {
 
     // Filtrage des incubés ciblés pour cet atelier
     let targetedIncubes = allIncubes;
-    if (selectedAtelier.targetMode === 'selection') {
+    const hasSelection = selectedAtelier.targetMode === 'selection' || (Array.isArray(selectedAtelier.selectedIncubes) && selectedAtelier.selectedIncubes.length > 0 && selectedAtelier.selectedIncubes.length < allIncubes.length);
+
+    if (showAllIncubesHistory) {
+      // Mode saisie d'un ancien événement activé manuellement : afficher l'ensemble des incubés
+      targetedIncubes = allIncubes;
+    } else if (hasSelection) {
       const selectedIds = Array.isArray(selectedAtelier.selectedIncubes) && selectedAtelier.selectedIncubes.length > 0
         ? selectedAtelier.selectedIncubes.map(String)
         : [];
@@ -1153,6 +1348,27 @@ export default function Evenements() {
             </div>
 
             <div className="flex items-center gap-2 shrink-0 ml-auto flex-wrap">
+              {/* Action Principale 1 : Voir QR Code */}
+              <button
+                type="button"
+                onClick={() => setQrModalAtelier(selectedAtelier)}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-black transition-all shadow-sm cursor-pointer"
+                title="Afficher et imprimer le QR Code de cet atelier"
+              >
+                <QrCode size={15} /> Voir QR Code
+              </button>
+
+              {/* Action Principale 2 : Feuille d'émargement PDF officielle */}
+              <button
+                type="button"
+                onClick={() => setShowPrintModal(true)}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-xs font-black transition-all shadow-sm cursor-pointer"
+                title="Afficher la feuille d'émargement officielle A4 pour impression ou enregistrement PDF"
+              >
+                <Printer size={15} /> Feuille d'émargement (PDF)
+              </button>
+
+              {/* Ajuster l'horaire */}
               <button
                 type="button"
                 onClick={() => setAdjustHoraireModal({
@@ -1162,51 +1378,52 @@ export default function Evenements() {
                   date: selectedAtelier.date || new Date().toISOString().split('T')[0],
                   statutOuverture: selectedAtelier.statutOuverture || 'auto'
                 })}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-dark-800 dark:hover:bg-dark-700 text-slate-700 dark:text-dark-200 text-xs font-bold transition-all border border-slate-200 dark:border-dark-700 cursor-pointer shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-dark-800 dark:hover:bg-dark-700 text-slate-700 dark:text-dark-200 text-xs font-bold transition-all border border-slate-200 dark:border-dark-700 cursor-pointer shadow-xs"
                 title="Ajuster l'heure de début ou de fin en cas de retard"
               >
                 <Clock size={14} className="text-primary-500" />
-                <span>⏱️ Ajuster l'horaire</span>
+                <span>⏱️ Horaire</span>
               </button>
 
+              {/* Débloquer maintenant */}
               <button
                 type="button"
                 onClick={handleToggleForceOpen}
-                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer shadow-sm ${
+                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer shadow-xs ${
                   selectedAtelier.statutOuverture === 'ouvert_force'
                     ? 'bg-emerald-500 text-white border-emerald-600'
-                    : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30'
+                    : 'bg-slate-100 hover:bg-slate-200 dark:bg-dark-800 dark:hover:bg-dark-700 text-slate-700 dark:text-dark-200 border-slate-200 dark:border-dark-700'
                 }`}
                 title="Débloquer immédiatement le QR code sans attendre l'heure de début"
               >
                 {selectedAtelier.statutOuverture === 'ouvert_force' ? (
                   <>
-                    <Unlock size={14} /> Émargement Actif
+                    <Unlock size={14} className="text-white" /> Émargement Débloqué
                   </>
                 ) : (
                   <>
-                    <Lock size={14} /> Débloquer maintenant
+                    <Lock size={14} className="text-amber-500" /> Débloquer
                   </>
                 )}
               </button>
 
-              <button
-                type="button"
-                onClick={() => setQrModalAtelier(selectedAtelier)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold transition-all border border-amber-500/30 shadow-sm cursor-pointer"
-                title="Afficher et imprimer le QR Code de cet atelier"
-              >
-                <QrCode size={14} /> Voir QR Code
-              </button>
-
+              {/* Supprimer */}
               <button
                 onClick={() => handleDeleteFormation(selectedAtelier.id)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-bold transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/30 dark:hover:bg-red-900/40 dark:text-red-400 text-xs font-bold transition-all cursor-pointer border border-red-200 dark:border-red-900/40"
+                title="Supprimer cet atelier"
               >
                 <Trash2 size={14} /> Supprimer
               </button>
             </div>
           </div>
+
+          {/* BANDEAU CAROUSEL PHOTOS DE L'ATELIER (SI DES PHOTOS SONT ASSOCIÉES) */}
+          {selectedAtelier.photos && selectedAtelier.photos.length > 0 && (
+            <div className="rounded-2xl overflow-hidden shadow-sm border border-slate-200 dark:border-dark-700/60">
+              <AtelierCarousel photos={selectedAtelier.photos} title={selectedAtelier.titre} heightClass="h-56 sm:h-72" />
+            </div>
+          )}
 
           {/* =========================================================================
              1. FEUILLE D'ÉMARGEMENT & GESTION COMPLÈTE DES PRÉSENCES
@@ -1250,98 +1467,117 @@ export default function Evenements() {
               </div>
             </div>
 
-            {/* Recherche & Filtres rapides + Bouton Imprimer */}
-            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-2">
-              <div className="relative w-full md:w-80">
-                <Search size={15} className="absolute left-3 top-2.5 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Rechercher un incubé (nom, projet, n° PP)..."
-                  value={presenceSearch}
-                  onChange={(e) => setPresenceSearch(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-dark-700 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 dark:text-dark-100 placeholder-slate-400 focus:outline-none focus:border-emerald-500 transition-all shadow-xs"
-                />
-              </div>
-
-              <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap justify-between md:justify-end">
-                <div className="flex items-center gap-1.5 overflow-x-auto">
-                  <button
-                    type="button"
-                    onClick={() => setPresenceFilter('all')}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                      presenceFilter === 'all'
-                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                        : 'bg-slate-100 dark:bg-dark-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
-                    }`}
-                  >
-                    Tous ({totalCount})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPresenceFilter('present')}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
-                      presenceFilter === 'present'
-                        ? 'bg-emerald-600 text-white shadow-sm'
-                        : 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100'
-                    }`}
-                  >
-                    <CheckCircle2 size={13} /> Présents ({presentCount})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPresenceFilter('absent')}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
-                      presenceFilter === 'absent'
-                        ? 'bg-amber-600 text-white shadow-sm'
-                        : 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 hover:bg-amber-100'
-                    }`}
-                  >
-                    <X size={13} /> Absents ({absentCount})
-                  </button>
+            {/* Recherche, Filtres & Barre d'actions épurée */}
+            <div className="flex flex-col gap-3 pt-2">
+              {/* Ligne 1 : Recherche + Filtres Statut + Bascule Mode Ancien Événement */}
+              <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                <div className="relative w-full md:w-80">
+                  <Search size={15} className="absolute left-3 top-2.5 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Rechercher un incubé (nom, projet, n° PP)..."
+                    value={presenceSearch}
+                    onChange={(e) => setPresenceSearch(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-dark-700 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 dark:text-dark-100 placeholder-slate-400 focus:outline-none focus:border-emerald-500 transition-all shadow-xs"
+                  />
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleSendConvocations}
-                  disabled={sendingEmails}
-                  className="btn btn-secondary btn-sm flex items-center gap-1.5 text-xs font-bold border border-slate-300 dark:border-dark-700 bg-white dark:bg-dark-800 hover:bg-slate-50 dark:hover:bg-dark-700 text-slate-800 dark:text-slate-100 shadow-sm shrink-0 ml-auto sm:ml-0 transition-all cursor-pointer"
-                  title="Envoyer les invitations et consignes par email aux incubés"
-                >
-                  <Mail size={14} className="text-amber-500" />
-                  <span>{sendingEmails ? 'Envoi...' : `📧 Invitations (${totalCount})`}</span>
-                </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Filtres de présence */}
+                  <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-dark-800 p-1 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setPresenceFilter('all')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        presenceFilter === 'all'
+                          ? 'bg-white dark:bg-dark-900 text-slate-900 dark:text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                      }`}
+                    >
+                      Tous ({totalCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPresenceFilter('present')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                        presenceFilter === 'present'
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'text-emerald-700 dark:text-emerald-400 hover:text-emerald-800'
+                      }`}
+                    >
+                      <CheckCircle2 size={13} /> Présents ({presentCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPresenceFilter('absent')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                        presenceFilter === 'absent'
+                          ? 'bg-amber-600 text-white shadow-xs'
+                          : 'text-amber-700 dark:text-amber-400 hover:text-amber-800'
+                      }`}
+                    >
+                      <X size={13} /> Absents ({absentCount})
+                    </button>
+                  </div>
 
-                <button
-                  type="button"
-                  onClick={handleSendReminder}
-                  disabled={sendingReminder}
-                  className="btn btn-secondary btn-sm flex items-center gap-1.5 text-xs font-bold border border-sky-300 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/30 hover:bg-sky-100 dark:hover:bg-sky-900/40 text-sky-800 dark:text-sky-300 shadow-sm shrink-0 transition-all cursor-pointer"
-                  title="Envoyer un email de rappel avec le lien d'émargement à tous les participants"
-                >
-                  <Bell size={14} className="text-sky-600" />
-                  <span>{sendingReminder ? 'Envoi...' : '🔔 Rappel'}</span>
-                </button>
+                  {/* BOUTON BASCULE : SAISIE ANCIEN ÉVÉNEMENT (AFFICHER TOUS LES INCUBÉS) */}
+                  <button
+                    type="button"
+                    onClick={() => setShowAllIncubesHistory(prev => !prev)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border cursor-pointer ${
+                      showAllIncubesHistory
+                        ? 'bg-amber-500 text-white border-amber-600 shadow-sm'
+                        : 'bg-slate-100 hover:bg-slate-200 dark:bg-dark-800 text-slate-700 dark:text-dark-300 border-slate-200 dark:border-dark-700'
+                    }`}
+                    title={showAllIncubesHistory 
+                      ? "Revenir à la liste des incubés ciblés uniquement" 
+                      : "Afficher l'ensemble des incubés pour renseigner manuellement un ancien atelier"}
+                  >
+                    <Users size={13} />
+                    <span>{showAllIncubesHistory ? '🎯 Afficher uniquement les invités' : '📜 Saisie ancien événement (Tous)'}</span>
+                  </button>
+                </div>
+              </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    exportAtelierPresencesToExcel(selectedAtelier, emargementList);
-                    toast.success("Feuille d'émargement exportée en Excel (.xlsx) !", { icon: '📊' });
-                  }}
-                  className="btn btn-secondary btn-sm flex items-center gap-1.5 text-xs font-bold border border-emerald-500/30 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 shadow-sm shrink-0 transition-all cursor-pointer"
-                  title="Télécharger la feuille d'émargement au format Excel (.xlsx)"
-                >
-                  <span>📊 Exporter (.xlsx)</span>
-                </button>
+              {/* Alerte informative si le mode historique est actif */}
+              {showAllIncubesHistory && (
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs flex items-center gap-2">
+                  <span className="text-base shrink-0">📜</span>
+                  <p className="leading-snug">
+                    <strong>Mode Saisie d'un Ancien Événement actif :</strong> Tous les incubés ({allIncubes.length}) sont affichés pour vous permettre de pointer manuellement les présences d'une session antérieure.
+                  </p>
+                </div>
+              )}
 
-                <button
-                  type="button"
-                  onClick={() => setShowPrintModal(true)}
-                  className="btn btn-primary btn-sm flex items-center gap-1.5 text-xs font-bold shadow-md shadow-primary-500/20 shrink-0 cursor-pointer"
-                  title="Afficher la feuille d'émargement officielle A4 pour impression ou enregistrement PDF"
-                >
-                  <Printer size={14} /> Feuille d'émargement (PDF)
-                </button>
+              {/* Ligne 2 : Actions de Communication Highlightées */}
+              <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-dark-800/80">
+                <span className="text-[11px] font-bold text-slate-500 dark:text-dark-400">
+                  📢 Communication & Notifications :
+                </span>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSendConvocations}
+                    disabled={sendingEmails}
+                    className="btn btn-secondary btn-sm flex items-center gap-1.5 text-xs font-bold border border-amber-300 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/30 hover:bg-amber-100 text-amber-900 dark:text-amber-200 shadow-xs cursor-pointer transition-all"
+                    title="Envoyer les invitations et consignes par email aux incubés"
+                  >
+                    <Mail size={14} className="text-amber-600" />
+                    <span>{sendingEmails ? 'Envoi...' : `📧 Convoquer / Invitations (${totalCount})`}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSendReminder}
+                    disabled={sendingReminder}
+                    className="btn btn-secondary btn-sm flex items-center gap-1.5 text-xs font-bold border border-sky-300 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/30 hover:bg-sky-100 dark:hover:bg-sky-900/40 text-sky-800 dark:text-sky-300 shadow-xs cursor-pointer transition-all"
+                    title="Envoyer un email de rappel avec le lien d'émargement à tous les participants"
+                  >
+                    <Bell size={14} className="text-sky-600" />
+                    <span>{sendingReminder ? 'Envoi...' : '🔔 Rappel émargement'}</span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1531,35 +1767,21 @@ export default function Evenements() {
                 </div>
               </div>
 
-              {/* ZONE DRAG & DROP */}
+              {/* ZONE DRAG & DROP & UPLOAD DIRECT */}
               <label 
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => {
                   e.preventDefault();
                   const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-                  if (files.length === 0) return;
-                  
-                  files.forEach(file => {
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                      const dataUrl = event.target.result;
-                      setSelectedAtelier(prev => {
-                        const existingPhotos = prev.photos || [];
-                        const updated = { ...prev, photos: [...existingPhotos, dataUrl] };
-                        setFormations(all => all.map(f => f.id === updated.id ? updated : f));
-                        return updated;
-                      });
-                    };
-                    reader.readAsDataURL(file);
-                  });
-                  toast.success(`${files.length} photo(s) ajoutée(s) !`);
+                  if (files.length > 0) handleUploadPhotosToExistingAtelier(files);
                 }}
                 className="border-2 border-dashed border-primary-500/40 hover:border-primary-500 dark:border-dark-600 rounded-2xl p-4 text-center flex flex-col items-center justify-center cursor-pointer bg-primary-500/5 transition-colors"
               >
                 <UploadCloud size={24} className="text-primary-500 mb-1" />
                 <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                  Glissez vos photos d'atelier ici ou cliquez
+                  Glissez vos photos d'atelier ici ou cliquez pour téléverser
                 </p>
+                <p className="text-[10px] text-slate-400 mt-0.5">JPG, PNG, WebP (enregistrées sur le serveur)</p>
                 <input
                   type="file"
                   accept="image/*"
@@ -1567,20 +1789,7 @@ export default function Evenements() {
                   className="hidden"
                   onChange={(e) => {
                     const files = Array.from(e.target.files || []).filter(f => f.type.startsWith('image/'));
-                    files.forEach(file => {
-                      const reader = new FileReader();
-                      reader.onload = (event) => {
-                        const dataUrl = event.target.result;
-                        setSelectedAtelier(prev => {
-                          const existingPhotos = prev.photos || [];
-                          const updated = { ...prev, photos: [...existingPhotos, dataUrl] };
-                          setFormations(all => all.map(f => f.id === updated.id ? updated : f));
-                          return updated;
-                        });
-                      };
-                      reader.readAsDataURL(file);
-                    });
-                    if (files.length > 0) toast.success(`${files.length} photo(s) ajoutée(s) !`);
+                    if (files.length > 0) handleUploadPhotosToExistingAtelier(files);
                   }}
                 />
               </label>
@@ -1590,19 +1799,11 @@ export default function Evenements() {
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 pt-1">
                   {selectedAtelier.photos.map((imgUrl, pIdx) => (
                     <div key={pIdx} className="relative group rounded-xl overflow-hidden border border-slate-200 dark:border-dark-700 aspect-video bg-black">
-                      <img src={imgUrl} alt={`Photo ${pIdx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                      <img src={getPhotoUrl(imgUrl)} alt={`Photo ${pIdx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                       <button
                         type="button"
-                        onClick={() => {
-                          setSelectedAtelier(prev => {
-                            const newPhotos = prev.photos.filter((_, i) => i !== pIdx);
-                            const updated = { ...prev, photos: newPhotos };
-                            setFormations(all => all.map(f => f.id === updated.id ? updated : f));
-                            return updated;
-                          });
-                          toast.success("Photo supprimée");
-                        }}
-                        className="absolute top-1 right-1 p-1 rounded-lg bg-black/60 text-white hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100"
+                        onClick={() => handleDeletePhotoFromExistingAtelier(imgUrl)}
+                        className="absolute top-1 right-1 p-1 rounded-lg bg-black/60 text-white hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
                         title="Supprimer la photo"
                       >
                         <Trash2 size={12} />
@@ -1822,110 +2023,119 @@ export default function Evenements() {
               <div 
                 key={f.id} 
                 onClick={() => setSelectedAtelier(f)}
-                className={`p-5 rounded-2xl border transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer ${
+                className={`rounded-2xl border transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer overflow-hidden ${
                   passe
                     ? 'bg-emerald-500/[0.04] border-emerald-500/30 dark:bg-emerald-950/20 hover:border-emerald-500/60'
                     : 'bg-white dark:bg-dark-900/60 border-slate-200 dark:border-dark-700/60 hover:border-primary-500/60'
                 } flex flex-col justify-between group`}
               >
-                <div>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 text-primary-600 dark:text-primary-400 text-[11px] font-extrabold uppercase tracking-wider mb-1">
-                        <GraduationCap size={14} className="shrink-0" />
-                        <span>Nom de l'atelier</span>
+                {/* 1. CAROUSEL PHOTO SUR LE HAUT DE LA CARTE */}
+                <AtelierCarousel photos={f.photos} title={f.titre} heightClass="h-44 sm:h-48" />
+
+                {/* 2. CORPS DE LA CARTE */}
+                <div className="p-4 flex-1 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 text-primary-600 dark:text-primary-400 text-[11px] font-extrabold uppercase tracking-wider mb-1">
+                          <GraduationCap size={14} className="shrink-0" />
+                          <span>Nom de l'atelier</span>
+                        </div>
+                        <h4 className="text-base font-black text-slate-900 dark:text-dark-100 leading-snug group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                          {f.titre}
+                        </h4>
                       </div>
-                      <h4 className="text-base font-black text-slate-900 dark:text-dark-100 leading-snug group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
-                        {f.titre}
-                      </h4>
+                      
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {passe ? (
+                          <span className="badge badge-green shrink-0 flex items-center gap-1 text-[11px]">
+                            <Check size={12} /> Passé
+                          </span>
+                        ) : (
+                          <span className="badge badge-gray shrink-0 text-[11px]">
+                            À venir
+                          </span>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteFormation(f.id, e)}
+                          title="Supprimer cet atelier"
+                          className="p-1 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </div>
-                    
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {passe ? (
-                        <span className="badge badge-green shrink-0 flex items-center gap-1">
-                          <Check size={12} /> Passé
+
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-dark-300">
+                      <span className="inline-flex items-center gap-1.5 font-medium bg-slate-100 dark:bg-dark-800 px-2.5 py-1 rounded-lg">
+                        <Calendar size={13} className="text-slate-400" /> {new Date(f.date).toLocaleDateString('fr-FR')}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 font-extrabold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 px-2.5 py-1 rounded-lg">
+                        <Clock size={13} /> {f.heureDebut || '09:30'} - {f.heureFin || '12:30'}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 font-medium text-slate-500 bg-slate-100 dark:bg-dark-800 px-2.5 py-1 rounded-lg">
+                        <Clock size={13} className="text-slate-400" /> {f.duree || '3h00'}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 font-medium text-slate-700 dark:text-dark-200">
+                        {(f.animateurType === 'incube' || f.animateurIncubeId) ? (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                          🎤 Incubé IDS
                         </span>
                       ) : (
-                        <span className="badge badge-gray shrink-0">
-                          À venir
-                        </span>
-                      )}
-
-                      <button
-                        onClick={(e) => handleDeleteFormation(f.id, e)}
-                        title="Supprimer cet atelier"
-                        className="p-1 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-500/10 transition-colors"
-                      >
-                        <Trash2 size={13} />
-                      </button>
+                        <GraduationCap size={13} className="text-slate-400" />
+                      )} {f.formateur}{f.intervenant ? ` / ${f.intervenant}` : ''}
+                      </span>
                     </div>
+
+                    {/* Description supprimée de dessous le titre pour un design aéré et épuré */}
+                    {f.description && (
+                      <div className="mt-2.5 flex items-center gap-1.5 text-[11px] text-slate-400 dark:text-dark-400">
+                        <Info size={12} className="text-slate-400 shrink-0" />
+                        <span className="truncate italic">Détails et objectifs consultables dans la fiche</span>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="mt-3.5 flex flex-wrap items-center gap-3.5 text-xs text-slate-600 dark:text-dark-300">
-                    <span className="flex items-center gap-1.5 font-medium">
-                      <Calendar size={13} className="text-slate-400" /> {new Date(f.date).toLocaleDateString('fr-FR')}
-                    </span>
-                    <span className="flex items-center gap-1.5 font-extrabold text-primary-600 dark:text-primary-400">
-                      <Clock size={13} /> {f.heureDebut || '09:30'} - {f.heureFin || '12:30'}
-                    </span>
-                    <span className="flex items-center gap-1.5 font-medium text-slate-500">
-                      <Clock size={13} className="text-slate-400" /> {f.duree || '3h00'}
-                    </span>
-                    <span className="flex items-center gap-1.5 truncate font-medium text-slate-700 dark:text-dark-200">
-                      {(f.animateurType === 'incube' || f.animateurIncubeId) ? (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-                        🎤 Incubé IDS
+                  <div className="mt-4 pt-3.5 border-t border-slate-100 dark:border-dark-700/40 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      {/* Compteur de présents */}
+                      <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full ${
+                        nbPresents > 0
+                          ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                          : 'bg-slate-100 dark:bg-dark-800 text-slate-500 dark:text-dark-400'
+                      }`}>
+                        <Users size={12} /> {nbPresents} présent{nbPresents !== 1 ? 's' : ''}
                       </span>
-                    ) : (
-                      <GraduationCap size={13} className="text-slate-400" />
-                    )} {f.formateur}{f.intervenant ? ` / ${f.intervenant}` : ''}
-                    </span>
-                  </div>
 
-                  {f.description && (
-                    <p className="mt-2.5 text-xs text-slate-600 dark:text-dark-300 line-clamp-2 leading-relaxed bg-slate-50/80 dark:bg-dark-800/60 p-2 rounded-xl border border-slate-200/60 dark:border-dark-700/60">
-                      {f.description}
-                    </p>
-                  )}
-                </div>
+                      {/* Badge nombre d'invités */}
+                      {f.invitedCount ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                          ✉️ {f.invitedCount} invité{f.invitedCount > 1 ? 's' : ''}
+                        </span>
+                      ) : null}
+                    </div>
 
-                <div className="mt-4 pt-3.5 border-t border-slate-100 dark:border-dark-700/40 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    {/* Compteur de présents */}
-                    <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full ${
-                      nbPresents > 0
-                        ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
-                        : 'bg-slate-100 dark:bg-dark-800 text-slate-500 dark:text-dark-400'
-                    }`}>
-                      <Users size={12} /> {nbPresents} présent{nbPresents !== 1 ? 's' : ''}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {/* Bouton Voir QR Code (ouvre le modal dédié) */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setQrModalAtelier(f);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold transition-all border border-amber-500/30 shadow-xs cursor-pointer"
+                        title="Afficher et imprimer le QR Code de cet atelier"
+                      >
+                        <QrCode size={14} /> Voir QR Code
+                      </button>
 
-                    {/* Badge nombre d'invités */}
-                    {f.invitedCount ? (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                        ✉️ {f.invitedCount} invité{f.invitedCount > 1 ? 's' : ''}
+                      {/* Bouton Détails & Feuille d'émargement */}
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary-500/10 group-hover:bg-primary-500/20 text-primary-700 dark:text-primary-300 text-xs font-bold transition-all border border-primary-500/30 shadow-xs">
+                        <Eye size={14} /> Feuille d'Émargement
                       </span>
-                    ) : null}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {/* Bouton Voir QR Code (ouvre le modal dédié) */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setQrModalAtelier(f);
-                      }}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold transition-all border border-amber-500/30 shadow-sm"
-                      title="Afficher et imprimer le QR Code de cet atelier"
-                    >
-                      <QrCode size={14} /> Voir QR Code
-                    </button>
-
-                    {/* Bouton Détails & Feuille d'émargement */}
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary-500/10 group-hover:bg-primary-500/20 text-primary-700 dark:text-primary-300 text-xs font-bold transition-all border border-primary-500/30 shadow-sm">
-                      <Eye size={14} /> Feuille d'Émargement
-                    </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2126,6 +2336,52 @@ export default function Evenements() {
                     value={newFormation.description}
                     onChange={(e) => setNewFormation({ ...newFormation, description: e.target.value })}
                   />
+                </div>
+
+                {/* PHOTOS DE L'ATELIER (POUR LE CAROUSEL) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="label mb-0 flex items-center gap-1.5 font-bold text-slate-800 dark:text-dark-200">
+                      <Camera size={14} className="text-primary-600 dark:text-primary-400" />
+                      Photos de l'atelier (Carousel)
+                    </label>
+                    <span className="text-[11px] text-slate-400">Optionnel</span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="border-2 border-dashed border-slate-300 dark:border-dark-700 hover:border-primary-500 rounded-xl p-3 text-center flex flex-col items-center justify-center cursor-pointer bg-slate-50/60 dark:bg-dark-800/40 hover:bg-primary-500/5 transition-all">
+                      <UploadCloud size={22} className="text-primary-500 mb-1" />
+                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                        Sélectionner des photos pour la session
+                      </span>
+                      <span className="text-[10px] text-slate-400">JPG, PNG, WebP (visibles dans le carousel de l'atelier)</span>
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleNewFormationPhotosSelected}
+                      />
+                    </label>
+
+                    {newFormationPhotoFiles.length > 0 && (
+                      <div className="grid grid-cols-4 gap-2 pt-1">
+                        {newFormationPhotoFiles.map((item, idx) => (
+                          <div key={idx} className="relative rounded-lg overflow-hidden border border-slate-200 dark:border-dark-700 aspect-video group">
+                            <img src={item.preview} alt={`preview ${idx}`} className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => removeNewFormationPhoto(idx)}
+                              className="absolute top-1 right-1 p-0.5 rounded bg-black/60 text-white hover:bg-red-500 transition-colors cursor-pointer"
+                              title="Retirer cette photo"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* ENVOI DIRECT D'INVITATION EMAIL */}
