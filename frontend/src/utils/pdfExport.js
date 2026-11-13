@@ -1812,19 +1812,15 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
   // ==========================================
   const bottomY = doc.lastAutoTable.finalY + 8;
 
-  // 3. Description du projet (Gauche)
+  // 3. Description du projet (Gauche - uniquement la description réelle sans ajout)
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(15, 23, 42);
-  doc.text('3. DESCRIPTION DU PROJET & PROPOSITION DE VALEUR', col1X, bottomY);
+  doc.text('3. DESCRIPTION DU PROJET', col1X, bottomY);
 
   const descContent = (incube?.description_projet && String(incube.description_projet).trim())
     ? String(incube.description_projet).trim()
-    : "Aucune description détaillée renseignée pour ce projet d'incubation.";
-
-  const propValeurContent = (incube?.proposition_valeur && String(incube.proposition_valeur).trim())
-    ? String(incube.proposition_valeur).trim()
-    : "Développement d'une offre innovante et durable pour le marché cible.";
+    : "Aucune description renseignée pour ce projet.";
 
   autoTable(doc, {
     startY: bottomY + 3.5,
@@ -1832,30 +1828,17 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
     tableWidth: colW,
     theme: 'grid',
     styles: { 
-      fontSize: 7.6, 
+      fontSize: 8, 
       font: 'helvetica', 
       lineColor: [226, 232, 240], 
-      lineWidth: 0.25 
-    },
-    columnStyles: {
-      0: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105], cellWidth: 38 },
-      1: { textColor: [15, 23, 42], cellWidth: colW - 38 }
+      lineWidth: 0.25,
+      fillColor: [248, 250, 252],
+      textColor: [30, 41, 59],
+      cellPadding: { top: 3.5, bottom: 3.5, left: 3.5, right: 3.5 },
+      lineHeightFactor: 1.38
     },
     body: [
-      [{ 
-        content: descContent, 
-        colSpan: 2, 
-        styles: { 
-          fillColor: [248, 250, 252], 
-          cellPadding: { top: 3.2, bottom: 3.2, left: 3.5, right: 3.5 },
-          textColor: [30, 41, 59],
-          lineHeightFactor: 1.35
-        } 
-      }],
-      [
-        { content: 'Proposition de valeur :', styles: { cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 } } }, 
-        { content: propValeurContent, styles: { cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 }, textColor: [15, 23, 42] } }
-      ]
+      [{ content: descContent }]
     ]
   });
 
