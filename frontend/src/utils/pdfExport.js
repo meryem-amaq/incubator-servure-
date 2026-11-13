@@ -1,3 +1,4 @@
+import QRCode from 'qrcode';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { getPhotoUrl } from '../api/axios';
@@ -1560,42 +1561,10 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
     }
   }
 
-  // Helper pour dessiner un QR Code vectoriel haute résolution
-  const drawQrFromSvg = (text, x, y, size, color = [2, 132, 199]) => {
-    try {
-      const svgStr = ReactDOMServer.renderToStaticMarkup(
-        React.createElement(QRCodeSVG, { value: text || 'https://ids.ma', size: 128 })
-      );
-      const vbMatch = svgStr.match(/viewBox="0 0 (\d+) (\d+)"/);
-      const gridSize = vbMatch ? parseInt(vbMatch[1], 10) : 25;
-
-      doc.setFillColor(255, 255, 255);
-      doc.setDrawColor(203, 213, 225);
-      doc.setLineWidth(0.3);
-      doc.roundedRect(x, y, size, size, 1.5, 1.5, 'FD');
-
-      const pad = size * 0.08;
-      const drawSize = size - pad * 2;
-      const scale = drawSize / gridSize;
-
-      const matches = [...svgStr.matchAll(/M(\d+)[, ]+(\d+)\s*h(\d+)v1/g)];
-      doc.setFillColor(...color);
-
-      matches.forEach(m => {
-        const px = parseInt(m[1], 10);
-        const py = parseInt(m[2], 10);
-        const pwModule = parseInt(m[3], 10);
-        doc.rect(x + pad + px * scale, y + pad + py * scale, pwModule * scale, scale, 'F');
-      });
-    } catch (err) {
-      console.error('Erreur dessin QR code:', err);
-    }
-  };
-
   // ==========================================
-  // 1. EN-TÊTE : DEUX LOGOS STRICTEMENT ÉGAUX
+  // 1. EN-TÊTE : DEUX LOGOS PARFAITEMENT ÉQUILIBRÉS
   // ==========================================
-  const badgeW = 38, badgeH = 14, badgeY = 9, badgeR = 2;
+  const badgeW = 38, badgeH = 14, badgeY = 8, badgeR = 2;
 
   // Logo IDS (Gauche)
   doc.setFillColor(255, 255, 255);
@@ -1622,103 +1591,131 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
 
   // Titre En-Tête Centré
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
+  doc.setFontSize(11.5);
   doc.setTextColor(15, 23, 42); // slate-900
-  doc.text('INCUBATEUR DIGITAL SOLIDAIRE (IDS)', pw / 2, 15, { align: 'center' });
+  doc.text('INCUBATEUR DIGITAL SOLIDAIRE (IDS)', pw / 2, 13.5, { align: 'center' });
 
   doc.setFontSize(9);
   doc.setTextColor(2, 132, 199); // primary sky-600
-  doc.text('FICHE SIGNALÉTIQUE & INFORMATIONS GÉNÉRALES', pw / 2, 21, { align: 'center' });
+  doc.text('FICHE SIGNALÉTIQUE & INFORMATIONS GÉNÉRALES', pw / 2, 19.5, { align: 'center' });
 
-  // Ligne de séparation fine sous l'en-tête (placée à Y=26)
+  // Ligne de séparation fine sous l'en-tête (placée à Y=24.5)
   doc.setDrawColor(226, 232, 240);
   doc.setLineWidth(0.4);
-  doc.line(marginX, 26, pw - marginX, 26);
+  doc.line(marginX, 24.5, pw - marginX, 24.5);
 
   // ==========================================
-  // 2. CARTOUCHE PORTEUR AVEC PHOTO & QR CODES (Y = 29 à 57)
+  // 2. CARTOUCHE PORTEUR AVEC PHOTO & QR CODES
+  //    ESPACÉ, AÉRÉ ET RAFFINÉ (Y = 28 à 57 mm, hauteur 29 mm)
   // ==========================================
-  const cartoucheY = 29;
-  const cartoucheH = 28;
+  const cartoucheY = 28;
+  const cartoucheH = 29;
   const cartoucheW = pw - marginX * 2; // 269 mm
 
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
   doc.setLineWidth(0.4);
-  doc.roundedRect(marginX, cartoucheY, cartoucheW, cartoucheH, 2.5, 2.5, 'FD');
+  doc.roundedRect(marginX, cartoucheY, cartoucheW, cartoucheH, 3, 3, 'FD');
 
   // Photo
-  const photoSize = 22;
+  const photoSize = 23;
   const photoX = marginX + 3.5;
   const photoY = cartoucheY + 3;
 
   doc.setFillColor(241, 245, 249);
   doc.setDrawColor(203, 213, 225);
-  doc.roundedRect(photoX, photoY, photoSize, photoSize, 1.5, 1.5, 'FD');
+  doc.setLineWidth(0.5);
+  doc.roundedRect(photoX, photoY, photoSize, photoSize, 2, 2, 'FD');
 
   if (photoDataUrl) {
     try {
       doc.addImage(photoDataUrl, 'PNG', photoX, photoY, photoSize, photoSize);
       doc.setDrawColor(2, 132, 199);
       doc.setLineWidth(0.5);
-      doc.roundedRect(photoX, photoY, photoSize, photoSize, 1.5, 1.5, 'S');
+      doc.roundedRect(photoX, photoY, photoSize, photoSize, 2, 2, 'S');
     } catch (e) {
       photoDataUrl = null;
     }
   }
   if (!photoDataUrl) {
-    const initials = incubeName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'IN';
+    const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'IN';
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
+    doc.setFontSize(12);
     doc.setTextColor(148, 163, 184);
-    doc.text(initials, photoX + photoSize / 2, photoY + 13, { align: 'center' });
+    doc.text(initials, photoX + photoSize / 2, photoY + 14, { align: 'center' });
   }
 
   // Identité au centre du cartouche (NOM EN MAJUSCULE, Prénom Capitalisé)
-  const textLeftX = photoX + photoSize + 6;
+  const textLeftX = photoX + photoSize + 7;
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
+  doc.setFontSize(13.5);
   doc.setTextColor(15, 23, 42);
-  doc.text(displayName, textLeftX, cartoucheY + 10);
+  doc.text(displayName, textLeftX, cartoucheY + 11);
 
   // Raison sociale
-  doc.setFontSize(10);
+  doc.setFontSize(10.5);
   doc.setTextColor(2, 132, 199);
-  doc.text(incube?.raison_sociale || 'Projet d\'incubation', textLeftX, cartoucheY + 17.5);
+  doc.text(incube?.raison_sociale || 'Projet d\'incubation', textLeftX, cartoucheY + 18.5);
 
   // QR Codes sur la droite du cartouche
-  const qrBoxSize = 20;
-  const qr1X = pw - marginX - qrBoxSize * 2 - 14;
-  const qr2X = pw - marginX - qrBoxSize - 5;
+  const qrBoxSize = 18;
+  const qr1X = pw - marginX - qrBoxSize * 2 - 16;
+  const qr2X = pw - marginX - qrBoxSize - 6;
   const qrY = cartoucheY + 2.5;
-
-  // QR 1 : LinkedIn (vectoriel haute résolution)
-  drawQrFromSvg(incube?.linkedin || 'https://www.linkedin.com', qr1X, qrY, qrBoxSize, [10, 102, 194]);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(6.8);
-  doc.setTextColor(10, 102, 194);
-  doc.text('QR LinkedIn', qr1X + qrBoxSize / 2, qrY + qrBoxSize + 3.8, { align: 'center' });
-
-  // QR 2 : Site Web (vectoriel haute résolution)
-  drawQrFromSvg(incube?.site_web || 'https://ids.ma', qr2X, qrY, qrBoxSize, [2, 132, 199]);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(6.8);
-  doc.setTextColor(2, 132, 199);
-  doc.text('QR Site Web', qr2X + qrBoxSize / 2, qrY + qrBoxSize + 3.8, { align: 'center' });
 
   // Séparateur vertical fin avant les QR codes
   doc.setDrawColor(226, 232, 240);
   doc.setLineWidth(0.4);
-  doc.line(qr1X - 6, cartoucheY + 3, qr1X - 6, cartoucheY + cartoucheH - 3);
+  doc.line(qr1X - 7, cartoucheY + 3, qr1X - 7, cartoucheY + cartoucheH - 3);
+
+  // Helper pour dessiner des QR codes vectoriels natifs fiables
+  const drawQrBox = async (text, x, y, size, label, labelColor = [10, 102, 194]) => {
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.35);
+    doc.roundedRect(x, y, size, size, 1.5, 1.5, 'FD');
+
+    try {
+      const qrDataUrl = await QRCode.toDataURL(text || 'https://ids.org.ma', {
+        margin: 1,
+        width: 256,
+        color: {
+          dark: '#081B38',
+          light: '#FFFFFF'
+        }
+      });
+      doc.addImage(qrDataUrl, 'PNG', x + 0.8, y + 0.8, size - 1.6, size - 1.6);
+    } catch (e) {
+      console.warn('Erreur génération QR code:', e);
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.8);
+    doc.setTextColor(...labelColor);
+    doc.text(label, x + size / 2, y + size + 4, { align: 'center' });
+  };
+
+  // QR 1 : LinkedIn
+  const linkedinUrl = incube?.linkedin && String(incube.linkedin).trim() !== ''
+    ? incube.linkedin
+    : (incube?.nom_incube ? `https://www.linkedin.com/search/results/all/?keywords=${encodeURIComponent(incube.nom_incube)}` : 'https://www.linkedin.com');
+  await drawQrBox(linkedinUrl, qr1X, qrY, qrBoxSize, 'QR LinkedIn', [10, 102, 194]);
+
+  // QR 2 : Site Web
+  const siteWebUrl = incube?.site_web && String(incube.site_web).trim() !== ''
+    ? incube.site_web
+    : 'https://ids.org.ma';
+  await drawQrBox(siteWebUrl, qr2X, qrY, qrBoxSize, 'QR Site Web', [2, 132, 199]);
 
   // ==========================================
-  // 3. DEUX COLONNES DE TABLEAUX ÉPURÉS (Y = 60 à 145)
+  // 3. DEUX COLONNES DE TABLEAUX ÉPURÉS
+  //    ESPACE AÉRÉ & LISIBLE (secStartY = 66 mm au lieu de 60 mm !)
   // ==========================================
   const colGap = 8;
   const colW = (pw - marginX * 2 - colGap) / 2; // 130.5 mm
   const col1X = marginX;
   const col2X = marginX + colW + colGap;
-  const secStartY = 60;
+  const secStartY = 66; // 9 mm de marge aérée après le cartouche !
 
   // --- COLONNE GAUCHE : RENSEIGNEMENTS PERSONNELS ---
   doc.setFont('helvetica', 'bold');
@@ -1787,8 +1784,9 @@ export const generateFicheSignaletiqueDocument = async (incube) => {
 
   // ==========================================
   // 4. PARTIE BASSE : DESCRIPTION & ASSOCIÉS
+  //    ESPACE AÉRÉ & RESPIRANT (bottomY = finalY + 7 mm au lieu de 5 mm)
   // ==========================================
-  const bottomY = doc.lastAutoTable.finalY + 5;
+  const bottomY = doc.lastAutoTable.finalY + 7;
 
   // Description du projet (Gauche)
   doc.setFont('helvetica', 'bold');
