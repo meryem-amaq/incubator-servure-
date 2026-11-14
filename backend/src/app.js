@@ -527,27 +527,53 @@ sequelize.authenticate()
     try {
       const bcrypt = require('bcryptjs');
       const { User } = require('./models');
-      const count = await User.count({
-        where: { role: ['super_admin', 'administrateur'] }
-      });
-      if (count === 0) {
-        const hash = await bcrypt.hash('Admin@2024', 12);
-        await User.create({
+      const { Op } = sequelize.Sequelize;
+
+      // 1. Garantir que le compte principal IDS possède toujours le rôle super_admin
+      const idsHash = await bcrypt.hash('Admin@2024', 12);
+      const [idsAdmin, createdIds] = await User.findOrCreate({
+        where: { email: 'incubateur.digital.solidaire@gmail.com' },
+        defaults: {
           nom: 'Incubateur Digital Solidaire',
           prenom: 'Administration',
           email: 'incubateur.digital.solidaire@gmail.com',
-          mot_de_passe: hash,
+          mot_de_passe: idsHash,
           role: 'super_admin',
           type: 'Administration',
+          badge_id: '145',
+          actif: true,
+        }
+      });
+      if (!createdIds && (idsAdmin.role !== 'super_admin' || idsAdmin.type !== 'Administration')) {
+        idsAdmin.role = 'super_admin';
+        idsAdmin.type = 'Administration';
+        await idsAdmin.save();
+      }
+
+      // 2. Garantir que Hicham BELAAZIZ possède toujours le compte et le rôle super_admin
+      const hichamHash = await bcrypt.hash('IdsAdmin2024!', 12);
+      const hicham = await User.findOne({
+        where: { email: { [Op.in]: ['hicham.belaaziz@ctpes.ma', 'hicham@ctpes.ma'] } }
+      });
+      if (hicham) {
+        if (hicham.role !== 'super_admin' || hicham.type !== 'Administration') {
+          hicham.role = 'super_admin';
+          hicham.type = 'Administration';
+          hicham.badge_id = '227';
+          hicham.actif = true;
+          await hicham.save();
+        }
+      } else {
+        await User.create({
+          nom: 'BELAAZIZ',
+          prenom: 'Hicham',
+          email: 'hicham.belaaziz@ctpes.ma',
+          mot_de_passe: hichamHash,
+          role: 'super_admin',
+          type: 'Administration',
+          badge_id: '227',
           actif: true,
         });
-        console.log('👤 Super Admin par défaut créé : incubateur.digital.solidaire@gmail.com');
-      } else {
-        // Garantir que le compte principal IDS possède toujours le rôle super_admin
-        await User.update(
-          { role: 'super_admin', type: 'Administration' },
-          { where: { email: 'incubateur.digital.solidaire@gmail.com' } }
-        );
       }
     } catch (adminErr) {
       console.error('Initialisation admin:', adminErr.message);

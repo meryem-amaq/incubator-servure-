@@ -28,6 +28,11 @@ exports.login = async (req, res) => {
       emailAliases.push('ilham.lahboub@ctpes.ma');
     }
 
+    // Alias tolérant pour Hicham BELAAZIZ : compatible hicham@ctpes.ma ou hicham.belaaziz@ctpes.ma
+    if (lowerEmail === 'hicham@ctpes.ma' || lowerEmail === 'hichame@ctpes.ma' || lowerEmail === 'hicham.belaaziz@ctpes.ma') {
+      emailAliases.push('hicham.belaaziz@ctpes.ma', 'hicham@ctpes.ma');
+    }
+
     const user = await User.findOne({ where: { email: { [Op.in]: emailAliases }, actif: true } });
     if (!user) return res.status(401).json({ message: 'Email ou mot de passe incorrect' });
 

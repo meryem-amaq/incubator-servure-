@@ -941,6 +941,7 @@ const ADMIN_KNOWN_MATRICULES = {
   'ayoub.elbouchikhi@ctpes.ma': { matricule: 143, cardno: '7587580', nom: 'Ayoub EL BOUCHIKHI' },
   'ilham.lahboub@ctpes.ma': { matricule: 194, cardno: '7561307', nom: 'Ilham LAHBOUB' },
   'hicham.belaaziz@ctpes.ma': { matricule: 227, cardno: '6883058', nom: 'Hicham BELAAZIZ' },
+  'hicham@ctpes.ma': { matricule: 227, cardno: '6883058', nom: 'Hicham BELAAZIZ' },
   'kawtar@ctpes.ma': { matricule: 144, cardno: '7568112', nom: 'Kawtar SBAI' },
   'charaf@ctpes.ma': { matricule: 205, cardno: '7586646', nom: 'Charaf EL AMRANI' },
   'aminemezzyane@gmail.com': { matricule: 142, cardno: '6895052', nom: 'Amine MEZZYANE' },
