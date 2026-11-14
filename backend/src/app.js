@@ -575,6 +575,16 @@ sequelize.authenticate()
           actif: true,
         });
       }
+
+      // 3. Cloisonnement strict des types : aucun mélange entre Staff et Incubés
+      await User.update(
+        { type: 'Administration' },
+        { where: { role: ['super_admin', 'admin', 'accompagnateur', 'administrateur'] } }
+      );
+      await User.update(
+        { type: 'Incube' },
+        { where: { role: ['incube', 'user'] } }
+      );
     } catch (adminErr) {
       console.error('Initialisation admin:', adminErr.message);
     }
