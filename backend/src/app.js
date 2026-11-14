@@ -542,6 +542,12 @@ sequelize.authenticate()
           actif: true,
         });
         console.log('👤 Super Admin par défaut créé : incubateur.digital.solidaire@gmail.com');
+      } else {
+        // Garantir que le compte principal IDS possède toujours le rôle super_admin
+        await User.update(
+          { role: 'super_admin', type: 'Administration' },
+          { where: { email: 'incubateur.digital.solidaire@gmail.com' } }
+        );
       }
     } catch (adminErr) {
       console.error('Initialisation admin:', adminErr.message);
