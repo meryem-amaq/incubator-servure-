@@ -515,6 +515,7 @@ sequelize.authenticate()
       await checkAndAddColumn('ateliers', 'statut_ouverture', "VARCHAR(50) DEFAULT 'auto'");
       await checkAndAddColumn('ateliers', 'drive_link', 'VARCHAR(500) NULL');
       await checkAndAddColumn('ateliers', 'date_fin', 'DATE NULL');
+      await checkAndAddColumn('ateliers', 'photos', 'JSON NULL');
       await checkAndAddColumn('users', 'type', "VARCHAR(50) DEFAULT 'Incube'");
       await checkAndAddColumn('users', 'badge_id', 'VARCHAR(50) NULL');
       await checkAndAddColumn('rh_detail', 'badge_id', 'VARCHAR(50) NULL');

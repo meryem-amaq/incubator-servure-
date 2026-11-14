@@ -649,8 +649,8 @@ async function collectFromAllDevices() {
 
     return { success: true, totalNouveauxScans: toInsert.length };
   } catch (error) {
-    console.error("❌ Erreur collectFromAllDevices:", error.message);
-    return { success: false, error: error.message };
+    console.error("❌ Erreur collectFromAllDevices:", error?.stack || error?.message || error);
+    return { success: false, error: error?.message || String(error) };
   } finally {
     isCollecting = false;
   }
