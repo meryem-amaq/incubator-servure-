@@ -277,12 +277,51 @@ async function collectFromAllDevices() {
   try {
     // 1. Pré-charger tous les utilisateurs, incubés, RH et usagers tourniquet avec leur badge_id / matricule
     const { RhDetail } = require('../models');
-    const [users, incubes, rhDetails, tourniquetUsers] = await Promise.all([
-      User.findAll({ attributes: ['id', 'badge_id', 'nom', 'prenom', 'type', 'role'] }),
-      Incube.findAll({ attributes: ['id', 'user_id', 'badge_id', 'matricule', 'nom_incube', 'associes'] }),
-      RhDetail ? RhDetail.findAll({ attributes: ['id', 'incube_id', 'badge_id', 'matricule', 'nom_complet'] }) : Promise.resolve([]),
-      TourniquetUser.findAll({ attributes: ['badge_id', 'cardno', 'name'], raw: true })
-    ]);
+
+    // Récupération résiliente de chaque entité avec auto-migration si la colonne badge_id manque
+    let users = [];
+    try {
+      users = await User.findAll({ attributes: ['id', 'badge_id', 'nom', 'prenom', 'type', 'role'] });
+    } catch (_) {
+      try {
+        await sequelize.query('ALTER TABLE users ADD COLUMN badge_id VARCHAR(50) NULL');
+        users = await User.findAll({ attributes: ['id', 'badge_id', 'nom', 'prenom', 'type', 'role'] });
+      } catch (__) {
+        users = await User.findAll({ attributes: ['id', 'nom', 'prenom', 'type', 'role'] });
+      }
+    }
+
+    let incubes = [];
+    try {
+      incubes = await Incube.findAll({ attributes: ['id', 'user_id', 'badge_id', 'matricule', 'nom_incube', 'associes'] });
+    } catch (_) {
+      try {
+        await sequelize.query('ALTER TABLE incubes ADD COLUMN badge_id VARCHAR(50) NULL AFTER matricule');
+        console.log('✅ Auto-migration : colonne badge_id ajoutée à la table incubes');
+        incubes = await Incube.findAll({ attributes: ['id', 'user_id', 'badge_id', 'matricule', 'nom_incube', 'associes'] });
+      } catch (__) {
+        incubes = await Incube.findAll({ attributes: ['id', 'user_id', 'matricule', 'nom_incube', 'associes'] });
+      }
+    }
+
+    let rhDetails = [];
+    if (RhDetail) {
+      try {
+        rhDetails = await RhDetail.findAll({ attributes: ['id', 'incube_id', 'badge_id', 'matricule', 'nom_complet'] });
+      } catch (_) {
+        try {
+          await sequelize.query('ALTER TABLE rh_detail ADD COLUMN badge_id VARCHAR(50) NULL');
+          rhDetails = await RhDetail.findAll({ attributes: ['id', 'incube_id', 'badge_id', 'matricule', 'nom_complet'] });
+        } catch (__) {
+          rhDetails = await RhDetail.findAll({ attributes: ['id', 'incube_id', 'matricule', 'nom_complet'] });
+        }
+      }
+    }
+
+    let tourniquetUsers = [];
+    try {
+      tourniquetUsers = await TourniquetUser.findAll({ attributes: ['badge_id', 'cardno', 'name'], raw: true });
+    } catch (_) {}
 
     // Dictionnaire badge_id / matricule -> user_id & normalisation cardno -> matricule
     const badgeToUserMap = new Map();

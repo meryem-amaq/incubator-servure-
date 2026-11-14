@@ -499,6 +499,7 @@ sequelize.authenticate()
 
       await checkAndAddColumn('incubes', 'est_suspendu', 'TINYINT(1) DEFAULT 0');
       await checkAndAddColumn('incubes', 'matricule', 'INT NULL');
+      await checkAndAddColumn('incubes', 'badge_id', 'VARCHAR(50) NULL');
       await checkAndAddColumn('incubes', 'cin', 'VARCHAR(50) NULL');
       await checkAndAddColumn('incubes', 'linkedin', 'VARCHAR(255) NULL');
       await checkAndAddColumn('incubes', 'site_web', 'VARCHAR(255) NULL');
